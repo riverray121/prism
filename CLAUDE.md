@@ -8,7 +8,7 @@ All design and process documentation lives in `docs/`. At the start of each sess
 
 1. `docs/dev-log.md` — current state: what's done, what's next, any notes
 2. `docs/build-order.md` — the active milestone and what it contains
-3. Whichever design docs are relevant to the active task (`docs/music-analysis-design-doc.md`, `docs/feature-catalog.md`, `docs/profile-schema.md`, `docs/development.md`)
+3. Whichever design docs are relevant to the active task (`docs/design-doc.md`, `docs/feature-catalog.md`, `docs/profile-schema.md`, `docs/development.md`)
 
 This grounds you in where the project actually is before proposing or doing anything.
 
@@ -34,7 +34,7 @@ The dev log is for *development context* that doesn't belong in the design docs.
 ## Source of truth
 
 Design and process are documented in `docs/`:
-- `docs/music-analysis-design-doc.md` — overall design
+- `docs/design-doc.md` — overall design
 - `docs/feature-catalog.md` — every analyzed feature
 - `docs/profile-schema.md` — JSON profile spec
 - `docs/build-order.md` — milestones

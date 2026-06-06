@@ -2,7 +2,7 @@
 
 JSON serialization of a single song's analysis. Consumed by the dashboard and by Stage 2 (the mapping tool). Versioned; major-version bumps are breaking.
 
-The design doc (`music-analysis-design-doc.md`) and feature catalog (`feature-catalog.md`) are companions to this file.
+The design doc (`design-doc.md`) and feature catalog (`feature-catalog.md`) are companions to this file.
 
 ---
 

@@ -1,4 +1,4 @@
-# Music Analysis System — Design Doc
+# Prism — Design Doc
 
 ## Overview
 

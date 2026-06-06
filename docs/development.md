@@ -1,6 +1,6 @@
 # Development Practices
 
-How we build and maintain this project. Companion to `music-analysis-design-doc.md`.
+How we build and maintain this project. Companion to `design-doc.md`.
 
 ## Testing
 
@@ -89,7 +89,7 @@ Validates at the boundary, so a schema mismatch surfaces immediately instead of 
 
 ## Logging
 
-- **Python:** stdlib `logging`. Write to a file under the app's data dir (`~/Library/Application Support/{appname}/logs/` on macOS). INFO by default; DEBUG when debugging.
+- **Python:** stdlib `logging`. Write to a file under the app's data dir (`~/Library/Application Support/Prism/logs/` on macOS). INFO by default; DEBUG when debugging.
 - **Rust shell:** `tracing` (de-facto standard).
 - **Frontend:** `console.*` is fine.
 
@@ -138,7 +138,7 @@ Don't build a generic `FeatureGraph` abstraction until three concrete graph type
 
 ## Documentation
 
-- Design decisions live in the design docs (`music-analysis-design-doc.md` + companions). Update when decisions change.
+- Design decisions live in the design docs (`design-doc.md` + companions). Update when decisions change.
 - Don't write docstrings explaining *what* code does — well-named functions handle that. Comment only for non-obvious *why*.
 - `README.md` at repo root: one paragraph + pointers to the design doc.
 - Development log: `dev-log.md` — protocol in `CLAUDE.md`.

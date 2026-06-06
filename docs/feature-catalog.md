@@ -1,6 +1,6 @@
 # Feature Catalog
 
-Canonical enumeration of every feature extracted by the analysis pipeline. The design doc (`music-analysis-design-doc.md`) references this file. For architecture and rationale, start there.
+Canonical enumeration of every feature extracted by the analysis pipeline. The design doc (`design-doc.md`) references this file. For architecture and rationale, start there.
 
 ## Conventions
 

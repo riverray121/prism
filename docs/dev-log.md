@@ -2,7 +2,7 @@
 
 ## Completed
 
-- Design phase: full design docs written — `music-analysis-design-doc.md`, `feature-catalog.md`, `profile-schema.md`, `build-order.md`, `development.md`.
+- Design phase: full design docs written — `design-doc.md`, `feature-catalog.md`, `profile-schema.md`, `build-order.md`, `development.md`.
 
 ## Todo
 

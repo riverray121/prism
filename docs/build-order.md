@@ -1,6 +1,6 @@
 # Build Order
 
-How to actually build the app. Companion to `music-analysis-design-doc.md`, `feature-catalog.md`, and `profile-schema.md`.
+How to actually build the app. Companion to `design-doc.md`, `feature-catalog.md`, and `profile-schema.md`.
 
 ## Philosophy
 
@@ -35,7 +35,7 @@ Build in this order — each step is a vertical slice:
 
 **Explicitly not in M1:** favorites, metadata editing, stems, Demucs, sidecar files, event/segment/heatmap render modes, cancellation, restart logic, error UI beyond "row marked failed."
 
-Deliverable: a working music visualizer with two features. Validates the full stack.
+Deliverable: a working build of Prism with two features. Validates the full stack.
 
 ---
 
