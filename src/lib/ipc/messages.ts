@@ -72,6 +72,7 @@ export const ProfileEventSchema = z.object({
   type: z.literal("profile"),
   song_id: z.string(),
   profile: ProfileSchema,
+  audio_path: z.string(),
 });
 
 // All events the sidecar can send on stdout.
