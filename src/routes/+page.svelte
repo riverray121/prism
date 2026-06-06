@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
+  import InspectionView from "$lib/components/InspectionView.svelte";
   import LibraryPanel from "$lib/components/LibraryPanel.svelte";
   import { listLibrary, onSidecarEvent } from "$lib/ipc";
   import { library } from "$lib/state/library.svelte";
+  import { inspection } from "$lib/state/inspection.svelte";
 
   // Subscribe to sidecar events and request the current library on mount.
   onMount(() => {
@@ -12,6 +14,11 @@
         library.songs = event.songs;
       } else if (event.type === "library.import_failed") {
         console.error("import failed", event.path, event.error);
+      } else if (event.type === "profile") {
+        // Ignore stale responses if the user has since navigated away/elsewhere.
+        if (event.song_id === inspection.songId) {
+          inspection.profile = event.profile;
+        }
       }
     });
     listLibrary();
@@ -27,5 +34,9 @@
     </p>
   </header>
 
-  <LibraryPanel />
+  {#if inspection.songId === null}
+    <LibraryPanel />
+  {:else}
+    <InspectionView />
+  {/if}
 </main>

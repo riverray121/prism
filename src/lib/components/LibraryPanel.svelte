@@ -3,6 +3,7 @@
 
   import { importFiles, queueAnalysis } from "$lib/ipc";
   import { library } from "$lib/state/library.svelte";
+  import { open as openInspection } from "$lib/state/inspection.svelte";
 
   // Open a native file picker and import the selected audio files.
   async function pickAndImport() {
@@ -71,7 +72,14 @@
         <tbody>
           {#each library.songs as song (song.id)}
             <tr
-              class="border-b border-neutral-200 last:border-0 dark:border-neutral-800/50"
+              onclick={() =>
+                song.status === "analyzed"
+                  ? openInspection(song.id)
+                  : undefined}
+              class="border-b border-neutral-200 last:border-0 dark:border-neutral-800/50 {song.status ===
+              'analyzed'
+                ? 'cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800/50'
+                : ''}"
             >
               <td class="px-3 py-2">{song.title}</td>
               <td class="px-3 py-2 text-neutral-600 dark:text-neutral-400"
