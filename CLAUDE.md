@@ -24,6 +24,15 @@ Keep it simple and concise. One line per entry where possible. Move entries from
 
 The dev log is for *development context* that doesn't belong in the design docs. Design changes go into the design docs themselves.
 
+## Code comments
+
+Comment frequently but not excessively. Comments must be concise, precise, accurate, and complete.
+
+- Precede each modular block of code with a comment describing what that block does.
+- State facts: the purpose of the code. Nothing more.
+- Never reference conversations, history, or decisions external to the code.
+- Only when something about a decision is non-obvious from the code itself, note it.
+
 ## Git
 
 - Commit frequently — small, focused commits over large ones.

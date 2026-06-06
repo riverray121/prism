@@ -45,7 +45,7 @@ Output Formatter
 ## Tech Stack
 
 - **Shell:** Tauri (Rust + system WebView). Lightweight desktop wrapper; cross-platform so the portability goal holds.
-- **UI:** Web stack inside the WebView (TypeScript). **uPlot** for stacked time-series and event/segment overlays — small (~40KB), fast at high point counts, simple array-based API. Spectrogram heatmap may use a custom Canvas2D pass rather than a uPlot plugin; decided when implemented.
+- **UI:** **Svelte 5 + SvelteKit** (TypeScript), configured as a static SPA via `adapter-static` (SSR off — Tauri has no Node server). Chosen over React/vanilla because the reactive surface (live library status, controls) is real but bounded, while the heavy visualization is imperative regardless of framework; Svelte's stores model IPC-derived state cleanly and bridge to imperative uPlot with less ceremony than React's render cycle. **Tailwind CSS v4** (via `@tailwindcss/vite`, no config file) for styling. **uPlot** for stacked time-series and event/segment overlays — small (~40KB), fast at high point counts, simple array-based API; it owns its canvas, so the framework only provides the surrounding DOM. Spectrogram heatmap may use a custom Canvas2D pass rather than a uPlot plugin; decided when implemented.
 - **Analysis backend:** Python sidecar process launched and managed by Tauri. Hosts librosa / Essentia / Demucs / PANNs.
 - **IPC (frontend ↔ sidecar):** stdin/stdout JSON-lines. Tauri spawns the Python sidecar and pipes messages in both directions; the Tauri Rust shell relays between WebView and pipes. No HTTP server, no port.
 - **Audio playback:** Web Audio API in the frontend. Playhead is driven from playback time, not from the sidecar.

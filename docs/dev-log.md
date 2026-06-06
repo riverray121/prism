@@ -3,11 +3,13 @@
 ## Completed
 
 - Design phase: full design docs written — `design-doc.md`, `feature-catalog.md`, `profile-schema.md`, `build-order.md`, `development.md`.
+- GitHub repo created: `riverray121/prism` (public), `origin` tracking `main`.
+- **M0** — Tauri scaffold: Svelte 5 + SvelteKit (static SPA) + Tailwind v4 frontend, Rust shell. Frontend builds, Rust shell compiles. Demo page replaced with minimal placeholder.
 
 ## Todo
 
 - **M0 — Scaffolding**
-  - Tauri project scaffold (TypeScript frontend, Rust shell)
+  - ~~Tauri project scaffold (TypeScript frontend, Rust shell)~~ ✓
   - Python sidecar spawned via Tauri's built-in sidecar mechanism
   - stdin/stdout JSON-line ping/pong round-trip
   - Python deps managed with `uv`
