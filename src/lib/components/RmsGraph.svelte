@@ -25,10 +25,15 @@
   } = $props();
 
   const HEIGHT = 400;
-  const ZOOM_FACTOR = 0.75; // <1: scroll up zooms in, scroll down zooms out
+  const ZOOM_FACTOR = 0.75; // range multiplier per zoom-in step (deltaY < 0)
 
   let container: HTMLDivElement;
   let chart: uPlot | undefined;
+
+  // While playing+zoomed, how the view tracks the playhead:
+  //   center — keep the playhead centered, scrolling the waveform under it
+  //   page   — let the playhead sweep across, jumping the window when it exits
+  let followMode = $state<"center" | "page">("center");
 
   // Full time extent of the data, in seconds.
   function maxX(): number {
@@ -68,8 +73,17 @@
     if (range >= full - 1e-6) return false; // not zoomed
     const visible = playheadSec >= min && playheadSec <= max;
     if (!follow && visible) return false; // paused and in view: leave the window alone
-    let nmin = playheadSec - range / 2;
-    let nmax = nmin + range;
+
+    let nmin: number;
+    let nmax: number;
+    if (followMode === "page") {
+      if (visible) return false; // sweep until the playhead exits, then page
+      nmin = playheadSec; // bring it to the left edge
+      nmax = nmin + range;
+    } else {
+      nmin = playheadSec - range / 2; // keep it centered
+      nmax = nmin + range;
+    }
     if (nmin < 0) {
       nmin = 0;
       nmax = range;
@@ -160,7 +174,42 @@
         if (min == null || max == null) return;
         const full = maxX();
         const range = max - min;
-        const nrange = e.deltaY < 0 ? range * ZOOM_FACTOR : range / ZOOM_FACTOR;
+
+        // Gesture routing across devices:
+        //  - trackpad pinch / ctrl+wheel -> zoom (the browser sets ctrlKey for pinch)
+        //  - mouse wheel -> zoom (coarse vertical steps, line mode or large integer
+        //    deltaY with no horizontal component)
+        //  - trackpad two-finger scroll -> pan horizontally
+        const mouseWheel =
+          e.deltaMode !== 0 ||
+          (e.deltaX === 0 &&
+            Number.isInteger(e.deltaY) &&
+            Math.abs(e.deltaY) >= 50);
+
+        if (!e.ctrlKey && !mouseWheel) {
+          if (range >= full - 1e-6) return; // not zoomed: nothing to pan
+          const dv = (e.deltaX * range) / (over.clientWidth || 1);
+          let nmin = min + dv;
+          let nmax = max + dv;
+          if (nmin < 0) {
+            nmin = 0;
+            nmax = range;
+          }
+          if (nmax > full) {
+            nmax = full;
+            nmin = full - range;
+          }
+          u.setScale("x", { min: nmin, max: nmax });
+          return;
+        }
+
+        // Zoom, centered on the cursor. Pinch deltas are small and frequent, so
+        // scale the step by magnitude; a mouse-wheel notch is one full step.
+        const intensity = e.ctrlKey
+          ? Math.min(Math.abs(e.deltaY) * 0.035, 2)
+          : 1;
+        const step = Math.pow(ZOOM_FACTOR, intensity);
+        const nrange = e.deltaY < 0 ? range * step : range / step;
         const center = timeAtEvent(u, e);
         const leftPct = range > 0 ? (center - min) / range : 0.5;
         let nmin = center - leftPct * nrange;
@@ -205,11 +254,20 @@
 </script>
 
 <div class="flex flex-col gap-2">
-  <button
-    onclick={resetZoom}
-    class="self-end text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
-  >
-    Reset zoom
-  </button>
+  <div class="flex items-center justify-end gap-4 text-xs text-neutral-500">
+    <button
+      onclick={() => (followMode = followMode === "center" ? "page" : "center")}
+      title="How the view tracks the playhead when zoomed and playing"
+      class="hover:text-neutral-700 dark:hover:text-neutral-300"
+    >
+      Follow: {followMode === "center" ? "Center" : "Page"}
+    </button>
+    <button
+      onclick={resetZoom}
+      class="hover:text-neutral-700 dark:hover:text-neutral-300"
+    >
+      Reset zoom
+    </button>
+  </div>
   <div bind:this={container} class="w-full"></div>
 </div>
