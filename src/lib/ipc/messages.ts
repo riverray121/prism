@@ -48,10 +48,22 @@ export const ContinuousFeatureSchema = z.object({
 });
 export type ContinuousFeature = z.infer<typeof ContinuousFeatureSchema>;
 
-// One mix feature. Grows with new render modes (event, segment, heatmap).
+// Event: a list of timestamped points. ML event features (e.g. chords) carry
+// extra attrs per event, so unknown keys pass through.
+export const EventSchema = z.object({ t: z.number() }).passthrough();
+export const EventFeatureSchema = z.object({
+  render: z.literal("event"),
+  category: z.string(),
+  source: z.string(),
+  events: z.array(EventSchema),
+});
+export type EventFeature = z.infer<typeof EventFeatureSchema>;
+
+// One mix feature. Grows with new render modes (segment, heatmap).
 export const MixFeatureSchema = z.discriminatedUnion("render", [
   ScalarFeatureSchema,
   ContinuousFeatureSchema,
+  EventFeatureSchema,
 ]);
 export type MixFeature = z.infer<typeof MixFeatureSchema>;
 

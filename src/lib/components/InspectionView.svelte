@@ -3,7 +3,12 @@
   import { onDestroy } from "svelte";
 
   import ContinuousGraph from "$lib/components/ContinuousGraph.svelte";
-  import type { ContinuousFeature, ScalarFeature } from "$lib/ipc/messages";
+  import EventGraph from "$lib/components/EventGraph.svelte";
+  import type {
+    ContinuousFeature,
+    EventFeature,
+    ScalarFeature,
+  } from "$lib/ipc/messages";
   import { close, inspection } from "$lib/state/inspection.svelte";
 
   // Playback uses the Web Audio API: the file is decoded into an AudioBuffer and
@@ -166,6 +171,19 @@
       (e): e is [string, ContinuousFeature] => e[1].render === "continuous",
     ),
   );
+  const events = $derived(
+    features.filter(
+      (e): e is [string, EventFeature] => e[1].render === "event",
+    ),
+  );
+
+  // Full time extent shared by every graph's x axis, from the timeline.
+  const durationSec = $derived(
+    inspection.profile
+      ? (inspection.profile.timeline.frame_count - 1) /
+          inspection.profile.timeline.frame_rate_hz
+      : 0,
+  );
 
   // Line colors cycled across the stacked continuous graphs for distinction.
   const PALETTE = [
@@ -249,6 +267,29 @@
         </div>
       {/each}
     </div>
+
+    <!-- Event features: vertical tick lanes on the shared time axis. -->
+    {#each events as [name, feature] (name)}
+      <div
+        class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+      >
+        <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+          {humanize(name)}
+          <span class="text-neutral-400 dark:text-neutral-600"
+            >· {feature.events.length} events</span
+          >
+        </p>
+        <EventGraph
+          events={feature.events}
+          maxTimeSec={durationSec}
+          playheadSec={currentTime}
+          follow={playing}
+          onSeek={scrub}
+          onScrubStart={scrubStart}
+          onScrubEnd={scrubEnd}
+        />
+      </div>
+    {/each}
 
     <!-- Continuous features: stacked line graphs sharing the playhead/scrub. -->
     <div class="flex flex-col gap-4">

@@ -4,19 +4,27 @@ import librosa
 import numpy as np
 
 
-def compute_bpm(y: np.ndarray, sr: int) -> float:
-    """Estimate global tempo in BPM from a mono signal."""
-    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-    # beat_track returns tempo as an array; take the scalar.
-    return float(np.atleast_1d(tempo)[0])
+def rhythm_features(y: np.ndarray, sr: int) -> dict[str, dict]:
+    """Global tempo and beat positions from one beat-tracking pass.
 
-
-def bpm(y: np.ndarray, sr: int) -> dict:
-    """Global tempo as a scalar feature envelope."""
+    Returns the bpm scalar and the beats event feature together so both come
+    from the same analysis (consistent tempo and beat grid).
+    """
+    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+    bpm = float(np.atleast_1d(tempo)[0])
+    beat_times = librosa.frames_to_time(beat_frames, sr=sr)
     return {
-        "render": "scalar",
-        "category": "rhythm",
-        "source": "librosa.beat",
-        "unit": "bpm",
-        "value": compute_bpm(y, sr),
+        "bpm": {
+            "render": "scalar",
+            "category": "rhythm",
+            "source": "librosa.beat",
+            "unit": "bpm",
+            "value": bpm,
+        },
+        "beats": {
+            "render": "event",
+            "category": "rhythm",
+            "source": "librosa.beat",
+            "events": [{"t": float(t)} for t in beat_times],
+        },
     }

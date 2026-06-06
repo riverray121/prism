@@ -40,7 +40,7 @@ def _analyze(y: np.ndarray, sr: int) -> tuple[float, int, dict[str, dict]]:
 
     key_env, key_conf = tonal.key(y, sr)
     mix: dict[str, dict] = {
-        "bpm": rhythm.bpm(y, sr),
+        **rhythm.rhythm_features(y, sr),  # bpm (scalar) + beats (event)
         "rms": amplitude.rms(y, sr, hop),
         "peak": amplitude.peak(y, sr, hop),
         "dynamic_range": amplitude.dynamic_range(y, sr),
