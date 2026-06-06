@@ -4,17 +4,17 @@ Guidance for Claude when working on this project.
 
 ## Session start
 
-At the start of each session, read in this order before starting new work:
+All design and process documentation lives in `docs/`. At the start of each session, read in this order before starting new work:
 
-1. `dev-log.md` — current state: what's done, what's next, any notes
-2. `build-order.md` — the active milestone and what it contains
-3. Whichever design docs are relevant to the active task (`music-analysis-design-doc.md`, `feature-catalog.md`, `profile-schema.md`, `development.md`)
+1. `docs/dev-log.md` — current state: what's done, what's next, any notes
+2. `docs/build-order.md` — the active milestone and what it contains
+3. Whichever design docs are relevant to the active task (`docs/music-analysis-design-doc.md`, `docs/feature-catalog.md`, `docs/profile-schema.md`, `docs/development.md`)
 
 This grounds you in where the project actually is before proposing or doing anything.
 
 ## Development log
 
-Maintain `dev-log.md` at the repo root. Update it as work progresses. Three sections:
+Maintain `docs/dev-log.md`. Update it as work progresses. Three sections:
 
 - **Completed** — what's been built, brief context
 - **Todo** — what's next (drawn from `build-order.md` or new work)
@@ -33,11 +33,11 @@ The dev log is for *development context* that doesn't belong in the design docs.
 
 ## Source of truth
 
-Design and process are documented in:
-- `music-analysis-design-doc.md` — overall design
-- `feature-catalog.md` — every analyzed feature
-- `profile-schema.md` — JSON profile spec
-- `build-order.md` — milestones
-- `development.md` — tooling and engineering practices
+Design and process are documented in `docs/`:
+- `docs/music-analysis-design-doc.md` — overall design
+- `docs/feature-catalog.md` — every analyzed feature
+- `docs/profile-schema.md` — JSON profile spec
+- `docs/build-order.md` — milestones
+- `docs/development.md` — tooling and engineering practices
 
 Update these docs when decisions change. Don't let them drift.
