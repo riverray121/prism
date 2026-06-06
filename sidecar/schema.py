@@ -14,6 +14,11 @@ class ListCommand(BaseModel):
     type: Literal["library.list"]
 
 
+class QueueAddCommand(BaseModel):
+    type: Literal["queue.add"]
+    song_ids: list[str]
+
+
 # Sidecar -> frontend events.
 
 

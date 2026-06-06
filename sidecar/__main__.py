@@ -1,15 +1,17 @@
 import json
 import logging
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import library, metadata, storage
+from . import ipc, library, metadata, storage, worker
 from .schema import (
     ImportCommand,
     ImportFailedEvent,
     LibrarySongsEvent,
     ListCommand,
+    QueueAddCommand,
     Song,
 )
 
@@ -22,17 +24,16 @@ logging.basicConfig(
 log = logging.getLogger("sidecar")
 
 
-def emit(event: object) -> None:
-    """Write one JSON-line event to stdout."""
-    print(event.model_dump_json(), flush=True)  # type: ignore[attr-defined]
-
-
 def library_snapshot() -> LibrarySongsEvent:
     """Read all rows and build a full library.songs event."""
     with library.connect() as con:
         rows = library.list_songs(con)
     songs = [Song(**dict(row)) for row in rows]
     return LibrarySongsEvent(songs=songs)
+
+
+def emit_snapshot() -> None:
+    ipc.emit(library_snapshot())
 
 
 def import_one(path_str: str) -> None:
@@ -64,17 +65,26 @@ def handle(msg: dict) -> None:
                 import_one(path_str)
             except Exception as exc:
                 log.exception("import failed: %s", path_str)
-                emit(ImportFailedEvent(path=path_str, error=str(exc)))
-        emit(library_snapshot())
+                ipc.emit(ImportFailedEvent(path=path_str, error=str(exc)))
+        emit_snapshot()
     elif msg_type == "library.list":
         ListCommand.model_validate(msg)
-        emit(library_snapshot())
+        emit_snapshot()
+    elif msg_type == "queue.add":
+        cmd = QueueAddCommand.model_validate(msg)
+        with library.connect() as con:
+            library.mark_queued(
+                con, cmd.song_ids, datetime.now(timezone.utc).isoformat()
+            )
+        emit_snapshot()  # reflect 'queued'; the worker picks up from here
     else:
         log.warning("unknown command: %r", msg)
 
 
 def main() -> None:
     log.info("sidecar started")
+    # Background worker drains the analysis queue while this thread reads stdin.
+    threading.Thread(target=worker.run, args=(emit_snapshot,), daemon=True).start()
     # Read one JSON command per line from stdin; write one JSON event per line to stdout.
     for raw in sys.stdin:
         line = raw.strip()

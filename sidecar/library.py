@@ -78,3 +78,46 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
         ORDER BY imported_at
         """
     ).fetchall()
+
+
+def mark_queued(con: sqlite3.Connection, song_ids: list[str], queued_at: str) -> None:
+    """Queue songs for analysis. Re-queues failed/unanalyzed rows; clears prior error."""
+    con.executemany(
+        """
+        UPDATE songs
+        SET status='queued', queued_at=?, error_message=NULL
+        WHERE id=? AND status IN ('unanalyzed', 'failed')
+        """,
+        [(queued_at, song_id) for song_id in song_ids],
+    )
+
+
+def next_queued(con: sqlite3.Connection) -> sqlite3.Row | None:
+    """Oldest queued song, or None. Columns cover what the worker needs to analyze."""
+    return con.execute(
+        """
+        SELECT id, title, artist, duration_sec, sample_rate, source_path, imported_at
+        FROM songs
+        WHERE status='queued'
+        ORDER BY queued_at
+        LIMIT 1
+        """
+    ).fetchone()
+
+
+def mark_analyzing(con: sqlite3.Connection, song_id: str) -> None:
+    con.execute("UPDATE songs SET status='analyzing' WHERE id=?", (song_id,))
+
+
+def mark_analyzed(con: sqlite3.Connection, song_id: str, analyzed_at: str) -> None:
+    con.execute(
+        "UPDATE songs SET status='analyzed', analyzed_at=? WHERE id=?",
+        (analyzed_at, song_id),
+    )
+
+
+def mark_failed(con: sqlite3.Connection, song_id: str, error_message: str) -> None:
+    con.execute(
+        "UPDATE songs SET status='failed', error_message=? WHERE id=?",
+        (error_message, song_id),
+    )

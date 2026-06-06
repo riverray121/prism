@@ -9,10 +9,10 @@
 - **M0** — Rust shell spawns sidecar (`uv run python -m sidecar`), forwards its stdout lines to the frontend as `sidecar-message` events, exposes `send_to_sidecar` command. Frontend sends ping, displays pong. End-to-end ping/pong round-trip (manually verified).
 - **M0** — Tooling: pre-commit with ruff (Python) and Prettier + Svelte/Tailwind plugins (frontend); root README. **M0 complete.**
 - **M1 slice 1 — SQLite + import.** `library.db` (`songs` table, full design-doc column set), per-song folder `library/songs/{uuid}/source.ext`. Metadata via mutagen (tags → `Artist - Title` filename → "Unknown"; duration/sample-rate across all 4 formats). IPC: `library.import` / `library.list` → `library.songs` snapshot. Frontend: `$lib/ipc` (zod-validated event stream), `$lib/state`, `LibraryPanel` with native file picker (tauri-plugin-dialog). Verified end-to-end in the running app with real test tracks (FLAC + MP3).
+- **M1 slice 2 — Worker + BPM.** Background worker thread (`worker.py`) drains the `status='queued'` set oldest-first, computes BPM (librosa, `features/rhythm.py`), writes `profile.json` (`mix.bpm` scalar), flips `queued → analyzing → analyzed` (or `failed`). `queue.add` command; status live-updates via `library.songs` snapshots emitted on each transition (`ipc.py` serializes stdout writes across threads). Frontend: Analyze/Retry button per row. Verified end-to-end in the running app (BPM 161.5 for Joji – Dior).
 
 ## Todo
 
-- **M1 slice 2** — Worker + BPM stage: Python worker pulls `queued` rows, computes BPM, writes `profile.json` with just `bpm`, flips status `queued → analyzing → analyzed`.
 - **M1 remaining** — inspection view (text) → RMS line graph (uPlot) → playback + playhead.
 - **M2 — Mix-level DSP fill-out**
 - **M3 — Demucs + per-stem DSP**
