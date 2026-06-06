@@ -8,10 +8,12 @@
 - **M0** — Python sidecar: uv project (Python 3.12), `sidecar/` package with pydantic IPC models. `python -m sidecar` reads JSON-lines on stdin, echoes `pong`; logs to stderr to keep stdout clean.
 - **M0** — Rust shell spawns sidecar (`uv run python -m sidecar`), forwards its stdout lines to the frontend as `sidecar-message` events, exposes `send_to_sidecar` command. Frontend sends ping, displays pong. End-to-end ping/pong round-trip (manually verified).
 - **M0** — Tooling: pre-commit with ruff (Python) and Prettier + Svelte/Tailwind plugins (frontend); root README. **M0 complete.**
+- **M1 slice 1 — SQLite + import.** `library.db` (`songs` table, full design-doc column set), per-song folder `library/songs/{uuid}/source.ext`. Metadata via mutagen (tags → `Artist - Title` filename → "Unknown"; duration/sample-rate across all 4 formats). IPC: `library.import` / `library.list` → `library.songs` snapshot. Frontend: `$lib/ipc` (zod-validated event stream), `$lib/state`, `LibraryPanel` with native file picker (tauri-plugin-dialog). Verified end-to-end in the running app with real test tracks (FLAC + MP3).
 
 ## Todo
 
-- **M1 — Magic moment** (see `build-order.md`) — next: SQLite + import → worker + BPM → inspection view → RMS → playback + playhead
+- **M1 slice 2** — Worker + BPM stage: Python worker pulls `queued` rows, computes BPM, writes `profile.json` with just `bpm`, flips status `queued → analyzing → analyzed`.
+- **M1 remaining** — inspection view (text) → RMS line graph (uPlot) → playback + playhead.
 - **M2 — Mix-level DSP fill-out**
 - **M3 — Demucs + per-stem DSP**
 - **M4 — ML classification + structure**

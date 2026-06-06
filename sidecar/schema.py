@@ -2,15 +2,38 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-# Frontend → sidecar commands.
+# Frontend -> sidecar commands.
 
 
-class PingCommand(BaseModel):
-    type: Literal["ping"]
+class ImportCommand(BaseModel):
+    type: Literal["library.import"]
+    paths: list[str]
 
 
-# Sidecar → frontend events.
+class ListCommand(BaseModel):
+    type: Literal["library.list"]
 
 
-class PongEvent(BaseModel):
-    type: Literal["pong"]
+# Sidecar -> frontend events.
+
+
+class Song(BaseModel):
+    id: str
+    title: str
+    artist: str
+    duration_sec: float | None
+    sample_rate: int | None
+    source_path: str
+    status: str
+    imported_at: str
+
+
+class LibrarySongsEvent(BaseModel):
+    type: Literal["library.songs"] = "library.songs"
+    songs: list[Song]
+
+
+class ImportFailedEvent(BaseModel):
+    type: Literal["library.import_failed"] = "library.import_failed"
+    path: str
+    error: str

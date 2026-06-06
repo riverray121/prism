@@ -16,3 +16,6 @@ __pycache__/
 
 # App-managed library data (lives in app data dir; ignore if ever created locally)
 /library
+
+# Local scratch audio for development/testing
+/test-audio

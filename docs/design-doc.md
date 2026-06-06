@@ -45,7 +45,7 @@ Output Formatter
 ## Tech Stack
 
 - **Shell:** Tauri (Rust + system WebView). Lightweight desktop wrapper; cross-platform so the portability goal holds.
-- **UI:** **Svelte 5 + SvelteKit** (TypeScript), configured as a static SPA via `adapter-static` (SSR off — Tauri has no Node server). Chosen over React/vanilla because the reactive surface (live library status, controls) is real but bounded, while the heavy visualization is imperative regardless of framework; Svelte's stores model IPC-derived state cleanly and bridge to imperative uPlot with less ceremony than React's render cycle. **Tailwind CSS v4** (via `@tailwindcss/vite`, no config file) for styling. **uPlot** for stacked time-series and event/segment overlays — small (~40KB), fast at high point counts, simple array-based API; it owns its canvas, so the framework only provides the surrounding DOM. Spectrogram heatmap may use a custom Canvas2D pass rather than a uPlot plugin; decided when implemented.
+- **UI:** **Svelte 5 + SvelteKit** (TypeScript), configured as a static SPA via `adapter-static` (SSR off — Tauri has no Node server). Chosen over React/vanilla because the reactive surface (live library status, controls) is real but bounded, while the heavy visualization is imperative regardless of framework; Svelte's stores model IPC-derived state cleanly and bridge to imperative uPlot with less ceremony than React's render cycle. **Tailwind CSS v4** (via `@tailwindcss/vite`, no config file) for styling. **uPlot** for stacked time-series and event/segment overlays — small (~40KB), fast at high point counts, simple array-based API; it owns its canvas, so the framework only provides the surrounding DOM. Spectrogram heatmap may use a custom Canvas2D pass rather than a uPlot plugin; decided when implemented. **UI primitives:** **shadcn-svelte** (copy-in components on bits-ui + Tailwind; supports Svelte 5 + Tailwind v4) for the fiddly interactive controls — selects/dropdowns, sliders, dialogs, tooltips, tabs. Adopted lazily, component by component, starting at the first such control (playback slider, per-feature Y-axis dropdown); trivial layout stays hand-rolled Tailwind. Its CSS-variable theme tokens will also own light/dark theming. The app surface already follows the OS light/dark theme via `color-scheme` + `light-dark()`.
 - **Analysis backend:** Python sidecar process launched and managed by Tauri. Hosts librosa / Essentia / Demucs / PANNs.
 - **IPC (frontend ↔ sidecar):** stdin/stdout JSON-lines. Tauri spawns the Python sidecar and pipes messages in both directions; the Tauri Rust shell relays between WebView and pipes. No HTTP server, no port.
 - **Audio playback:** Web Audio API in the frontend. Playhead is driven from playback time, not from the sidecar.
@@ -113,6 +113,8 @@ One JSON message per line.
 **Frontend → backend commands:**
 
 ```json
+{ "type": "library.import", "paths": ["/abs/path/song.flac"] }
+{ "type": "library.list" }
 { "type": "queue.add",    "song_ids": ["..."] }
 { "type": "queue.cancel", "song_id": "..." }
 ```
@@ -120,6 +122,8 @@ One JSON message per line.
 **Backend → frontend events:**
 
 ```json
+{ "type": "library.songs", "songs": [ /* full library snapshot, see below */ ] }
+{ "type": "library.import_failed", "path": "...", "error": "..." }
 { "type": "job.started",         "song_id": "..." }
 { "type": "job.stage_started",   "song_id": "...", "stage": "demucs" }
 { "type": "job.stage_progress",  "song_id": "...", "stage": "demucs", "progress": 0.42 }
@@ -128,6 +132,8 @@ One JSON message per line.
 { "type": "job.failed",          "song_id": "...", "stage": "demucs", "error": "..." }
 { "type": "job.cancelled",       "song_id": "..." }
 ```
+
+`library.import` copies each file into the managed library and assigns a UUID; `library.list` requests the current state. Both reply with a `library.songs` snapshot — the full song list, not a delta — which the frontend renders wholesale. Per-song fields: `id`, `title`, `artist`, `duration_sec`, `sample_rate`, `source_path` (relative to the library root), `status`, `imported_at`. There is no request/response correlation; the snapshot model keeps the UI a pure function of the latest event.
 
 `stage_progress` is meaningful primarily for Demucs (which exposes a progress callback). DSP and ML stages emit only `stage_started` / `stage_completed`.
 

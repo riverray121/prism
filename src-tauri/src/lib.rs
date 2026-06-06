@@ -57,6 +57,7 @@ fn spawn_sidecar(app: &AppHandle) -> Child {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let mut child = spawn_sidecar(app.handle());
             let stdin = child.stdin.take().expect("sidecar stdin piped");
