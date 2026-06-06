@@ -39,6 +39,8 @@ Comment frequently but not excessively. Comments must be concise, precise, accur
 - When working **autonomously**, commit on your own as work completes.
 - When working **interactively** with the user, ask permission before committing.
 - **Never** include Claude as a `Co-Authored-By:` in commit messages. Commits are authored by the user only.
+- Commit messages are clean and tight prose — a concise subject, a short prose body only when it adds context. Never use bulleted lists.
+- Do not push on every commit. Commit locally as work progresses; push only after the user has tested and confirmed a feature works.
 
 ## Source of truth
 
