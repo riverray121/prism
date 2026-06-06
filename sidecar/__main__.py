@@ -83,7 +83,14 @@ def handle(msg: dict) -> None:
         cmd = GetProfileCommand.model_validate(msg)
         try:
             profile = storage.read_profile(cmd.song_id)
-            ipc.emit(ProfileEvent(song_id=cmd.song_id, profile=profile))
+            audio_path = str(
+                storage.SONGS_DIR / cmd.song_id / profile["song"]["source_file"]
+            )
+            ipc.emit(
+                ProfileEvent(
+                    song_id=cmd.song_id, profile=profile, audio_path=audio_path
+                )
+            )
         except FileNotFoundError:
             log.warning("no profile for %s", cmd.song_id)
     else:

@@ -53,3 +53,6 @@ class ProfileEvent(BaseModel):
     type: Literal["profile"] = "profile"
     song_id: str
     profile: dict
+    # Absolute path to the source audio, for the frontend's asset-protocol URL.
+    # Runtime-only (machine-specific), so kept out of profile.json.
+    audio_path: str
