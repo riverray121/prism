@@ -11,14 +11,58 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 import librosa
+import numpy as np
 
 from . import library, storage
-from .features import amplitude, rhythm
+from .features import amplitude, frequency, rhythm, timbre, tonal
 
 log = logging.getLogger("sidecar.worker")
 
 # Seconds to wait between queue polls when idle.
 POLL_INTERVAL = 1.0
+
+# Target frame rate for continuous features; the actual rate is sr/hop. n_fft is
+# the STFT window shared across frequency features.
+TARGET_FRAME_RATE_HZ = 100
+N_FFT = 2048
+
+
+def _analyze(y: np.ndarray, sr: int) -> tuple[float, int, dict[str, dict]]:
+    """Run every mix-level feature off one loaded signal.
+
+    Returns (frame_rate_hz, frame_count, mix). Continuous features are truncated
+    to a shared frame_count so they line up on the timeline.
+    """
+    hop = max(1, round(sr / TARGET_FRAME_RATE_HZ))
+    frame_rate_hz = sr / hop
+    # Magnitude spectrogram, computed once and shared by the frequency features.
+    spectrum = np.abs(librosa.stft(y, n_fft=N_FFT, hop_length=hop))
+
+    key_env, key_conf = tonal.key(y, sr)
+    mix: dict[str, dict] = {
+        "bpm": rhythm.bpm(y, sr),
+        "rms": amplitude.rms(y, sr, hop),
+        "peak": amplitude.peak(y, sr, hop),
+        "dynamic_range": amplitude.dynamic_range(y, sr),
+        "spectral_centroid": frequency.spectral_centroid(spectrum, sr),
+        "spectral_rolloff": frequency.spectral_rolloff(spectrum, sr),
+        "spectral_flatness": frequency.spectral_flatness(spectrum),
+        "spectral_flux": frequency.spectral_flux(spectrum),
+        **frequency.band_energies(spectrum, sr, N_FFT),
+        "zero_crossing_rate": timbre.zero_crossing_rate(y, hop),
+        "key": key_env,
+        "key_confidence": key_conf,
+        "tuning_deviation": tonal.tuning_deviation(y, sr),
+    }
+
+    # Align continuous features: truncate each to the shortest so they share one
+    # frame_count (librosa feature lengths can differ by a frame from centering).
+    lengths = [len(f["data"]) for f in mix.values() if f["render"] == "continuous"]
+    frame_count = min(lengths) if lengths else 0
+    for f in mix.values():
+        if f["render"] == "continuous":
+            f["data"] = f["data"][:frame_count]
+    return frame_rate_hz, frame_count, mix
 
 
 def _now() -> str:
@@ -42,19 +86,24 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
         audio_path = storage.LIBRARY_ROOT / song["source_path"]
         # Load the mixed-down signal once; every mix feature works off it.
         y, sr = librosa.load(audio_path, mono=True)
-        bpm = rhythm.compute_bpm(y, sr)
-        rms_data, frame_rate_hz = amplitude.compute_rms(y, sr)
+        frame_rate_hz, frame_count, mix = _analyze(y, sr)
         analyzed_at = _now()
         storage.write_profile(
             song,
             analyzed_at=analyzed_at,
-            bpm=bpm,
-            rms_data=rms_data,
             frame_rate_hz=frame_rate_hz,
+            frame_count=frame_count,
+            mix=mix,
         )
         with library.connect() as con:
             library.mark_analyzed(con, song_id, analyzed_at)
-        log.info("analyzed %s bpm=%.1f rms_frames=%d", song_id, bpm, len(rms_data))
+        log.info(
+            "analyzed %s bpm=%.1f features=%d frames=%d",
+            song_id,
+            mix["bpm"]["value"],
+            len(mix),
+            frame_count,
+        )
     except Exception as exc:
         log.exception("analysis failed: %s", song_id)
         with library.connect() as con:

@@ -2,21 +2,28 @@
   import uPlot from "uplot";
   import "uplot/dist/uPlot.min.css";
 
-  import type { Profile } from "$lib/ipc/messages";
+  import type { ContinuousFeature } from "$lib/ipc/messages";
 
-  // Concrete graph for the RMS continuous feature. A generic FeatureGraph
-  // abstraction waits until three concrete graph types exist (see development.md).
+  // Concrete graph for any continuous feature (one value per timeline frame).
+  // A generic cross-render FeatureGraph waits until event/heatmap graphs also
+  // exist (see development.md); this only parameterizes the single line type.
   let {
-    rms,
+    feature,
     frameRateHz,
+    label = "value",
+    color = "#6366f1",
+    height = 120,
     playheadSec = null,
     follow = false,
     onSeek,
     onScrubStart,
     onScrubEnd,
   }: {
-    rms: Profile["mix"]["rms"];
+    feature: ContinuousFeature;
     frameRateHz: number;
+    label?: string;
+    color?: string;
+    height?: number;
     playheadSec?: number | null;
     follow?: boolean; // smooth-center the view on the playhead (while playing)
     onSeek?: (sec: number) => void;
@@ -24,7 +31,6 @@
     onScrubEnd?: () => void; // pointer released (commit scrub)
   } = $props();
 
-  const HEIGHT = 400;
   const ZOOM_FACTOR = 0.75; // range multiplier per zoom-in step (deltaY < 0)
 
   let container: HTMLDivElement;
@@ -37,13 +43,15 @@
 
   // Full time extent of the data, in seconds.
   function maxX(): number {
-    return rms.data.length > 1 ? (rms.data.length - 1) / frameRateHz : 1;
+    return feature.data.length > 1
+      ? (feature.data.length - 1) / frameRateHz
+      : 1;
   }
 
   // X axis is time in seconds, derived from the frame index (no timestamps stored).
   function buildData(): uPlot.AlignedData {
-    const xs = rms.data.map((_, i) => i / frameRateHz);
-    return [xs, rms.data];
+    const xs = feature.data.map((_, i) => i / frameRateHz);
+    return [xs, feature.data];
   }
 
   function clamp(t: number, lo: number, hi: number): number {
@@ -102,7 +110,7 @@
     const grid = { stroke: "rgba(128,128,128,0.15)", width: 1 };
     return {
       width: container.clientWidth,
-      height: HEIGHT,
+      height,
       scales: { x: { time: false } },
       // Drag is repurposed for scrubbing the playhead; zoom is on the wheel.
       cursor: { drag: { x: false, y: false } },
@@ -110,10 +118,7 @@
         { stroke: "#888", grid },
         { stroke: "#888", grid },
       ],
-      series: [
-        {},
-        { label: "RMS", stroke: "#6366f1", width: 1, points: { show: false } },
-      ],
+      series: [{}, { label, stroke: color, width: 1, points: { show: false } }],
       legend: { show: false },
       // Draw the playback head as a vertical line, in uPlot's own coordinate
       // system so it stays aligned; skip it when outside the current view.
@@ -165,6 +170,9 @@
     });
     over.addEventListener("pointerup", endScrub);
     over.addEventListener("pointercancel", endScrub);
+
+    // Double-click resets the zoom to the full time extent.
+    over.addEventListener("dblclick", resetZoom);
 
     over.addEventListener(
       "wheel",
@@ -230,12 +238,12 @@
     );
   }
 
-  // Create the chart once per dataset (rms/frameRateHz), tear down on change.
+  // Create the chart once per dataset (feature/frameRateHz), tear down on change.
   $effect(() => {
     chart = new uPlot(options(), buildData(), container);
     attachInteractions(chart);
     const ro = new ResizeObserver(() =>
-      chart?.setSize({ width: container.clientWidth, height: HEIGHT }),
+      chart?.setSize({ width: container.clientWidth, height }),
     );
     ro.observe(container);
     return () => {

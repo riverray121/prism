@@ -26,15 +26,17 @@ export const ImportFailedEventSchema = z.object({
   error: z.string(),
 });
 
-// Profile JSON (subset we consume). Grows as features are added; see
-// docs/profile-schema.md.
+// Profile JSON (subset we consume). The mix is a keyed map of feature
+// envelopes, discriminated by render mode; see docs/profile-schema.md.
 export const ScalarFeatureSchema = z.object({
   render: z.literal("scalar"),
   category: z.string(),
   source: z.string(),
   unit: z.string(),
-  value: z.number(),
+  // Scalars are mostly numeric, but some (e.g. key) carry a string value.
+  value: z.union([z.number(), z.string()]),
 });
+export type ScalarFeature = z.infer<typeof ScalarFeatureSchema>;
 
 export const ContinuousFeatureSchema = z.object({
   render: z.literal("continuous"),
@@ -44,6 +46,14 @@ export const ContinuousFeatureSchema = z.object({
   range: z.tuple([z.number(), z.number()]).optional(),
   data: z.array(z.number()),
 });
+export type ContinuousFeature = z.infer<typeof ContinuousFeatureSchema>;
+
+// One mix feature. Grows with new render modes (event, segment, heatmap).
+export const MixFeatureSchema = z.discriminatedUnion("render", [
+  ScalarFeatureSchema,
+  ContinuousFeatureSchema,
+]);
+export type MixFeature = z.infer<typeof MixFeatureSchema>;
 
 export const ProfileSchema = z.object({
   schema_version: z.string(),
@@ -61,10 +71,7 @@ export const ProfileSchema = z.object({
     frame_rate_hz: z.number(),
     frame_count: z.number(),
   }),
-  mix: z.object({
-    bpm: ScalarFeatureSchema,
-    rms: ContinuousFeatureSchema,
-  }),
+  mix: z.record(z.string(), MixFeatureSchema),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 

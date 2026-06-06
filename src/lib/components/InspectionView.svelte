@@ -2,7 +2,8 @@
   import { convertFileSrc } from "@tauri-apps/api/core";
   import { onDestroy } from "svelte";
 
-  import RmsGraph from "$lib/components/RmsGraph.svelte";
+  import ContinuousGraph from "$lib/components/ContinuousGraph.svelte";
+  import type { ContinuousFeature, ScalarFeature } from "$lib/ipc/messages";
   import { close, inspection } from "$lib/state/inspection.svelte";
 
   // Playback uses the Web Audio API: the file is decoded into an AudioBuffer and
@@ -150,8 +151,46 @@
     ctx?.close();
   });
 
-  function formatBpm(value: number): string {
-    return value.toFixed(1);
+  // Split the keyed mix map into scalar (text) and continuous (graph) features,
+  // each preserving the profile's insertion order.
+  const features = $derived(
+    inspection.profile ? Object.entries(inspection.profile.mix) : [],
+  );
+  const scalars = $derived(
+    features.filter(
+      (e): e is [string, ScalarFeature] => e[1].render === "scalar",
+    ),
+  );
+  const continuous = $derived(
+    features.filter(
+      (e): e is [string, ContinuousFeature] => e[1].render === "continuous",
+    ),
+  );
+
+  // Line colors cycled across the stacked continuous graphs for distinction.
+  const PALETTE = [
+    "#6366f1",
+    "#06b6d4",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#a855f7",
+    "#ec4899",
+    "#84cc16",
+  ];
+
+  // "spectral_centroid" -> "Spectral centroid".
+  function humanize(name: string): string {
+    const s = name.replace(/_/g, " ");
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  function formatScalar(f: ScalarFeature): string {
+    if (typeof f.value === "string") return f.value;
+    const n = f.unit === "normalized" ? f.value.toFixed(2) : f.value.toFixed(1);
+    const unit =
+      f.unit === "normalized" || f.unit === "key" ? "" : ` ${f.unit}`;
+    return `${n}${unit}`;
   }
 
   function formatTime(seconds: number): string {
@@ -195,30 +234,47 @@
       </span>
     </div>
 
-    <div
-      class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      <p class="text-xs text-neutral-500 dark:text-neutral-400">BPM</p>
-      <p class="text-3xl font-semibold tabular-nums">
-        {formatBpm(inspection.profile.mix.bpm.value)}
-      </p>
+    <!-- Scalar features: one value each, shown as a labeled grid. -->
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {#each scalars as [name, feature] (name)}
+        <div
+          class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <p class="text-xs text-neutral-500 dark:text-neutral-400">
+            {humanize(name)}
+          </p>
+          <p class="text-xl font-semibold tabular-nums">
+            {formatScalar(feature)}
+          </p>
+        </div>
+      {/each}
     </div>
 
-    <div
-      class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-        RMS (volume envelope)
-      </p>
-      <RmsGraph
-        rms={inspection.profile.mix.rms}
-        frameRateHz={inspection.profile.timeline.frame_rate_hz}
-        playheadSec={currentTime}
-        follow={playing}
-        onSeek={scrub}
-        onScrubStart={scrubStart}
-        onScrubEnd={scrubEnd}
-      />
+    <!-- Continuous features: stacked line graphs sharing the playhead/scrub. -->
+    <div class="flex flex-col gap-4">
+      {#each continuous as [name, feature], i (name)}
+        <div
+          class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+            {humanize(name)}
+            <span class="text-neutral-400 dark:text-neutral-600"
+              >· {feature.unit}</span
+            >
+          </p>
+          <ContinuousGraph
+            {feature}
+            frameRateHz={inspection.profile.timeline.frame_rate_hz}
+            label={name}
+            color={PALETTE[i % PALETTE.length]}
+            playheadSec={currentTime}
+            follow={playing}
+            onSeek={scrub}
+            onScrubStart={scrubStart}
+            onScrubEnd={scrubEnd}
+          />
+        </div>
+      {/each}
     </div>
   {/if}
 </section>

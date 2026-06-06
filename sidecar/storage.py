@@ -39,13 +39,14 @@ def write_profile(
     song: dict,
     *,
     analyzed_at: str,
-    bpm: float,
-    rms_data: list[float],
     frame_rate_hz: float,
+    frame_count: int,
+    mix: dict[str, dict],
 ) -> None:
-    """Write profile.json for an analyzed song. M1 holds bpm + rms.
+    """Write profile.json for an analyzed song.
 
-    Continuous features sample on the timeline (frame_rate_hz, frame_count).
+    ``mix`` is the keyed map of feature envelopes (see docs/profile-schema.md);
+    the worker assembles it and aligns every continuous feature to frame_count.
     Sidecar paths in the profile are relative to profile.json itself, so
     source_file is just the filename.
     """
@@ -63,25 +64,9 @@ def write_profile(
         },
         "timeline": {
             "frame_rate_hz": frame_rate_hz,
-            "frame_count": len(rms_data),
+            "frame_count": frame_count,
         },
-        "mix": {
-            "bpm": {
-                "render": "scalar",
-                "category": "rhythm",
-                "source": "librosa.beat",
-                "unit": "bpm",
-                "value": bpm,
-            },
-            "rms": {
-                "render": "continuous",
-                "category": "amplitude",
-                "source": "librosa",
-                "unit": "normalized",
-                "range": [0, 1],
-                "data": rms_data,
-            },
-        },
+        "mix": mix,
     }
     path = SONGS_DIR / song["id"] / "profile.json"
     path.write_text(json.dumps(profile, indent=2))
