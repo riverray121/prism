@@ -59,11 +59,25 @@ export const EventFeatureSchema = z.object({
 });
 export type EventFeature = z.infer<typeof EventFeatureSchema>;
 
-// One mix feature. Grows with new render modes (segment, heatmap).
+// Heatmap: a 2D matrix stored in a .npy sidecar; the JSON holds only the
+// reference and shape. shape is [rows, cols], axes names each dimension.
+export const HeatmapFeatureSchema = z.object({
+  render: z.literal("heatmap"),
+  category: z.string(),
+  source: z.string(),
+  unit: z.string(),
+  sidecar: z.string(),
+  shape: z.array(z.number()),
+  axes: z.array(z.string()),
+});
+export type HeatmapFeature = z.infer<typeof HeatmapFeatureSchema>;
+
+// One mix feature. Grows with new render modes (segment).
 export const MixFeatureSchema = z.discriminatedUnion("render", [
   ScalarFeatureSchema,
   ContinuousFeatureSchema,
   EventFeatureSchema,
+  HeatmapFeatureSchema,
 ]);
 export type MixFeature = z.infer<typeof MixFeatureSchema>;
 
@@ -92,6 +106,7 @@ export const ProfileEventSchema = z.object({
   song_id: z.string(),
   profile: ProfileSchema,
   audio_path: z.string(),
+  song_dir: z.string(),
 });
 
 // All events the sidecar can send on stdout.

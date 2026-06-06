@@ -19,6 +19,7 @@
         if (event.song_id === inspection.songId) {
           inspection.profile = event.profile;
           inspection.audioPath = event.audio_path;
+          inspection.songDir = event.song_dir;
         }
       }
     });

@@ -4,9 +4,11 @@
 
   import ContinuousGraph from "$lib/components/ContinuousGraph.svelte";
   import EventGraph from "$lib/components/EventGraph.svelte";
+  import HeatmapGraph from "$lib/components/HeatmapGraph.svelte";
   import type {
     ContinuousFeature,
     EventFeature,
+    HeatmapFeature,
     ScalarFeature,
   } from "$lib/ipc/messages";
   import { close, inspection } from "$lib/state/inspection.svelte";
@@ -176,6 +178,11 @@
       (e): e is [string, EventFeature] => e[1].render === "event",
     ),
   );
+  const heatmaps = $derived(
+    features.filter(
+      (e): e is [string, HeatmapFeature] => e[1].render === "heatmap",
+    ),
+  );
 
   // Full time extent shared by every graph's x axis, from the timeline.
   const durationSec = $derived(
@@ -290,6 +297,31 @@
         />
       </div>
     {/each}
+
+    <!-- Heatmap features: a .npy matrix rendered as a colormapped image. -->
+    {#if inspection.songDir}
+      {#each heatmaps as [name, feature] (name)}
+        <div
+          class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+            {humanize(name)}
+            <span class="text-neutral-400 dark:text-neutral-600"
+              >· {feature.shape[0]}×{feature.shape[1]} {feature.unit}</span
+            >
+          </p>
+          <HeatmapGraph
+            path={`${inspection.songDir}/${feature.sidecar}`}
+            frameRateHz={inspection.profile.timeline.frame_rate_hz}
+            playheadSec={currentTime}
+            follow={playing}
+            onSeek={scrub}
+            onScrubStart={scrubStart}
+            onScrubEnd={scrubEnd}
+          />
+        </div>
+      {/each}
+    {/if}
 
     <!-- Continuous features: stacked line graphs sharing the playhead/scrub. -->
     <div class="flex flex-col gap-4">

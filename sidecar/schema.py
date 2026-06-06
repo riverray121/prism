@@ -56,3 +56,6 @@ class ProfileEvent(BaseModel):
     # Absolute path to the source audio, for the frontend's asset-protocol URL.
     # Runtime-only (machine-specific), so kept out of profile.json.
     audio_path: str
+    # Absolute path to the song folder, for resolving sidecar paths (heatmap
+    # .npy files) against the profile's relative sidecar fields.
+    song_dir: str

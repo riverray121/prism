@@ -83,12 +83,14 @@ def handle(msg: dict) -> None:
         cmd = GetProfileCommand.model_validate(msg)
         try:
             profile = storage.read_profile(cmd.song_id)
-            audio_path = str(
-                storage.SONGS_DIR / cmd.song_id / profile["song"]["source_file"]
-            )
+            song_dir = storage.SONGS_DIR / cmd.song_id
+            audio_path = str(song_dir / profile["song"]["source_file"])
             ipc.emit(
                 ProfileEvent(
-                    song_id=cmd.song_id, profile=profile, audio_path=audio_path
+                    song_id=cmd.song_id,
+                    profile=profile,
+                    audio_path=audio_path,
+                    song_dir=str(song_dir),
                 )
             )
         except FileNotFoundError:

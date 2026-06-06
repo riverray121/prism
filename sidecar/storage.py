@@ -10,6 +10,8 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 
+import numpy as np
+
 # Profile JSON schema version (see docs/profile-schema.md).
 SCHEMA_VERSION = "0.1.0"
 
@@ -70,6 +72,19 @@ def write_profile(
     }
     path = SONGS_DIR / song["id"] / "profile.json"
     path.write_text(json.dumps(profile, indent=2))
+
+
+def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:
+    """Write a heatmap matrix as an uncompressed float32 .npy sidecar.
+
+    Returns the path relative to profile.json (e.g. ``heatmaps/mfcc.npy``), which
+    is what the feature's ``sidecar`` field stores.
+    """
+    rel = f"heatmaps/{name}.npy"
+    path = SONGS_DIR / song_id / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(path, matrix.astype(np.float32))
+    return rel
 
 
 def read_profile(song_id: str) -> dict:

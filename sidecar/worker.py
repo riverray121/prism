@@ -1,8 +1,8 @@
 """Single background worker that analyzes queued songs sequentially.
 
 The queue is the set of songs rows with status='queued', oldest first. The
-worker claims one, runs the analysis stages, and writes status + profile.json.
-M1 runs only the BPM stage. No cross-song parallelism.
+worker claims one, runs every mix-level feature off a single loaded signal, and
+writes status + profile.json (+ heatmap .npy sidecars). No cross-song parallelism.
 """
 
 import logging
@@ -27,11 +27,14 @@ TARGET_FRAME_RATE_HZ = 100
 N_FFT = 2048
 
 
-def _analyze(y: np.ndarray, sr: int) -> tuple[float, int, dict[str, dict]]:
+def _analyze(
+    y: np.ndarray, sr: int
+) -> tuple[float, int, dict[str, dict], dict[str, np.ndarray]]:
     """Run every mix-level feature off one loaded signal.
 
-    Returns (frame_rate_hz, frame_count, mix). Continuous features are truncated
-    to a shared frame_count so they line up on the timeline.
+    Returns (frame_rate_hz, frame_count, mix, heatmaps). Continuous features and
+    heatmap matrices are truncated to a shared frame_count so they line up on the
+    timeline; heatmap matrices are written to .npy sidecars by the caller.
     """
     hop = max(1, round(sr / TARGET_FRAME_RATE_HZ))
     frame_rate_hz = sr / hop
@@ -54,6 +57,8 @@ def _analyze(y: np.ndarray, sr: int) -> tuple[float, int, dict[str, dict]]:
         "key_confidence": key_conf,
         "tuning_deviation": tonal.tuning_deviation(y, sr),
     }
+    # Heatmap matrices (raw, shape [bins, frames]); aligned and registered below.
+    heatmaps: dict[str, np.ndarray] = {"mfcc": timbre.mfcc(y, sr, hop)}
 
     # Align continuous features: truncate each to the shortest so they share one
     # frame_count (librosa feature lengths can differ by a frame from centering).
@@ -62,7 +67,37 @@ def _analyze(y: np.ndarray, sr: int) -> tuple[float, int, dict[str, dict]]:
     for f in mix.values():
         if f["render"] == "continuous":
             f["data"] = f["data"][:frame_count]
-    return frame_rate_hz, frame_count, mix
+
+    # Truncate heatmaps to frame_count and register their envelopes in the mix.
+    for name, matrix in heatmaps.items():
+        matrix = matrix[:, :frame_count]
+        heatmaps[name] = matrix
+        mix[name] = _heatmap_envelope(name, matrix)
+
+    return frame_rate_hz, frame_count, mix, heatmaps
+
+
+# Per-heatmap display metadata; the payload itself lives in the .npy sidecar.
+_HEATMAP_META = {
+    "mfcc": {
+        "category": "timbre",
+        "unit": "coefficient",
+        "axes": ["mfcc", "time_frame"],
+    },
+}
+
+
+def _heatmap_envelope(name: str, matrix: np.ndarray) -> dict:
+    meta = _HEATMAP_META[name]
+    return {
+        "render": "heatmap",
+        "category": meta["category"],
+        "source": "librosa",
+        "unit": meta["unit"],
+        "sidecar": f"heatmaps/{name}.npy",
+        "shape": [int(matrix.shape[0]), int(matrix.shape[1])],
+        "axes": meta["axes"],
+    }
 
 
 def _now() -> str:
@@ -86,7 +121,10 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
         audio_path = storage.LIBRARY_ROOT / song["source_path"]
         # Load the mixed-down signal once; every mix feature works off it.
         y, sr = librosa.load(audio_path, mono=True)
-        frame_rate_hz, frame_count, mix = _analyze(y, sr)
+        frame_rate_hz, frame_count, mix, heatmaps = _analyze(y, sr)
+        # Heatmap payloads go to .npy sidecars; only their envelopes sit in the profile.
+        for name, matrix in heatmaps.items():
+            storage.write_heatmap(song_id, name, matrix)
         analyzed_at = _now()
         storage.write_profile(
             song,
