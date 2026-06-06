@@ -115,6 +115,7 @@ One JSON message per line.
 ```json
 { "type": "library.import", "paths": ["/abs/path/song.flac"] }
 { "type": "library.list" }
+{ "type": "profile.get",  "song_id": "..." }
 { "type": "queue.add",    "song_ids": ["..."] }
 { "type": "queue.cancel", "song_id": "..." }
 ```
@@ -124,6 +125,7 @@ One JSON message per line.
 ```json
 { "type": "library.songs", "songs": [ /* full library snapshot, see below */ ] }
 { "type": "library.import_failed", "path": "...", "error": "..." }
+{ "type": "profile", "song_id": "...", "profile": { /* profile.json contents */ } }
 { "type": "job.started",         "song_id": "..." }
 { "type": "job.stage_started",   "song_id": "...", "stage": "demucs" }
 { "type": "job.stage_progress",  "song_id": "...", "stage": "demucs", "progress": 0.42 }
@@ -133,7 +135,7 @@ One JSON message per line.
 { "type": "job.cancelled",       "song_id": "..." }
 ```
 
-`library.import` copies each file into the managed library and assigns a UUID; `library.list` requests the current state. Both reply with a `library.songs` snapshot — the full song list, not a delta — which the frontend renders wholesale. Per-song fields: `id`, `title`, `artist`, `duration_sec`, `sample_rate`, `source_path` (relative to the library root), `status`, `imported_at`. There is no request/response correlation; the snapshot model keeps the UI a pure function of the latest event.
+`library.import` copies each file into the managed library and assigns a UUID; `library.list` requests the current state. Both reply with a `library.songs` snapshot — the full song list, not a delta — which the frontend renders wholesale. Per-song fields: `id`, `title`, `artist`, `duration_sec`, `sample_rate`, `source_path` (relative to the library root), `status`, `imported_at`. There is no request/response correlation; the snapshot model keeps the UI a pure function of the latest event. `profile.get` reads an analyzed song's `profile.json` and replies with a `profile` event carrying the parsed contents; the frontend owns no disk access.
 
 `stage_progress` is meaningful primarily for Demucs (which exposes a progress callback). DSP and ML stages emit only `stage_started` / `stage_completed`.
 

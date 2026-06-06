@@ -65,3 +65,8 @@ def write_profile(song: dict, *, bpm: float, analyzed_at: str) -> None:
     }
     path = SONGS_DIR / song["id"] / "profile.json"
     path.write_text(json.dumps(profile, indent=2))
+
+
+def read_profile(song_id: str) -> dict:
+    """Read an analyzed song's profile.json. Raises FileNotFoundError if absent."""
+    return json.loads((SONGS_DIR / song_id / "profile.json").read_text())

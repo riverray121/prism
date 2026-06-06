@@ -19,6 +19,11 @@ class QueueAddCommand(BaseModel):
     song_ids: list[str]
 
 
+class GetProfileCommand(BaseModel):
+    type: Literal["profile.get"]
+    song_id: str
+
+
 # Sidecar -> frontend events.
 
 
@@ -42,3 +47,9 @@ class ImportFailedEvent(BaseModel):
     type: Literal["library.import_failed"] = "library.import_failed"
     path: str
     error: str
+
+
+class ProfileEvent(BaseModel):
+    type: Literal["profile"] = "profile"
+    song_id: str
+    profile: dict

@@ -7,10 +7,12 @@ from pathlib import Path
 
 from . import ipc, library, metadata, storage, worker
 from .schema import (
+    GetProfileCommand,
     ImportCommand,
     ImportFailedEvent,
     LibrarySongsEvent,
     ListCommand,
+    ProfileEvent,
     QueueAddCommand,
     Song,
 )
@@ -77,6 +79,13 @@ def handle(msg: dict) -> None:
                 con, cmd.song_ids, datetime.now(timezone.utc).isoformat()
             )
         emit_snapshot()  # reflect 'queued'; the worker picks up from here
+    elif msg_type == "profile.get":
+        cmd = GetProfileCommand.model_validate(msg)
+        try:
+            profile = storage.read_profile(cmd.song_id)
+            ipc.emit(ProfileEvent(song_id=cmd.song_id, profile=profile))
+        except FileNotFoundError:
+            log.warning("no profile for %s", cmd.song_id)
     else:
         log.warning("unknown command: %r", msg)
 
