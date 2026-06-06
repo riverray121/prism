@@ -81,6 +81,7 @@ Deliverable: all stable features from the catalog.
 
 ## Milestone 5 — Favorites, polish, aspirational
 
+- **UI/UX design doc + dashboard rework.** Write a dedicated UI design doc (visual language, layout, interaction model, component system) now that the full feature set exists, then rework the frontend against it. The UI built through M1–M4 is intentionally minimal and functional — treat it as a replaceable presentation layer, not the final design. See the frontend layering contract in `development.md`.
 - Favorites UI + persistence (`favorites` field in profile.json)
 - Metadata editing in the library
 - Library filters (status, missing metadata)

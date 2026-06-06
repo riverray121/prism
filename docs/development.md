@@ -132,6 +132,19 @@ src/
 
 Don't build a generic `FeatureGraph` abstraction until three concrete graph types are working. Design from the concrete, not the abstract.
 
+**Frontend layering contract (keep the UI replaceable).** The UI through M1–M4 is intentionally minimal; a UI/UX design doc and reskin land in M5 (see `build-order.md`). To make that rework clean, keep a hard split between durable and disposable layers:
+
+- **Durable, presentation-free** — survives a reskin untouched: `lib/ipc` (commands + event stream), `lib/ipc/messages.ts` (zod schemas + types), `lib/state` (reactive stores and the actions that mutate them, e.g. `open`/`close`/queueing).
+- **Disposable presentation** — what the M5 rework replaces: `lib/components` (the `.svelte` views) and all Tailwind/styling.
+
+Rules that preserve the split:
+
+- Components are dumb: they render state and call actions. No IPC calls, disk access, or domain logic buried in markup — only presentational helpers (formatting) and event handlers that delegate to `state`/`ipc`.
+- Logic and side effects live in `state` or `ipc`, never in a component.
+- A component reskin must require zero changes to `ipc`/`state`/`messages.ts`. If a UI change forces edits there, the split has leaked — fix the layering, not the symptom.
+
+When shadcn-svelte is adopted (lazily; see the design doc) it formalizes the component layer without touching the durable layers.
+
 ## Documentation
 
 - Design decisions live in the design docs (`design-doc.md` + companions). Update when decisions change.
