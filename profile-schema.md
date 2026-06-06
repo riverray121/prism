@@ -1,0 +1,233 @@
+# Profile Schema
+
+JSON serialization of a single song's analysis. Consumed by the dashboard and by Stage 2 (the mapping tool). Versioned; major-version bumps are breaking.
+
+The design doc (`music-analysis-design-doc.md`) and feature catalog (`feature-catalog.md`) are companions to this file.
+
+---
+
+## Disk layout
+
+One folder per song. Sidecar paths in `profile.json` are relative to the profile itself.
+
+```
+library/
+  library.db                 # SQLite index of all songs
+  songs/
+    {uuid}/
+      profile.json
+      source.flac            # or .wav / .mp3 / .m4a
+      stems/
+        kick.wav
+        snare.wav
+        hats.wav
+        bass.wav
+        synth.wav
+        vocals.wav
+      heatmaps/
+        spectrogram.npy
+        chroma.npy
+        mfcc.npy
+        kick_mfcc.npy
+        snare_mfcc.npy
+        hats_mfcc.npy
+        bass_mfcc.npy
+        synth_mfcc.npy
+        vocals_mfcc.npy
+```
+
+`{uuid}` is UUIDv4, assigned at import.
+
+---
+
+## Top-level structure
+
+```json
+{
+  "schema_version": "0.1.0",
+  "song": {
+    "id": "f3a1c2b4-...",
+    "title": "Idol",
+    "artist": "Yeat",
+    "duration_sec": 234.52,
+    "sample_rate": 44100,
+    "source_file": "source.flac",
+    "imported_at": "2026-05-30T12:34:56Z",
+    "analyzed_at": "2026-05-30T13:00:00Z"
+  },
+  "timeline": {
+    "frame_rate_hz": 100,
+    "frame_count": 23452
+  },
+  "mix": {
+    "bpm": { ... },
+    "beats": { ... },
+    "spectrogram": { ... },
+    ...
+  },
+  "stems": {
+    "kick":   { "audio_file": "stems/kick.wav",   "features": { ... } },
+    "snare":  { "audio_file": "stems/snare.wav",  "features": { ... } },
+    "hats":   { "audio_file": "stems/hats.wav",   "features": { ... } },
+    "bass":   { "audio_file": "stems/bass.wav",   "features": { ... } },
+    "synth":  { "audio_file": "stems/synth.wav",  "features": { ... } },
+    "vocals": { "audio_file": "stems/vocals.wav", "features": { ... } }
+  },
+  "favorites": [
+    "mix.beats",
+    "stems.bass.features.pitch"
+  ]
+}
+```
+
+`mix` is flat; features are keyed by their catalog name. The `category` field on each feature is the only grouping signal — there is no nesting by category.
+
+---
+
+## Per-feature envelope
+
+Every feature entry carries the same metadata fields (`render`, `category`, `source`, `unit`) plus a payload that varies by render mode. Optional fields: `range`, `status`, `confidence`.
+
+### scalar
+
+```json
+"bpm": {
+  "render": "scalar",
+  "category": "rhythm",
+  "source": "librosa.beat",
+  "unit": "bpm",
+  "value": 128.0
+}
+```
+
+### continuous
+
+Sampled on the implicit 100 Hz timeline. `data` length equals `timeline.frame_count`. No timestamps stored.
+
+```json
+"rms": {
+  "render": "continuous",
+  "category": "amplitude",
+  "source": "librosa",
+  "unit": "normalized",
+  "range": [0, 1],
+  "data": [0.12, 0.15, 0.18, /* ... 23452 values ... */]
+}
+```
+
+ML continuous features add a parallel `confidence` array of equal length. WIP features add `"status": "wip"`:
+
+```json
+"valence": {
+  "render": "continuous",
+  "category": "emotional",
+  "source": "model_tbd",
+  "unit": "normalized",
+  "range": [0, 1],
+  "status": "wip",
+  "data":       [/* ... */],
+  "confidence": [/* ... */]
+}
+```
+
+### event
+
+```json
+"beats": {
+  "render": "event",
+  "category": "rhythm",
+  "source": "librosa.beat",
+  "events": [
+    {"t": 0.234},
+    {"t": 0.703}
+  ]
+}
+
+"chords": {
+  "render": "event",
+  "category": "tonal",
+  "source": "madmom",
+  "events": [
+    {"t": 0.0,  "root": "C",  "quality": "maj", "confidence": 0.91},
+    {"t": 4.12, "root": "Am", "quality": "min", "confidence": 0.84}
+  ]
+}
+```
+
+For ML event features, `confidence` is a field on each event.
+
+### segment
+
+```json
+"sections": {
+  "render": "segment",
+  "category": "structure",
+  "source": "msaf",
+  "segments": [
+    {"start": 0.0,  "end": 16.2, "label": "intro", "confidence": 0.87},
+    {"start": 16.2, "end": 48.4, "label": "verse", "confidence": 0.79},
+    {"start": 48.4, "end": 80.0, "label": "drop",  "confidence": 0.92}
+  ]
+}
+```
+
+### heatmap
+
+Payload lives in a sidecar `.npy` file. The JSON entry contains only the reference and shape metadata.
+
+```json
+"spectrogram": {
+  "render": "heatmap",
+  "category": "frequency",
+  "source": "librosa",
+  "unit": "dB",
+  "sidecar": "heatmaps/spectrogram.npy",
+  "shape": [513, 23452],
+  "axes": ["freq_hz", "time_frame"]
+}
+```
+
+`axes` names the meaning of each matrix dimension in order.
+
+---
+
+## Sidecar files
+
+- **Format:** NumPy `.npy`, uncompressed. One matrix per file.
+- **Path:** relative to `profile.json`, written in the feature's `sidecar` field.
+- **Required:** if a feature declares `sidecar`, the file must exist. Loader fails fast on missing sidecars (a half-loaded profile is worse than a clear error).
+
+Stem WAVs are referenced from `stems.{stem}.audio_file`, same rules apply.
+
+---
+
+## Versioning
+
+- `schema_version` follows semver.
+- **Minor bumps:** backward-compatible additions — new optional fields, new features in the catalog.
+- **Major bumps:** breaking changes — renamed/removed fields, changed semantics, changed sidecar conventions.
+- Loaders check the major version on load and refuse unknown majors.
+- Current: `0.1.0`.
+
+---
+
+## Confidence
+
+- **DSP features:** omit `confidence` entirely.
+- **ML `continuous` features:** parallel `confidence` array, same length as `data`.
+- **ML `event` / `segment` features:** `confidence` field on each entry.
+- **ML `scalar` features:** `confidence` as a sibling field (e.g. `key_confidence` in the catalog).
+
+---
+
+## Status
+
+Features marked `[WIP]` in the catalog carry `"status": "wip"` in the profile. Loaders may render these with reduced emphasis or filter them out entirely. Absence of `status` means the feature is stable.
+
+---
+
+## Favorites
+
+- Array of dot-path strings referencing canonical feature locations.
+- Examples: `"mix.beats"`, `"stems.bass.features.pitch"`, `"mix.sections"`.
+- Loader validates that each path resolves at load time; broken favorites trigger a warning, not a load failure (a removed feature shouldn't kill the profile).
