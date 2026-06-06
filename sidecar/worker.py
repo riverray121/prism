@@ -10,8 +10,10 @@ import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+import librosa
+
 from . import library, storage
-from .features import rhythm
+from .features import amplitude, rhythm
 
 log = logging.getLogger("sidecar.worker")
 
@@ -38,12 +40,21 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
     on_change()  # reflect 'analyzing'
     try:
         audio_path = storage.LIBRARY_ROOT / song["source_path"]
-        bpm = rhythm.compute_bpm(audio_path)
+        # Load the mixed-down signal once; every mix feature works off it.
+        y, sr = librosa.load(audio_path, mono=True)
+        bpm = rhythm.compute_bpm(y, sr)
+        rms_data, frame_rate_hz = amplitude.compute_rms(y, sr)
         analyzed_at = _now()
-        storage.write_profile(song, bpm=bpm, analyzed_at=analyzed_at)
+        storage.write_profile(
+            song,
+            analyzed_at=analyzed_at,
+            bpm=bpm,
+            rms_data=rms_data,
+            frame_rate_hz=frame_rate_hz,
+        )
         with library.connect() as con:
             library.mark_analyzed(con, song_id, analyzed_at)
-        log.info("analyzed %s bpm=%.1f", song_id, bpm)
+        log.info("analyzed %s bpm=%.1f rms_frames=%d", song_id, bpm, len(rms_data))
     except Exception as exc:
         log.exception("analysis failed: %s", song_id)
         with library.connect() as con:

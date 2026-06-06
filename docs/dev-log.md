@@ -11,10 +11,11 @@
 - **M1 slice 1 — SQLite + import.** `library.db` (`songs` table, full design-doc column set), per-song folder `library/songs/{uuid}/source.ext`. Metadata via mutagen (tags → `Artist - Title` filename → "Unknown"; duration/sample-rate across all 4 formats). IPC: `library.import` / `library.list` → `library.songs` snapshot. Frontend: `$lib/ipc` (zod-validated event stream), `$lib/state`, `LibraryPanel` with native file picker (tauri-plugin-dialog). Verified end-to-end in the running app with real test tracks (FLAC + MP3).
 - **M1 slice 2 — Worker + BPM.** Background worker thread (`worker.py`) drains the `status='queued'` set oldest-first, computes BPM (librosa, `features/rhythm.py`), writes `profile.json` (`mix.bpm` scalar), flips `queued → analyzing → analyzed` (or `failed`). `queue.add` command; status live-updates via `library.songs` snapshots emitted on each transition (`ipc.py` serializes stdout writes across threads). Frontend: Analyze/Retry button per row. Verified end-to-end in the running app (BPM 161.5 for Joji – Dior).
 - **M1 slice 3 — Inspection view (text).** `profile.get` command → `profile` event (sidecar reads `profile.json`; frontend owns no disk access). Frontend: zod `Profile` schema, `$lib/state/inspection`, `InspectionView` component, clickable analyzed rows, library/inspection view toggle. Shows BPM as text. Verified in the running app.
+- **M1 slice 4 — RMS line graph.** Profile gains `timeline` (frame_rate_hz, frame_count) and a continuous `rms` feature (peak-normalized 0–1, ~100 Hz). Worker now loads the signal once and passes `(y, sr)` to pure extractors (`rhythm.compute_bpm`, `amplitude.compute_rms`). Frontend: `ContinuousFeature` zod schema, `RmsGraph` component (concrete uPlot line, x=seconds from frame index, responsive via ResizeObserver). Verified in the running app.
 
 ## Todo
 
-- **M1 remaining** — RMS line graph (uPlot) → playback + playhead.
+- **M1 remaining** — playback + playhead (Web Audio, vertical line sweeping the RMS graph in sync). Last M1 slice.
 - **M2 — Mix-level DSP fill-out**
 - **M3 — Demucs + per-stem DSP**
 - **M4 — ML classification + structure**

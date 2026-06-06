@@ -35,9 +35,17 @@ def import_file(source: Path) -> tuple[str, str]:
     return song_id, str(dest.relative_to(LIBRARY_ROOT))
 
 
-def write_profile(song: dict, *, bpm: float, analyzed_at: str) -> None:
-    """Write profile.json for an analyzed song. M1 holds only the bpm feature.
+def write_profile(
+    song: dict,
+    *,
+    analyzed_at: str,
+    bpm: float,
+    rms_data: list[float],
+    frame_rate_hz: float,
+) -> None:
+    """Write profile.json for an analyzed song. M1 holds bpm + rms.
 
+    Continuous features sample on the timeline (frame_rate_hz, frame_count).
     Sidecar paths in the profile are relative to profile.json itself, so
     source_file is just the filename.
     """
@@ -53,6 +61,10 @@ def write_profile(song: dict, *, bpm: float, analyzed_at: str) -> None:
             "imported_at": song["imported_at"],
             "analyzed_at": analyzed_at,
         },
+        "timeline": {
+            "frame_rate_hz": frame_rate_hz,
+            "frame_count": len(rms_data),
+        },
         "mix": {
             "bpm": {
                 "render": "scalar",
@@ -60,7 +72,15 @@ def write_profile(song: dict, *, bpm: float, analyzed_at: str) -> None:
                 "source": "librosa.beat",
                 "unit": "bpm",
                 "value": bpm,
-            }
+            },
+            "rms": {
+                "render": "continuous",
+                "category": "amplitude",
+                "source": "librosa",
+                "unit": "normalized",
+                "range": [0, 1],
+                "data": rms_data,
+            },
         },
     }
     path = SONGS_DIR / song["id"] / "profile.json"
