@@ -1,0 +1,19 @@
+# Linters and formatters only — no tests (slow, and local test runs cover safety).
+repos:
+  # Python: lint + format the sidecar.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.16
+    hooks:
+      - id: ruff
+      - id: ruff-format
+
+  # Frontend: Prettier with Svelte + Tailwind plugins. Local hook so it uses
+  # the project's prettier and plugins from node_modules.
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier
+        entry: pnpm exec prettier --write
+        language: system
+        files: \.(svelte|ts|js|css|json|md|html)$
+        exclude: ^(pnpm-lock\.yaml|src-tauri/|build/|\.svelte-kit/)

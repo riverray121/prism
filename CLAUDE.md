@@ -22,7 +22,7 @@ Maintain `docs/dev-log.md`. Update it as work progresses. Three sections:
 
 Keep it simple and concise. One line per entry where possible. Move entries from Todo → Completed as work finishes. Append to Notes when something is worth remembering but isn't actionable.
 
-The dev log is for *development context* that doesn't belong in the design docs. Design changes go into the design docs themselves.
+The dev log is for _development context_ that doesn't belong in the design docs. Design changes go into the design docs themselves.
 
 ## Code comments
 
@@ -45,6 +45,7 @@ Comment frequently but not excessively. Comments must be concise, precise, accur
 ## Source of truth
 
 Design and process are documented in `docs/`:
+
 - `docs/design-doc.md` — overall design
 - `docs/feature-catalog.md` — every analyzed feature
 - `docs/profile-schema.md` — JSON profile spec

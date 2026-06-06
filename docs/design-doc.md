@@ -153,7 +153,7 @@ Canonical feature list lives in [`feature-catalog.md`](./feature-catalog.md), wi
 - **Section detection** (hybrid heuristics + ML): intro / verse / chorus / drop / breakdown / outro
 - **Motif / phrase recurrence**
 - **Novelty score** (per-frame, self-similarity)
-- **Emotional valence, tension/release** *(aspirational — no committed model yet)*
+- **Emotional valence, tension/release** _(aspirational — no committed model yet)_
 
 No models trained from scratch — all pretrained, all run locally.
 
@@ -190,6 +190,7 @@ Full spec lives in [`profile-schema.md`](./profile-schema.md). Summary:
 ## Dashboard Spec
 
 ### Library panel
+
 - View all imported songs with live status
 - Select one or many → start analysis (queued, run concurrently up to the limit)
 - Import new files
@@ -206,15 +207,18 @@ Each feature gets its own graph, stacked vertically on a shared time (X) axis. R
 A per-feature **Y-axis dropdown** switches between that feature's dimensions (e.g. bass → energy / pitch / transient sharpness).
 
 ### Playback + tracker
+
 - Play the song
 - A vertical playhead sweeps across all graphs in sync on the shared time axis
 - Lets the user confirm a given spike corresponds to the sound they hear at that moment
 
 ### Favoriting
+
 - Mark features (or specific dimensions) as favorited
 - Favorited set is emphasized/flagged in the exported profile
 
 ### Save / Load
+
 - Save analyzed profile to file (full analysis + favorites)
 - Load previously analyzed songs back into the dashboard without reprocessing
 
@@ -222,14 +226,14 @@ A per-feature **Y-axis dropdown** switches between that feature's dimensions (e.
 
 ## DSP vs ML Summary
 
-| Deterministic (DSP)          | Requires ML (pretrained)        |
-| ---------------------------- | ------------------------------- |
-| BPM, beats, onsets           | Stem separation (Demucs)        |
-| All spectral features        | Sound-type classification (PANNs)|
-| Volume, ADSR, transients     | Section detection (hybrid)      |
-| MFCC, ZCR, flatness          | Motif recurrence                |
-| Key/chord (mostly)           | Novel vs repeated sounds (hybrid)|
-| Stereo width, reverb         | Emotional valence               |
+| Deterministic (DSP)      | Requires ML (pretrained)          |
+| ------------------------ | --------------------------------- |
+| BPM, beats, onsets       | Stem separation (Demucs)          |
+| All spectral features    | Sound-type classification (PANNs) |
+| Volume, ADSR, transients | Section detection (hybrid)        |
+| MFCC, ZCR, flatness      | Motif recurrence                  |
+| Key/chord (mostly)       | Novel vs repeated sounds (hybrid) |
+| Stereo width, reverb     | Emotional valence                 |
 
 ---
 

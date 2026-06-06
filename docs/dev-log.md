@@ -6,19 +6,12 @@
 - GitHub repo created: `riverray121/prism` (public), `origin` tracking `main`.
 - **M0** — Tauri scaffold: Svelte 5 + SvelteKit (static SPA) + Tailwind v4 frontend, Rust shell. Frontend builds, Rust shell compiles. Demo page replaced with minimal placeholder.
 - **M0** — Python sidecar: uv project (Python 3.12), `sidecar/` package with pydantic IPC models. `python -m sidecar` reads JSON-lines on stdin, echoes `pong`; logs to stderr to keep stdout clean.
-- **M0** — Rust shell spawns sidecar (`uv run python -m sidecar`), forwards its stdout lines to the frontend as `sidecar-message` events, exposes `send_to_sidecar` command. Frontend sends ping, displays pong. End-to-end ping/pong round-trip.
+- **M0** — Rust shell spawns sidecar (`uv run python -m sidecar`), forwards its stdout lines to the frontend as `sidecar-message` events, exposes `send_to_sidecar` command. Frontend sends ping, displays pong. End-to-end ping/pong round-trip (manually verified).
+- **M0** — Tooling: pre-commit with ruff (Python) and Prettier + Svelte/Tailwind plugins (frontend); root README. **M0 complete.**
 
 ## Todo
 
-- **M0 — Scaffolding**
-  - ~~Tauri project scaffold (TypeScript frontend, Rust shell)~~ ✓
-  - ~~Python sidecar spawned by the Rust shell~~ ✓
-  - ~~stdin/stdout JSON-line ping/pong round-trip~~ ✓
-  - ~~Python deps managed with `uv`~~ ✓
-  - Initial `pre-commit` config installed
-  - `README.md` at repo root with one-paragraph project description + links to design docs
-
-- **M1 — Magic moment** (see `build-order.md`)
+- **M1 — Magic moment** (see `build-order.md`) — next: SQLite + import → worker + BPM → inspection view → RMS → playback + playhead
 - **M2 — Mix-level DSP fill-out**
 - **M3 — Demucs + per-stem DSP**
 - **M4 — ML classification + structure**
