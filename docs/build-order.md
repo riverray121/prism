@@ -47,9 +47,10 @@ Add the rest of the mix-level features from `feature-catalog.md`. Each new rende
 - `mfcc` or `spectrogram` — first `heatmap` feature; validates the `.npy` sidecar pipeline
 - `sections` — first `segment` feature; render as labeled bands (this is ML; can defer to M4 to keep M2 DSP-only)
 - Remaining cheap DSP: band energy (6 bands), spectral centroid/flux/flatness/rolloff, chroma, key, chord events, LUFS, peak, dynamic range, ZCR, stereo width
-- Dashboard: stacked graphs on shared time axis, Y-axis dropdown per feature
 
-Deliverable: fully-featured analysis for everything that doesn't require stem separation.
+**No UI design work in M2.** Each feature renders into the existing minimal stacked-graph layout as it lands — just enough to confirm the data is correct. All UI/UX design (the dashboard: shared time axis, shared zoom/playhead, Y-axis dropdown, and consolidating the per-graph interaction code) is deferred to a single redesign in M5. Do not build the dashboard incrementally here.
+
+Deliverable: fully-featured analysis for everything that doesn't require stem separation, shown in the throwaway minimal UI.
 
 ---
 
@@ -81,7 +82,7 @@ Deliverable: all stable features from the catalog.
 
 ## Milestone 5 — Favorites, polish, aspirational
 
-- **UI/UX design doc + dashboard rework.** Write a dedicated UI design doc (visual language, layout, interaction model, component system) now that the full feature set exists, then rework the frontend against it. The UI built through M1–M4 is intentionally minimal and functional — treat it as a replaceable presentation layer, not the final design. See the frontend layering contract in `development.md`.
+- **UI/UX design doc + dashboard rework.** Write a dedicated UI design doc (visual language, layout, interaction model, component system) now that the full feature set exists, then rework the frontend against it. The UI built through M1–M4 is intentionally minimal and functional — treat it as a replaceable presentation layer, not the final design. See the frontend layering contract in `development.md`. This is the single place all UI design happens; nothing UI is designed piecemeal before here. Scope includes the **dashboard** (stacked graphs on a shared time axis, shared zoom/playhead across all lanes, Y-axis dropdown per feature) and **consolidating the zoom/scrub/playhead interaction code** currently duplicated across the concrete graph components (`ContinuousGraph`, `EventGraph`, `HeatmapGraph`) into one shared time-axis layer.
 - Favorites UI + persistence (`favorites` field in profile.json)
 - Metadata editing in the library
 - Library filters (status, missing metadata)

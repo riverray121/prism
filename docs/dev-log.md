@@ -20,15 +20,14 @@
 
 ## Todo
 
-- **M2 slice 4 — dashboard** (stacked graphs on a shared time axis + shared zoom/playhead; consolidate the duplicated zoom/scrub/playhead scaffolding from the three graph components into one shared time-axis layer; Y-axis dropdown per feature). (`mfcc`/`spectrogram` via `.npy` + Canvas2D).
-- **M2 slice 4 — dashboard** (stacked graphs on a shared time axis, Y-axis dropdown).
-- **M2 remaining DSP** needing extra deps/stereo: `chroma`, `chords`, `key` via essentia, `loudness_lufs` (pyloudnorm), `stereo_width` (stereo load).
+- **M2 remaining DSP** needing extra deps/stereo: `chroma` (heatmap), `chords` (event), `key` via essentia, `loudness_lufs` (pyloudnorm), `stereo_width` (stereo load). Each renders into the existing minimal UI — no UI design work.
 - **M3 — Demucs + per-stem DSP**
 - **M4 — ML classification + structure**
-- **M5 — Favorites, polish, aspirational**
+- **M5 — single UI/UX redesign + favorites/polish.** All UI design happens here, in one pass: the dashboard (shared time axis, shared zoom/playhead, Y-axis dropdown per feature) and consolidating the zoom/scrub/playhead code duplicated across `ContinuousGraph`/`EventGraph`/`HeatmapGraph` into one shared time-axis layer. No incremental dashboard or UI design before M5.
 
 ## Notes
 
+- **All UI design deferred to one M5 redesign.** Through M2–M4 each feature renders into the existing minimal stacked-graph layout, just enough to confirm the data. No dashboard, no shared-axis/zoom consolidation, no layout polish until M5 — the whole UI is designed and built once, against a UI/UX design doc, after the full feature set exists. The duplicated zoom/scrub/playhead code across the three graph components is intentional debt to be paid off then.
 - **Sidecar launch: spawn from source.** Tauri's Rust shell spawns `uv run python -m sidecar` as a child process. Reproducibility comes from `uv.lock`, not freezing. Chosen over the Tauri "true sidecar" (frozen binary) because: (1) edit-test loop stays in seconds instead of requiring a PyInstaller rebuild on every Python change; (2) the hard part of freezing is torch/Demucs native libs, which don't land until M3 — so freezing early doesn't de-risk what it would seem to. Do a dedicated freeze spike at M3.
 - **Python pinned to 3.12** via uv (not system 3.13). De-risks madmom and essentia, which lag new Python releases and have M-series build friction.
 - **No ORM for `library.db`.** Queries are hand-written stdlib `sqlite3`, all isolated in `library.py`; callers never see SQL. Fine while the DB is a single index table. **Shipping caveat:** today the DB is dev-only and gitignored, so a schema change just means recreating it — but if we ever ship to users, changing the schema means real migrations against databases they already have. At that point adopt a migration story (and likely SQLModel, since pydantic is already in use).
