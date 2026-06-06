@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RmsGraph from "$lib/components/RmsGraph.svelte";
   import { close, inspection } from "$lib/state/inspection.svelte";
 
   // BPM rounded for display; the profile keeps the raw value.
@@ -33,6 +34,18 @@
       <p class="text-3xl font-semibold tabular-nums">
         {formatBpm(inspection.profile.mix.bpm.value)}
       </p>
+    </div>
+
+    <div
+      class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+    >
+      <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+        RMS (volume envelope)
+      </p>
+      <RmsGraph
+        rms={inspection.profile.mix.rms}
+        frameRateHz={inspection.profile.timeline.frame_rate_hz}
+      />
     </div>
   {/if}
 </section>

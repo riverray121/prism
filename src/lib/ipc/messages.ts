@@ -36,6 +36,15 @@ export const ScalarFeatureSchema = z.object({
   value: z.number(),
 });
 
+export const ContinuousFeatureSchema = z.object({
+  render: z.literal("continuous"),
+  category: z.string(),
+  source: z.string(),
+  unit: z.string(),
+  range: z.tuple([z.number(), z.number()]).optional(),
+  data: z.array(z.number()),
+});
+
 export const ProfileSchema = z.object({
   schema_version: z.string(),
   song: z.object({
@@ -48,8 +57,13 @@ export const ProfileSchema = z.object({
     imported_at: z.string(),
     analyzed_at: z.string(),
   }),
+  timeline: z.object({
+    frame_rate_hz: z.number(),
+    frame_count: z.number(),
+  }),
   mix: z.object({
     bpm: ScalarFeatureSchema,
+    rms: ContinuousFeatureSchema,
   }),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
