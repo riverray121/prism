@@ -25,6 +25,8 @@ How we build and maintain this project. Companion to `design-doc.md`.
 
 **Fixtures:** `tests/fixtures/` holds ~3 short audio clips (≤30s, varied content — one EDM, one vocal-heavy, one ambient). Small enough to live in git.
 
+**When tests run:** the full suite runs automatically on `git push` via a `pre-push` hook, not on every commit. This keeps commits fast (test startup is slow once librosa/torch are imported) while gating code before it leaves the machine — matching the "push only after tested" rule in `CLAUDE.md`. Wired in M1, when the first tests exist (an empty `pytest` run fails with exit code 5, so the hook can't be added before then).
+
 ## Dependency management
 
 | Layer                 | Tool    | Lockfile         |
@@ -57,13 +59,13 @@ CD is irrelevant until distribution becomes a goal. Tauri has GitHub Actions tem
 
 ## Pre-commit
 
-Use the `pre-commit` framework. Run `pre-commit install` once after cloning; hooks run before each commit.
+Use the `pre-commit` framework. Run `pre-commit install` once after cloning. Fast linters and formatters run on every commit; the test suite runs on `git push` (see [Testing](#testing) for the `pre-push` rationale).
 
 Python uses `ruff` (lint + format). The frontend uses **Prettier** with `prettier-plugin-svelte` and `prettier-plugin-tailwindcss`, run as a local hook so it picks up the project's plugins from `node_modules`. Prettier replaces the originally-planned Biome because Biome does not format `.svelte` files, which is where most frontend code lives; Prettier covers Svelte, TS/JS, CSS, JSON, and Markdown, and auto-sorts Tailwind classes. Prettier is formatter-only — JS linting (ESLint) can be added later if real gaps appear; type diagnostics already come from `svelte-check` (`pnpm check`).
 
 See `.pre-commit-config.yaml` for the current hooks and pinned revisions.
 
-**Linters and formatters only — no tests.** Tests in pre-commit are annoying when slow and don't add safety that local test-runs don't already give.
+**Commit stage: linters and formatters only.** Tests on the commit stage are annoying when slow and don't add safety that the `pre-push` run doesn't already give.
 
 ## Type checking
 
