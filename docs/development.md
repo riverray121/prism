@@ -34,7 +34,9 @@ All lockfiles are committed.
 
 **Not used: Docker.** Tauri apps run natively on the user's machine — there is no server to containerize. Docker would add a layer we'd then have to undo to ship.
 
-**Bundling for distribution:** deferred. For personal use, run from source. When eventually shipping, the Python sidecar needs bundling (PyInstaller / PyOxidizer / embedded Python distribution). Non-trivial because of PyTorch/Demucs native libs — solve when shipping becomes a goal.
+**Sidecar launch (dev):** Tauri's Rust shell spawns `uv run python -m sidecar` as a child process. This is intentionally *not* Tauri's "true sidecar" (frozen binary) mechanism — the edit-test loop stays in seconds, and `uv.lock` provides the reproducibility that freezing would otherwise give. Python is pinned to **3.12** via uv to de-risk madmom and essentia.
+
+**Bundling for distribution:** deferred. For personal use, run from source. When eventually shipping, the Python sidecar needs to be frozen (PyInstaller / PyOxidizer) and placed at `src-tauri/binaries/sidecar-{target-triple}` for Tauri's sidecar bundler to pick up. Non-trivial because of PyTorch/Demucs native libs — plan for a dedicated spike at M3 when torch first lands.
 
 ## CI/CD
 
