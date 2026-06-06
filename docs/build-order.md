@@ -86,6 +86,8 @@ Deliverable: all stable features from the catalog.
 - Library filters (status, missing metadata)
 - Better error / retry UX
 - Aspirational features (`valence`, `tension`) — implement or drop
+- YouTube import — paste a URL, auto-download the audio as FLAC via `yt-dlp` (`yt-dlp -f bestaudio -x --audio-format flac -o "%(title)s (YouTube).%(ext)s" <url>`), then run it through the normal import flow
+- Color palettes — select from or create named palettes of colors that go well together; swapping a palette remaps the visualizer config automatically
 
 Deliverable: shipping-quality v1.
 
