@@ -1,7 +1,7 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
 
-  import { importFiles } from "$lib/ipc";
+  import { importFiles, queueAnalysis } from "$lib/ipc";
   import { library } from "$lib/state/library.svelte";
 
   // Open a native file picker and import the selected audio files.
@@ -15,6 +15,11 @@
     if (selected === null) return;
     const paths = Array.isArray(selected) ? selected : [selected];
     await importFiles(paths);
+  }
+
+  // Queue a song for analysis.
+  function analyze(songId: string) {
+    return queueAnalysis([songId]);
   }
 
   // Uppercase file extension from the stored source path (e.g. "FLAC", "MP3").
@@ -60,6 +65,7 @@
             <th class="px-3 py-2 font-medium">Type</th>
             <th class="px-3 py-2 font-medium">Duration</th>
             <th class="px-3 py-2 font-medium">Status</th>
+            <th class="px-3 py-2"></th>
           </tr>
         </thead>
         <tbody>
@@ -80,6 +86,16 @@
                 {formatDuration(song.duration_sec)}
               </td>
               <td class="px-3 py-2 text-neutral-500">{song.status}</td>
+              <td class="px-3 py-2 text-right">
+                {#if song.status === "unanalyzed" || song.status === "failed"}
+                  <button
+                    onclick={() => analyze(song.id)}
+                    class="rounded bg-neutral-200 px-2 py-1 text-xs font-medium hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+                  >
+                    {song.status === "failed" ? "Retry" : "Analyze"}
+                  </button>
+                {/if}
+              </td>
             </tr>
           {/each}
         </tbody>

@@ -17,6 +17,10 @@ export function listLibrary(): Promise<void> {
   return sendCommand({ type: "library.list" });
 }
 
+export function queueAnalysis(songIds: string[]): Promise<void> {
+  return sendCommand({ type: "queue.add", song_ids: songIds });
+}
+
 // Subscribe to validated sidecar events. Each stdout line is parsed and checked
 // against the schema; malformed or unknown lines are logged and dropped.
 // Returns an unsubscribe function.
