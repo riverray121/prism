@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+/* Root surface follows the OS light/dark theme. color-scheme enables light-dark()
+   and themes native scrollbars; overscroll-behavior kills the rubber-band gap
+   that otherwise exposes the page background at the top and bottom. */
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+  html,
+  body {
+    height: 100%;
+    overscroll-behavior: none;
+    background-color: light-dark(
+      var(--color-neutral-50),
+      var(--color-neutral-950)
+    );
+    color: light-dark(var(--color-neutral-900), var(--color-neutral-100));
+  }
+}
