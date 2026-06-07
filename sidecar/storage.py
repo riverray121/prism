@@ -83,7 +83,9 @@ def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:
     rel = f"heatmaps/{name}.npy"
     path = SONGS_DIR / song_id / rel
     path.parent.mkdir(parents=True, exist_ok=True)
-    np.save(path, matrix.astype(np.float32))
+    # Force C-order: some librosa features (e.g. chroma_cqt) return Fortran-order
+    # arrays, and the frontend .npy parser only reads C-order.
+    np.save(path, np.ascontiguousarray(matrix, dtype=np.float32))
     return rel
 
 

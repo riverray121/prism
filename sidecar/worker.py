@@ -14,7 +14,7 @@ import librosa
 import numpy as np
 
 from . import library, storage
-from .features import amplitude, frequency, rhythm, timbre, tonal
+from .features import amplitude, frequency, rhythm, spatial, timbre, tonal
 
 log = logging.getLogger("sidecar.worker")
 
@@ -28,13 +28,14 @@ N_FFT = 2048
 
 
 def _analyze(
-    y: np.ndarray, sr: int
+    y: np.ndarray, y_stereo: np.ndarray, sr: int
 ) -> tuple[float, int, dict[str, dict], dict[str, np.ndarray]]:
     """Run every mix-level feature off one loaded signal.
 
-    Returns (frame_rate_hz, frame_count, mix, heatmaps). Continuous features and
-    heatmap matrices are truncated to a shared frame_count so they line up on the
-    timeline; heatmap matrices are written to .npy sidecars by the caller.
+    ``y`` is mono (most features); ``y_stereo`` is the raw load (mono or 2-channel)
+    for spatial features. Returns (frame_rate_hz, frame_count, mix, heatmaps).
+    Continuous features and heatmap matrices are truncated to a shared frame_count
+    so they line up on the timeline; heatmaps are written to .npy by the caller.
     """
     hop = max(1, round(sr / TARGET_FRAME_RATE_HZ))
     frame_rate_hz = sr / hop
@@ -46,6 +47,7 @@ def _analyze(
         **rhythm.rhythm_features(y, sr),  # bpm (scalar) + beats (event)
         "rms": amplitude.rms(y, sr, hop),
         "peak": amplitude.peak(y, sr, hop),
+        "loudness_lufs": amplitude.loudness_lufs(y, sr, hop),
         "dynamic_range": amplitude.dynamic_range(y, sr),
         "spectral_centroid": frequency.spectral_centroid(spectrum, sr),
         "spectral_rolloff": frequency.spectral_rolloff(spectrum, sr),
@@ -53,12 +55,16 @@ def _analyze(
         "spectral_flux": frequency.spectral_flux(spectrum),
         **frequency.band_energies(spectrum, sr, N_FFT),
         "zero_crossing_rate": timbre.zero_crossing_rate(y, hop),
+        "stereo_width": spatial.stereo_width(y_stereo, sr, hop),
         "key": key_env,
         "key_confidence": key_conf,
         "tuning_deviation": tonal.tuning_deviation(y, sr),
     }
     # Heatmap matrices (raw, shape [bins, frames]); aligned and registered below.
-    heatmaps: dict[str, np.ndarray] = {"mfcc": timbre.mfcc(y, sr, hop)}
+    heatmaps: dict[str, np.ndarray] = {
+        "mfcc": timbre.mfcc(y, sr, hop),
+        "chroma": tonal.chroma(y, sr, hop),
+    }
 
     # Align continuous features: truncate each to the shortest so they share one
     # frame_count (librosa feature lengths can differ by a frame from centering).
@@ -83,6 +89,11 @@ _HEATMAP_META = {
         "category": "timbre",
         "unit": "coefficient",
         "axes": ["mfcc", "time_frame"],
+    },
+    "chroma": {
+        "category": "tonal",
+        "unit": "energy",
+        "axes": ["pitch_class", "time_frame"],
     },
 }
 
@@ -119,9 +130,10 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
     on_change()  # reflect 'analyzing'
     try:
         audio_path = storage.LIBRARY_ROOT / song["source_path"]
-        # Load the mixed-down signal once; every mix feature works off it.
-        y, sr = librosa.load(audio_path, mono=True)
-        frame_rate_hz, frame_count, mix, heatmaps = _analyze(y, sr)
+        # Load once, keeping channels for spatial features; derive mono for the rest.
+        y_stereo, sr = librosa.load(audio_path, mono=False)
+        y = librosa.to_mono(y_stereo)
+        frame_rate_hz, frame_count, mix, heatmaps = _analyze(y, y_stereo, sr)
         # Heatmap payloads go to .npy sidecars; only their envelopes sit in the profile.
         for name, matrix in heatmaps.items():
             storage.write_heatmap(song_id, name, matrix)

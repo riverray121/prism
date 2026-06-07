@@ -65,3 +65,12 @@ def tuning_deviation(y: np.ndarray, sr: int) -> dict:
         "unit": "cents",
         "value": tuning * 100.0,
     }
+
+
+def chroma(y: np.ndarray, sr: int, hop: int) -> np.ndarray:
+    """Pitch-class energy heatmap: matrix of shape (12, frames).
+
+    Returned as a raw matrix (not an envelope) — written to a .npy sidecar by the
+    worker, like other heatmaps.
+    """
+    return librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop)
