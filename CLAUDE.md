@@ -42,6 +42,14 @@ Comment frequently but not excessively. Comments must be concise, precise, accur
 - Commit messages are a single line — a concise subject only. No body, no bulleted lists.
 - Do not push on every commit. Commit locally as work progresses; push only after the user has tested and confirmed a feature works.
 
+## Verifying features — the user tests, not Claude
+
+Do **not** manually run the analysis pipeline on library songs, regenerate `profile.json`, manipulate `library.db`, or otherwise alter library data to demonstrate or verify a feature. The user tests each feature themselves through the running app. Verify your own code only with isolated, unit-level checks (pure extractor calls on a signal, type checks, lint) that never touch the library. Only modify the database or library data when **explicitly** asked.
+
+Note: the Python sidecar is **not** hot-reloaded. Tauri spawns it once at app launch and only restarts it on Rust changes — so after editing any sidecar code, the running app must be relaunched before its analysis reflects the change.
+
+Always launch (or relaunch) the app yourself after making changes the user needs to test, so a fresh sidecar with the current code is running and the user never has to start it manually. Just launch it — do not import or analyze anything.
+
 ## Source of truth
 
 Design and process are documented in `docs/`:

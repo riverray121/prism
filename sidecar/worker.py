@@ -44,7 +44,7 @@ def _analyze(
 
     key_env, key_conf = tonal.key(y, sr)
     mix: dict[str, dict] = {
-        **rhythm.rhythm_features(y, sr),  # bpm (scalar) + beats (event)
+        **rhythm.rhythm_features(y, sr),  # bpm (scalar) + beats, downbeats (event)
         "rms": amplitude.rms(y, sr, hop),
         "peak": amplitude.peak(y, sr, hop),
         "loudness_lufs": amplitude.loudness_lufs(y, sr, hop),

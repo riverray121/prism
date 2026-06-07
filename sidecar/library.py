@@ -38,8 +38,16 @@ def connect() -> Iterator[sqlite3.Connection]:
     storage.LIBRARY_ROOT.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(storage.DB_PATH)
     con.row_factory = sqlite3.Row
-    # WAL allows the worker thread to write while the UI reads, from M2 on.
-    con.execute("PRAGMA journal_mode=WAL")
+    # WAL (worker writes while the UI reads) is a persistent DB property, so set
+    # it once. Switching to WAL takes an exclusive lock and ignores busy_timeout,
+    # so on a freshly created DB the worker and UI threads can collide on the
+    # switch — only switch if it isn't already WAL, and tolerate a concurrent
+    # setter winning the race.
+    if con.execute("PRAGMA journal_mode").fetchone()[0].lower() != "wal":
+        try:
+            con.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            pass
     con.execute(_SCHEMA)
     try:
         yield con
