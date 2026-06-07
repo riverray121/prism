@@ -41,23 +41,35 @@ Deliverable: a working build of Prism with two features. Validates the full stac
 
 ## Milestone 2 — Fill out mix-level DSP
 
-Add the rest of the mix-level features from `feature-catalog.md`. Each new render mode is a small integration.
+The cheap, dependency-light mix-level features from `feature-catalog.md`. **Done:**
 
-- `beats` — first `event` feature; render as vertical ticks
-- `mfcc` or `spectrogram` — first `heatmap` feature; validates the `.npy` sidecar pipeline
-- `sections` — first `segment` feature; render as labeled bands (this is ML; can defer to M4 to keep M2 DSP-only)
-- Remaining cheap DSP: band energy (6 bands), spectral centroid/flux/flatness/rolloff, chroma, key, chord events, LUFS, peak, dynamic range, ZCR, stereo width
+- `beats` — first `event` feature (ticks)
+- `spectrogram`, `mfcc`, `chroma` — `heatmap` features via the `.npy` sidecar pipeline
+- band energy (6 bands), spectral centroid/flux/flatness/rolloff, key (+ confidence, tuning), LUFS, peak, dynamic range, ZCR, stereo width — plus `bpm`/`rms` from M1
 
-**No UI design work in M2.** Each feature renders into the existing minimal stacked-graph layout as it lands — just enough to confirm the data is correct. All UI/UX design (the dashboard: shared time axis, shared zoom/playhead, Y-axis dropdown, and consolidating the per-graph interaction code) is deferred to a single redesign in M5. Do not build the dashboard incrementally here.
+Render modes covered: `scalar`, `continuous`, `event`, `heatmap` (`segment` arrives in M4).
 
-Deliverable: fully-featured analysis for everything that doesn't require stem separation, shown in the throwaway minimal UI.
+**No UI design work in M2.** Each feature renders into the existing minimal stacked-graph layout — just enough to confirm the data is correct. All UI/UX design (the dashboard: shared time axis, shared zoom/playhead, Y-axis dropdown, and consolidating the per-graph interaction code) is deferred to a single redesign in M5. Do not build the dashboard incrementally here.
+
+**Reassigned out of M2** (clean exit — every catalog feature has a home):
+
+- `chords` (event) → **M3**, via the BTC transformer (PyTorch) — pulled in with Demucs's torch dependency.
+- `downbeats` (event) → **M3** — needs `madmom` or an alternative; decided alongside chords.
+- `silence` (segment), `rhythmic_density` (continuous) → **M4** — `silence` introduces the `segment` render mode, which lands with `sections`.
+- `swing`, `harmonic_complexity`, `reverb_amount`, `roughness` (`[WIP]`; `roughness` needs essentia/AGPL) → **M5** — aspirational/refinement.
+- `sections`/`motifs`/`novelty` and PANNs `sound_tags`/`timbral_axes` (ML) → **M4** (already planned).
+- `valence`/`tension` (`[WIP]` emotional ML) → **M5** (already planned).
+
+Deliverable: complete mix-level DSP for everything cheap and dependency-light; deeper-dependency, segment-mode, ML, and WIP features reassigned above.
 
 ---
 
 ## Milestone 3 — Demucs + per-stem DSP
 
-First long-running stage. Sub-progress and failure handling matter here.
+First long-running stage, and where PyTorch enters. Sub-progress and failure handling matter here.
 
+- **`chords` (event) — front of M3, via the BTC transformer** ([jayg996/BTC-ISMIR19](https://github.com/jayg996/BTC-ISMIR19), MIT, 12 MB checkpoint, CPU-fine). First trained model in the pipeline; introduces the torch dependency and de-risks it before the heavier Demucs stage. Vendor `btc_model.py` + its helpers; features are a librosa CQT (n_bins 144, bins/oct 24, hop 2048, 22050 Hz); large-voca = 170 chord classes → `{t, root, quality, confidence}`.
+- `downbeats` (event) — deferred from M2; needs `madmom` or an alternative; decide alongside chords.
 - Demucs stage; stems written to `library/songs/{uuid}/stems/`
 - Per-stem DSP features (energy, onsets, transients, centroid, MFCC; pitch for melodic stems; vibrato for vocals)
 - `stage_progress` events emitted from Demucs progress callback
@@ -71,9 +83,10 @@ Deliverable: full DSP pipeline including stems.
 
 ## Milestone 4 — ML classification + structure
 
-- PANNs sound classification (model download + caching, class subset decision)
-- Section detection (msaf)
-- Motif recurrence + novelty
+- PANNs sound classification (model download + caching, class subset decision) — `sound_tags`, `timbral_axes`
+- Section detection (msaf) — `sections`, the first `segment` render mode
+- Motif recurrence + novelty — `motifs`, `novelty`
+- `silence` (segment) and `rhythmic_density` (continuous) — mix-level DSP deferred from M2; `silence` rides the new `segment` render mode
 - Confidence rendering in the dashboard (reduced opacity, error bars, or similar)
 
 Deliverable: all stable features from the catalog.
@@ -87,7 +100,7 @@ Deliverable: all stable features from the catalog.
 - Metadata editing in the library
 - Library filters (status, missing metadata)
 - Better error / retry UX
-- Aspirational features (`valence`, `tension`) — implement or drop
+- Aspirational / `[WIP]` features — implement or drop: `valence`, `tension`, `swing`, `harmonic_complexity`, `reverb_amount`, `roughness` (the last needs essentia/AGPL — use a librosa proxy or drop)
 - YouTube import — paste a URL, auto-download the audio as FLAC via `yt-dlp` (`yt-dlp -f bestaudio -x --audio-format flac -o "%(title)s (YouTube).%(ext)s" <url>`), then run it through the normal import flow
 - Color palettes — select from or create named palettes of colors that go well together; swapping a palette remaps the visualizer config automatically
 

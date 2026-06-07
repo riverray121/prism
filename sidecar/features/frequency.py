@@ -63,6 +63,17 @@ def spectral_flux(S: np.ndarray) -> dict:
     return _continuous("librosa", "normalized", normalized, [0, 1])
 
 
+def spectrogram(y: np.ndarray, sr: int, hop: int, n_fft: int = 1024) -> np.ndarray:
+    """Log-power spectrogram in dB for display: matrix of shape (1 + n_fft/2, frames).
+
+    Uses a smaller window than the feature spectrum to keep the sidecar a sane size
+    (513 bins at n_fft=1024). Returned as a raw matrix; written to a .npy sidecar
+    by the worker. dB is referenced to the per-song max, so values are <= 0.
+    """
+    mag = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=hop))
+    return librosa.amplitude_to_db(mag, ref=np.max)
+
+
 def band_energies(S: np.ndarray, sr: int, n_fft: int) -> dict[str, dict]:
     """Per-frame fraction of spectral energy in each of six frequency bands (0-1)."""
     freqs = librosa.fft_frequencies(sr=sr, n_fft=n_fft)

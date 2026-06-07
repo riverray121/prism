@@ -313,6 +313,7 @@
           <HeatmapGraph
             path={`${inspection.songDir}/${feature.sidecar}`}
             frameRateHz={inspection.profile.timeline.frame_rate_hz}
+            normalize={name === "spectrogram" ? "global" : "per-row"}
             playheadSec={currentTime}
             follow={playing}
             onSeek={scrub}

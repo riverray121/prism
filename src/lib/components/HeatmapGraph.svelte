@@ -12,6 +12,7 @@
     path,
     frameRateHz,
     height = 160,
+    normalize = "per-row",
     playheadSec = null,
     follow = false,
     onSeek,
@@ -21,6 +22,9 @@
     path: string; // absolute fs path to the .npy sidecar
     frameRateHz: number;
     height?: number;
+    // per-row: each row scaled to its own range (mfcc/chroma, mixed scales).
+    // global: one range for the whole matrix (spectrogram dB — preserves loudness).
+    normalize?: "per-row" | "global";
     playheadSec?: number | null;
     follow?: boolean;
     onSeek?: (sec: number) => void;
@@ -83,23 +87,36 @@
 
   // Render the matrix once into a native-resolution offscreen canvas (cols×rows);
   // the draw hook scales the relevant slice of it into the plot each frame.
-  // Each row is normalized independently so coefficients on different scales (e.g.
-  // MFCC's energy-dominated row 0) don't flatten the rest to one color.
+  // Normalization (per-row vs global) is chosen per feature: per-row keeps each
+  // coefficient legible when scales differ (mfcc's energy row 0); global keeps
+  // the true relative magnitudes (a spectrogram's loudness across frequencies).
   function buildOffscreen(m: Npy): HTMLCanvasElement {
     const [rows, cols] = m.shape;
+    let globalLo = Infinity;
+    let globalHi = -Infinity;
+    if (normalize === "global") {
+      for (let i = 0; i < m.data.length; i++) {
+        const v = m.data[i];
+        if (v < globalLo) globalLo = v;
+        if (v > globalHi) globalHi = v;
+      }
+    }
     const canvas = document.createElement("canvas");
     canvas.width = cols;
     canvas.height = rows;
     const ctx = canvas.getContext("2d")!;
     const img = ctx.createImageData(cols, rows);
     for (let r = 0; r < rows; r++) {
-      // Per-row min/max.
-      let lo = Infinity;
-      let hi = -Infinity;
-      for (let c = 0; c < cols; c++) {
-        const v = m.data[r * cols + c];
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
+      let lo = globalLo;
+      let hi = globalHi;
+      if (normalize === "per-row") {
+        lo = Infinity;
+        hi = -Infinity;
+        for (let c = 0; c < cols; c++) {
+          const v = m.data[r * cols + c];
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
       }
       const span = hi - lo || 1;
       const y = rows - 1 - r; // low row index at the bottom

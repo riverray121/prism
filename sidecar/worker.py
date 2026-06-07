@@ -62,6 +62,7 @@ def _analyze(
     }
     # Heatmap matrices (raw, shape [bins, frames]); aligned and registered below.
     heatmaps: dict[str, np.ndarray] = {
+        "spectrogram": frequency.spectrogram(y, sr, hop),
         "mfcc": timbre.mfcc(y, sr, hop),
         "chroma": tonal.chroma(y, sr, hop),
     }
@@ -85,6 +86,11 @@ def _analyze(
 
 # Per-heatmap display metadata; the payload itself lives in the .npy sidecar.
 _HEATMAP_META = {
+    "spectrogram": {
+        "category": "frequency",
+        "unit": "dB",
+        "axes": ["freq_hz", "time_frame"],
+    },
     "mfcc": {
         "category": "timbre",
         "unit": "coefficient",
