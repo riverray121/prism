@@ -6,7 +6,7 @@ A desktop dashboard that imports audio files, runs a multi-layer pipeline to ext
 
 **Scope:** Analysis layer only. Hardware, DMX, light mapping, and licensing are out of scope.
 
-**Target platform:** Mac-first (developed on M3 Pro, Demucs on Metal/MPS — tens of seconds per song), but built portable so development can move to another OS later. Avoid Mac-only dependencies where a cross-platform equivalent exists; isolate platform-specific code (GPU backend selection, audio device access) behind a thin abstraction.
+**Target platform:** Mac-first (developed on M3 Pro; stem separation runs on the Apple GPU — Demucs via Metal/MPS in tens of seconds per song, heavier RoFormer/MDX engines via ONNX Runtime's CoreML provider), but built portable so development can move to another OS later. Avoid Mac-only dependencies where a cross-platform equivalent exists; isolate platform-specific code (GPU backend selection, audio device access) behind a thin abstraction.
 
 **Target genres:** EDM, psychedelic trap (Yeat, Fred Again, Slayyter, Joji).
 
@@ -29,7 +29,7 @@ Input Handler            Import audio → managed library
       v
 Processing Core
   ├── DSP layer           librosa / Essentia — deterministic features
-  └── ML layer            Demucs (stems) + PANNs (classification)
+  └── ML layer            multi-engine stem separation + PANNs (classification)
       |
       v
 Aggregation / Normalize   unify timescales + units onto one timeline
@@ -46,7 +46,7 @@ Output Formatter
 
 - **Shell:** Tauri (Rust + system WebView). Lightweight desktop wrapper; cross-platform so the portability goal holds.
 - **UI:** **Svelte 5 + SvelteKit** (TypeScript), configured as a static SPA via `adapter-static` (SSR off — Tauri has no Node server). Chosen over React/vanilla because the reactive surface (live library status, controls) is real but bounded, while the heavy visualization is imperative regardless of framework; Svelte's stores model IPC-derived state cleanly and bridge to imperative uPlot with less ceremony than React's render cycle. **Tailwind CSS v4** (via `@tailwindcss/vite`, no config file) for styling. **uPlot** for stacked time-series and event/segment overlays — small (~40KB), fast at high point counts, simple array-based API; it owns its canvas, so the framework only provides the surrounding DOM. Spectrogram heatmap may use a custom Canvas2D pass rather than a uPlot plugin; decided when implemented. **UI primitives:** **shadcn-svelte** (copy-in components on bits-ui + Tailwind; supports Svelte 5 + Tailwind v4) for the fiddly interactive controls — selects/dropdowns, sliders, dialogs, tooltips, tabs. Adopted lazily, component by component, starting at the first such control (playback slider, per-feature Y-axis dropdown); trivial layout stays hand-rolled Tailwind. Its CSS-variable theme tokens will also own light/dark theming. The app surface already follows the OS light/dark theme via `color-scheme` + `light-dark()`.
-- **Analysis backend:** Python sidecar process launched and managed by Tauri. Hosts librosa / Essentia / Demucs / PANNs.
+- **Analysis backend:** Python sidecar process launched and managed by Tauri. Hosts librosa / Essentia / `audio-separator` (stem engines) / PANNs.
 - **IPC (frontend ↔ sidecar):** stdin/stdout JSON-lines. Tauri spawns the Python sidecar and pipes messages in both directions; the Tauri Rust shell relays between WebView and pipes. No HTTP server, no port.
 - **Audio playback:** Web Audio API in the frontend. Playhead is driven from playback time, not from the sidecar.
 
@@ -73,8 +73,8 @@ Songs are analyzed sequentially by a single worker in the Python sidecar. No cro
 Each song passes through four stages in order:
 
 1. **DSP-mix** — librosa/Essentia features on the full mix
-2. **Demucs separation** — write the 6 stem WAVs to disk
-3. **DSP-per-stem** — librosa features on each separated stem
+2. **Stem separation** — run a configured set of separation engines (via `audio-separator`); write each engine's stem WAVs to disk under `stems/{engine}/`
+3. **DSP-per-stem** — librosa features on every separated stem, for every engine
 4. **ML classification** — PANNs, section detection, motif recurrence, novelty, valence/tension
 
 ### Queue
@@ -127,17 +127,17 @@ One JSON message per line.
 { "type": "library.import_failed", "path": "...", "error": "..." }
 { "type": "profile", "song_id": "...", "profile": { /* profile.json contents */ } }
 { "type": "job.started",         "song_id": "..." }
-{ "type": "job.stage_started",   "song_id": "...", "stage": "demucs" }
-{ "type": "job.stage_progress",  "song_id": "...", "stage": "demucs", "progress": 0.42 }
-{ "type": "job.stage_completed", "song_id": "...", "stage": "demucs" }
+{ "type": "job.stage_started",   "song_id": "...", "stage": "separate", "engine": "bs_roformer" }
+{ "type": "job.stage_progress",  "song_id": "...", "stage": "separate", "engine": "bs_roformer", "progress": 0.42 }
+{ "type": "job.stage_completed", "song_id": "...", "stage": "separate", "engine": "bs_roformer" }
 { "type": "job.completed",       "song_id": "..." }
-{ "type": "job.failed",          "song_id": "...", "stage": "demucs", "error": "..." }
+{ "type": "job.failed",          "song_id": "...", "stage": "separate", "engine": "bs_roformer", "error": "..." }
 { "type": "job.cancelled",       "song_id": "..." }
 ```
 
 `library.import` copies each file into the managed library and assigns a UUID; `library.list` requests the current state. Both reply with a `library.songs` snapshot — the full song list, not a delta — which the frontend renders wholesale. Per-song fields: `id`, `title`, `artist`, `duration_sec`, `sample_rate`, `source_path` (relative to the library root), `status`, `imported_at`. There is no request/response correlation; the snapshot model keeps the UI a pure function of the latest event. `profile.get` reads an analyzed song's `profile.json` and replies with a `profile` event carrying the parsed contents; the frontend owns no disk access.
 
-`stage_progress` is meaningful primarily for Demucs (which exposes a progress callback). DSP and ML stages emit only `stage_started` / `stage_completed`.
+`stage_progress` is meaningful primarily for the separation stage (each engine exposes a progress callback); it carries the `engine` currently running, since the stage iterates the configured engine set. DSP and ML stages emit only `stage_started` / `stage_completed`.
 
 ---
 
@@ -156,7 +156,7 @@ Canonical feature list lives in [`feature-catalog.md`](./feature-catalog.md), wi
 
 ### ML layer (pretrained, runs locally)
 
-- **Stem separation (Demucs):** kick, snare, hats, bass, synth, vocals — written to disk as WAVs; each stem then gets its own DSP feature pass (energy, onsets, transients, brightness, MFCC; pitch for melodic stems; vibrato for vocals)
+- **Stem separation (multi-engine, via `audio-separator`):** a configured set of engines — Demucs, MDX/MDX23C, VR, and RoFormer (BS-RoFormer / Mel-Band RoFormer), plus built-in ensemble — each separating the mix into its native stem set (e.g. drums/bass/other/vocals), written to disk as WAVs under `stems/{engine}/`. Every engine's output is kept so analyses are directly comparable. Each stem then gets its own DSP feature pass (energy, onsets, transients, brightness, MFCC; pitch for melodic stems; vibrato for vocals)
 - **Sound-type classification (PANNs):** per-frame tag probabilities + curated timbral axes
 - **Section detection** (hybrid heuristics + ML): intro / verse / chorus / drop / breakdown / outro
 - **Motif / phrase recurrence**
@@ -184,12 +184,12 @@ Reconciles raw outputs that arrive at incompatible timescales (onsets per-ms, se
 
 Full spec lives in [`profile-schema.md`](./profile-schema.md). Summary:
 
-- **Disk unit:** one folder per song under `library/songs/{uuid}/`, containing `profile.json`, source audio, stem WAVs, and `.npy` sidecars for heatmaps.
-- **Top-level structure:** `schema_version`, `song` metadata, `timeline` (frame rate + count), `mix` (flat feature map), `stems` (per-stem audio + features), `favorites`.
+- **Disk unit:** one folder per song under `library/songs/{uuid}/`, containing `profile.json`, source audio, per-engine stem WAVs (`stems/{engine}/`), and `.npy` sidecars for heatmaps.
+- **Top-level structure:** `schema_version`, `song` metadata, `timeline` (frame rate + count), `mix` (flat feature map), `stems` (keyed by engine, then stem → audio + features), `favorites`.
 - **Per-feature envelope:** every feature self-describes with `render` mode, `category`, `source`, `unit`, and a render-specific payload (`value`, `data`, `events`, `segments`, or `sidecar`).
 - **Heatmaps stored as uncompressed `.npy` sidecars**, referenced by relative path; JSON keeps only shape and axis metadata.
 - **Versioning:** `schema_version` is semver; major-version bumps are breaking. Stage 2 checks the major on load.
-- **Favorites:** dot-paths into the profile (e.g. `"stems.bass.features.pitch"`).
+- **Favorites:** dot-paths into the profile (e.g. `"stems.htdemucs_ft.bass.features.pitch"`).
 
 ### Human-readable — Dashboard (below)
 
@@ -236,7 +236,7 @@ A per-feature **Y-axis dropdown** switches between that feature's dimensions (e.
 
 | Deterministic (DSP)      | Requires ML (pretrained)          |
 | ------------------------ | --------------------------------- |
-| BPM, beats, onsets       | Stem separation (Demucs)          |
+| BPM, beats, onsets       | Stem separation (multi-engine)    |
 | All spectral features    | Sound-type classification (PANNs) |
 | Volume, ADSR, transients | Section detection (hybrid)        |
 | MFCC, ZCR, flatness      | Motif recurrence                  |

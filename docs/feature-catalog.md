@@ -4,7 +4,7 @@ Canonical enumeration of every feature extracted by the analysis pipeline. The d
 
 ## Conventions
 
-- **Name** — canonical identifier used in the JSON profile. Snake*case. Per-stem features use a `{stem}*`prefix where`{stem}`is one of`kick`, `snare`, `hats`, `bass`, `synth`, `vocals`.
+- **Name** — canonical identifier used in the JSON profile. Snake*case. The per-stem tables below use a `{stem}*`prefix as shorthand; in the profile these features live at`stems.{engine}.{stem}.features.{name}`(keyed by separation engine, then stem).`{stem}` is whatever the engine's model outputs — the stem set is engine-dependent, not fixed.
 - **Render** — render mode for the dashboard; also constrains storage shape:
   - `scalar` — one value per song
   - `continuous` — sampled on the unified 100 Hz timeline
@@ -109,9 +109,9 @@ ML features carry a per-frame `confidence`. DSP features omit it.
 
 ## Per-stem features
 
-Stems come from Demucs separation. Each stem is also written as a WAV file and referenced from the JSON profile by path.
+Stems come from the multi-engine separation stage (see `design-doc.md` and `build-order.md`): a configured set of engines via `audio-separator`, each producing its native stem set. Every stem, for every engine, is written as a WAV and referenced from the JSON profile by path, and gets the full feature pass below — so the same features can be compared across engines for the same stem.
 
-### Common — all 6 stems
+### Common — every stem
 
 | Name                         | Render     | Source        | Unit / Range    | Notes                              |
 | ---------------------------- | ---------- | ------------- | --------------- | ---------------------------------- |
@@ -121,7 +121,7 @@ Stems come from Demucs separation. Each stem is also written as a WAV file and r
 | `{stem}_spectral_centroid`   | continuous | librosa       | Hz              | per-stem brightness                |
 | `{stem}_mfcc`                | heatmap    | librosa       | 13×time         | per-stem timbre; sidecar candidate |
 
-### Melodic stems only — `bass`, `synth`, `vocals`
+### Melodic stems only (e.g. `bass`, `vocals`, and any harmonic/instrumental stem an engine emits)
 
 | Name                      | Render     | Source       | Unit / Range | Notes               |
 | ------------------------- | ---------- | ------------ | ------------ | ------------------- |

@@ -71,24 +71,29 @@ First trained model in the pipeline. Both features are mix-level and run inside 
 - **`chords` (event), via the BTC transformer** ([jayg996/BTC-ISMIR19](https://github.com/jayg996/BTC-ISMIR19), MIT, 12 MB checkpoint, CPU-fine). Vendor `btc_model.py` + its helpers; features are a librosa CQT (n_bins 144, bins/oct 24, hop 2048, 22050 Hz); large-voca = 170 chord classes → `{t, root, quality, confidence}`. Renders on the existing `EventGraph` tick lane.
 - **`downbeats` (event) — librosa-based heuristic.** Derive downbeats from the M2 beat grid: assume 4/4 and pick the bar-start phase by scoring each of the four candidate phases against musical cues (onset strength, low-frequency/kick energy, harmonic change at bar boundaries). No new dependency, runs off data we already compute. Chosen over madmom (py3.12 / M-series build friction — the reason Python is pinned) and a torch downbeat model. Accuracy is weaker on meter changes / pickup bars; see the dev-log note for future upgrade paths if it proves inadequate.
 - Add `torch` to the sidecar deps; keep running from source. (App freezing/packaging is out of development scope — see the packaging note in dev-log.)
-- **Model weights: download-on-first-run into a local cache; never in git.** Build a small `sidecar/models.py` registry — `{name, url, sha256, dest}` per model — and an `ensure(model)` that checks the cache, downloads + checksum-verifies if missing, and fails loudly on mismatch. Cache dir lives in the app-data dir (`~/Library/Application Support/Prism/models/` on macOS), gitignored. The BTC checkpoint (~12 MB) is the only model needing this hand-rolled in M3 (it's vendored code, not a pip package); mirror it to a GitHub Release on our own repo and point the registry there so we control the URL. Demucs (M4) and PANNs (M5) auto-download and cache their own weights — reuse this pattern only for parity (point their cache at the same dir); don't reimplement their fetch.
+- **Model weights: download-on-first-run into a local cache; never in git.** Build a small `sidecar/models.py` registry — `{name, url, sha256, dest}` per model — and an `ensure(model)` that checks the cache, downloads + checksum-verifies if missing, and fails loudly on mismatch. Cache dir lives in the app-data dir (`~/Library/Application Support/Prism/models/` on macOS), gitignored. The BTC checkpoint (~12 MB) is the only model needing this hand-rolled in M3 (it's vendored code, not a pip package); mirror it to a GitHub Release on our own repo and point the registry there so we control the URL. The M4 separation engines (via `audio-separator`) and PANNs (M5) auto-download and cache their own weights — reuse this pattern only for parity (point their cache at the same dir, e.g. `audio-separator`'s `model_file_dir`); don't reimplement their fetch.
 
 Deliverable: chords + downbeats rendering against playback; torch in the dependency set and de-risked.
 
 ---
 
-## Milestone 4 — Demucs + per-stem DSP
+## Milestone 4 — Multi-engine stem separation + per-stem DSP
 
-First long-running stage; introduces the multi-stage worker. Sub-progress and failure handling matter here.
+First long-running stage; introduces the multi-stage worker. Sub-progress and failure handling matter here. The goal is **maximum separation quality plus side-by-side comparison across engines** — speed is not a constraint.
 
-- **Multi-stage worker.** Refactor the single-pass worker into ordered stages (`dsp-mix → demucs → dsp-stem`). Surface progress: extend the `library.songs` snapshot with `current_stage` / `current_stage_progress` (keeps the UI a pure function of snapshots, matching the existing model) rather than a parallel `job.*` event stream.
-- Demucs stage; stems written to `library/songs/{uuid}/stems/`; progress wired from Demucs's callback.
-- Per-stem DSP features (energy, onsets, transients, centroid, MFCC; pitch for melodic stems; vibrato for vocals) — reuse the mix extractors per stem; write under `stems.{stem}.features`.
-- Failure handling end-to-end: kill the sidecar mid-Demucs and confirm the "Analysis interrupted" startup logic works; clean up the partial song folder on failure.
+- **Multi-stage worker.** Refactor the single-pass worker into ordered stages (`dsp-mix → separate → dsp-stem`). Surface progress: extend the `library.songs` snapshot with `current_stage` / `current_stage_progress` (keeps the UI a pure function of snapshots, matching the existing model) rather than a parallel `job.*` event stream. The `separate` stage iterates the configured engine set, so the snapshot also carries which engine is currently running.
+- **Separation via `audio-separator`** ([nomadkaraoke/python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator)) — one interface over Demucs, MDX, MDX23C/MDXC, VR, and RoFormer (BS-RoFormer / Mel-Band RoFormer), with built-in ensemble (`avg_wave`, `median_wave`, `max_fft`, presets) and automatic model download/caching. Wrap it behind a thin sidecar `Separator` interface (input mix → `{stem: array}`) so the engine set is swappable and the worker never sees library internals.
+- **Run a configured _set_ of engines per song, not one.** Quality-first default set: a top RoFormer checkpoint + Demucs (`htdemucs_ft`) + an ensemble preset — exact members are config, tuned by comparing outputs. Each engine writes its native stem set to `library/songs/{uuid}/stems/{engine}/`; progress wired from each engine's callback.
+- **Keep every engine's stems on disk.** No cleanup pass in v1 — all engine outputs are retained for ongoing A/B (audio and downstream features). Storage grows ~N× with the engine count; revisit pruning later.
+- Per-stem DSP features (energy, onsets, transients, centroid, MFCC; pitch for melodic stems; vibrato for vocals) — reuse the mix extractors per stem, for every engine; write under `stems.{engine}.{stem}.features`.
+- **Model weights** auto-download via `audio-separator`'s own cache; point its `model_file_dir` at the shared app-data model dir from M3 (`sidecar/models.py`).
+- Failure handling end-to-end: kill the sidecar mid-separation and confirm the "Analysis interrupted" startup logic works; clean up the partial song folder on failure.
 - Cancellation of queued songs.
-- Dashboard: stem section, grouped per-stem features (reuse existing graph components).
+- Dashboard: stem section grouped by engine, per-stem features comparable across engines (reuse existing graph components).
 
-Deliverable: full DSP pipeline including stems.
+**Apple Silicon acceleration.** `audio-separator` accelerates on the Apple GPU via ONNX Runtime's CoreML provider (M1+, macOS Sonoma+); Demucs uses MPS. If CoreML/MPS proves flaky for the RoFormer/MDX engines, [`mlx-audio-separator`](https://github.com/ssmall256/mlx-audio-separator) (MLX-native, same engine families, ~1.85× faster, near drop-in) is the fallback backend — slot it behind the same `Separator` interface. Speed is not a goal; this is only about getting the engines running on-GPU at all.
+
+Deliverable: full DSP pipeline including stems from multiple separation engines, retained for comparison.
 
 ---
 

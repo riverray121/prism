@@ -18,25 +18,35 @@ library/
       profile.json
       source.flac            # or .wav / .mp3 / .m4a
       stems/
-        kick.wav
-        snare.wav
-        hats.wav
-        bass.wav
-        synth.wav
-        vocals.wav
+        htdemucs_ft/         # one subfolder per separation engine
+          vocals.wav
+          drums.wav
+          bass.wav
+          other.wav
+        bs_roformer/
+          vocals.wav
+          drums.wav
+          bass.wav
+          other.wav
       heatmaps/
         spectrogram.npy
         chroma.npy
         mfcc.npy
-        kick_mfcc.npy
-        snare_mfcc.npy
-        hats_mfcc.npy
-        bass_mfcc.npy
-        synth_mfcc.npy
-        vocals_mfcc.npy
+        htdemucs_ft/         # per-stem heatmaps nested by engine
+          vocals_mfcc.npy
+          drums_mfcc.npy
+          bass_mfcc.npy
+          other_mfcc.npy
+        bs_roformer/
+          vocals_mfcc.npy
+          drums_mfcc.npy
+          bass_mfcc.npy
+          other_mfcc.npy
 ```
 
 `{uuid}` is UUIDv4, assigned at import.
+
+Stems are nested one level by **separation engine**. M4 runs a set of engines per song (see `build-order.md`); each engine writes the stem set its model produces — the stem names vary by model (e.g. Demucs `htdemucs` → drums/bass/other/vocals; a 6-stem model adds guitar/piano). Every engine's output is kept on disk; there is no v1 cleanup pass.
 
 ---
 
@@ -66,21 +76,29 @@ library/
     ...
   },
   "stems": {
-    "kick":   { "audio_file": "stems/kick.wav",   "features": { ... } },
-    "snare":  { "audio_file": "stems/snare.wav",  "features": { ... } },
-    "hats":   { "audio_file": "stems/hats.wav",   "features": { ... } },
-    "bass":   { "audio_file": "stems/bass.wav",   "features": { ... } },
-    "synth":  { "audio_file": "stems/synth.wav",  "features": { ... } },
-    "vocals": { "audio_file": "stems/vocals.wav", "features": { ... } }
+    "htdemucs_ft": {
+      "vocals": { "audio_file": "stems/htdemucs_ft/vocals.wav", "features": { ... } },
+      "drums":  { "audio_file": "stems/htdemucs_ft/drums.wav",  "features": { ... } },
+      "bass":   { "audio_file": "stems/htdemucs_ft/bass.wav",   "features": { ... } },
+      "other":  { "audio_file": "stems/htdemucs_ft/other.wav",  "features": { ... } }
+    },
+    "bs_roformer": {
+      "vocals": { "audio_file": "stems/bs_roformer/vocals.wav", "features": { ... } },
+      "drums":  { "audio_file": "stems/bs_roformer/drums.wav",  "features": { ... } },
+      "bass":   { "audio_file": "stems/bs_roformer/bass.wav",   "features": { ... } },
+      "other":  { "audio_file": "stems/bs_roformer/other.wav",  "features": { ... } }
+    }
   },
   "favorites": [
     "mix.beats",
-    "stems.bass.features.pitch"
+    "stems.htdemucs_ft.bass.features.pitch"
   ]
 }
 ```
 
 `mix` is flat; features are keyed by their catalog name. The `category` field on each feature is the only grouping signal — there is no nesting by category.
+
+`stems` is keyed first by **separation engine**, then by **stem**. Each engine's id matches its `audio-separator` model (e.g. `htdemucs_ft`, `bs_roformer`, `mdx23c`); the stem set under each engine is whatever that model outputs. The same per-stem feature set (see `feature-catalog.md`) is computed for every engine's stems, so analyses are directly comparable across engines.
 
 ---
 
@@ -197,7 +215,7 @@ Payload lives in a sidecar `.npy` file. The JSON entry contains only the referen
 - **Path:** relative to `profile.json`, written in the feature's `sidecar` field.
 - **Required:** if a feature declares `sidecar`, the file must exist. Loader fails fast on missing sidecars (a half-loaded profile is worse than a clear error).
 
-Stem WAVs are referenced from `stems.{stem}.audio_file`, same rules apply.
+Stem WAVs are referenced from `stems.{engine}.{stem}.audio_file`, same rules apply.
 
 ---
 
@@ -229,5 +247,5 @@ Features marked `[WIP]` in the catalog carry `"status": "wip"` in the profile. L
 ## Favorites
 
 - Array of dot-path strings referencing canonical feature locations.
-- Examples: `"mix.beats"`, `"stems.bass.features.pitch"`, `"mix.sections"`.
+- Examples: `"mix.beats"`, `"stems.htdemucs_ft.bass.features.pitch"`, `"mix.sections"`.
 - Loader validates that each path resolves at load time; broken favorites trigger a warning, not a load failure (a removed feature shouldn't kill the profile).
