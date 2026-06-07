@@ -41,7 +41,7 @@ All lockfiles are committed.
 
 **Sidecar launch (dev):** Tauri's Rust shell spawns `uv run python -m sidecar` as a child process. This is intentionally _not_ Tauri's "true sidecar" (frozen binary) mechanism — the edit-test loop stays in seconds, and `uv.lock` provides the reproducibility that freezing would otherwise give. Python is pinned to **3.12** via uv to de-risk madmom and essentia.
 
-**Bundling for distribution:** deferred. For personal use, run from source. When eventually shipping, the Python sidecar needs to be frozen (PyInstaller / PyOxidizer) and placed at `src-tauri/binaries/sidecar-{target-triple}` for Tauri's sidecar bundler to pick up. Non-trivial because of PyTorch/Demucs native libs — plan for a dedicated spike at M3 when torch first lands.
+**Bundling for distribution:** deferred. For personal use, run from source. When eventually shipping, the Python sidecar needs to be frozen (PyInstaller / PyOxidizer) and placed at `src-tauri/binaries/sidecar-{target-triple}` for Tauri's sidecar bundler to pick up. Non-trivial because of PyTorch/Demucs native libs. Not part of development — only if/when distribution becomes a goal.
 
 ## CI/CD
 
