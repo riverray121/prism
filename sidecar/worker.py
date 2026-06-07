@@ -14,7 +14,7 @@ import librosa
 import numpy as np
 
 from . import library, storage
-from .features import amplitude, frequency, rhythm, spatial, timbre, tonal
+from .features import amplitude, chords, frequency, rhythm, spatial, timbre, tonal
 
 log = logging.getLogger("sidecar.worker")
 
@@ -59,6 +59,7 @@ def _analyze(
         "key": key_env,
         "key_confidence": key_conf,
         "tuning_deviation": tonal.tuning_deviation(y, sr),
+        "chords": chords.compute_chords(y, sr),
     }
     # Heatmap matrices (raw, shape [bins, frames]); aligned and registered below.
     heatmaps: dict[str, np.ndarray] = {

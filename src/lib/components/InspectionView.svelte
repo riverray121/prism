@@ -210,6 +210,35 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
+  // Compact musical shorthand for a chord quality (BTC's vocabulary). Major
+  // renders as the bare root by convention.
+  const CHORD_QUALITY: Record<string, string> = {
+    maj: "",
+    min: "m",
+    dim: "dim",
+    aug: "aug",
+    min6: "m6",
+    maj6: "6",
+    min7: "m7",
+    minmaj7: "mM7",
+    maj7: "maj7",
+    "7": "7",
+    dim7: "dim7",
+    hdim7: "ø7",
+    sus2: "sus2",
+    sus4: "sus4",
+  };
+
+  // Label a chord event (root/quality passed through the event schema). 'N' (no
+  // chord) and 'X' (unknown) carry no quality and render as-is.
+  function chordLabel(ev: EventFeature["events"][number]): string | null {
+    const c = ev as { root?: string; quality?: string };
+    if (!c.root) return null;
+    if (c.root === "N" || c.root === "X") return c.root;
+    const q = c.quality ?? "";
+    return c.root + (CHORD_QUALITY[q] ?? q);
+  }
+
   function formatScalar(f: ScalarFeature): string {
     if (typeof f.value === "string") return f.value;
     const n = f.unit === "normalized" ? f.value.toFixed(2) : f.value.toFixed(1);
@@ -291,6 +320,8 @@
           maxTimeSec={durationSec}
           playheadSec={currentTime}
           follow={playing}
+          labelFor={name === "chords" ? chordLabel : undefined}
+          height={name === "chords" ? 88 : 64}
           onSeek={scrub}
           onScrubStart={scrubStart}
           onScrubEnd={scrubEnd}

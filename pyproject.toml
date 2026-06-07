@@ -9,7 +9,12 @@ dependencies = [
     "numpy>=2.4.6",
     "pydantic>=2",
     "pyloudnorm>=0.2.0",
+    "torch>=2.12.0",
 ]
 
 [tool.uv]
 package = false
+
+[tool.ruff]
+# Vendored third-party code is kept close to upstream; don't lint or reformat it.
+extend-exclude = ["sidecar/vendor"]
