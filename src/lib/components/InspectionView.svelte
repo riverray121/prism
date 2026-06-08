@@ -9,6 +9,7 @@
     ContinuousFeature,
     EventFeature,
     HeatmapFeature,
+    MixFeature,
     ScalarFeature,
   } from "$lib/ipc/messages";
   import { close, inspection } from "$lib/state/inspection.svelte";
@@ -20,21 +21,50 @@
 
   let currentTime = $state(0);
   let playing = $state(false);
-  let audioBuffer = $state<AudioBuffer | null>(null);
+  // Which audio source is audible: "mix" (the original) or a stem, keyed
+  // `${engine}::${stem}`. All graphs share one playhead regardless of the source,
+  // so any stem — or the original — can be heard against every graph.
+  let activeKey = $state("mix");
+  let activeBuffer = $state<AudioBuffer | null>(null);
 
   let ctx: AudioContext | undefined;
   let source: AudioBufferSourceNode | undefined;
   let startCtxTime = 0; // ctx.currentTime when the current source started
   let startOffset = 0; // buffer offset the current source started from
   let raf: number | null = null;
+  // Decoded buffers cached by file path, so switching sources doesn't re-decode.
+  let buffers = new Map<string, AudioBuffer>();
+  // Bumped on each song change to abandon decodes still in flight.
+  let loadToken = 0;
 
   function ensureCtx(): AudioContext {
     if (!ctx) ctx = new AudioContext();
     return ctx;
   }
 
+  // Resolve a source key to its absolute file path (null if unavailable).
+  function pathForKey(key: string): string | null {
+    if (key === "mix") return inspection.audioPath;
+    const prof = inspection.profile;
+    if (!prof || !inspection.songDir) return null;
+    const [engine, stem] = key.split("::");
+    const audioFile = prof.stems[engine]?.[stem]?.audio_file;
+    return audioFile ? `${inspection.songDir}/${audioFile}` : null;
+  }
+
+  // Decode a file to an AudioBuffer, caching by path.
+  async function loadBuffer(path: string): Promise<AudioBuffer> {
+    const cached = buffers.get(path);
+    if (cached) return cached;
+    const resp = await fetch(convertFileSrc(path));
+    const bytes = await resp.arrayBuffer();
+    const decoded = await ensureCtx().decodeAudioData(bytes);
+    buffers.set(path, decoded);
+    return decoded;
+  }
+
   function duration(): number {
-    return audioBuffer?.duration ?? inspection.profile?.song.duration_sec ?? 0;
+    return activeBuffer?.duration ?? inspection.profile?.song.duration_sec ?? 0;
   }
 
   // Current playback position from the audio clock while playing, else the held position.
@@ -46,7 +76,7 @@
   function startSource(offset: number) {
     const context = ensureCtx();
     const node = context.createBufferSource();
-    node.buffer = audioBuffer;
+    node.buffer = activeBuffer;
     node.connect(context.destination);
     node.onended = onSourceEnded;
     startOffset = offset;
@@ -91,13 +121,38 @@
     raf = requestAnimationFrame(tick);
   }
 
-  async function play() {
-    if (!audioBuffer) return;
-    await ensureCtx().resume();
-    if (currentTime >= duration()) currentTime = 0;
-    startSource(currentTime);
-    playing = true;
-    tick();
+  // Surfaced in the transport when playback fails, so errors are visible instead
+  // of silent (e.g. a missing stem file or a decode failure).
+  let playbackError = $state<string | null>(null);
+
+  // Play a source (mix or stem) from the current playhead, switching the active
+  // buffer first. The playhead is preserved across switches, so soloing a stem
+  // mid-playback keeps it aligned to the graphs.
+  async function playKey(key: string) {
+    const path = pathForKey(key);
+    if (!path) {
+      playbackError = `No audio path for "${key}".`;
+      return;
+    }
+    const token = loadToken;
+    try {
+      const context = ensureCtx();
+      await context.resume();
+      const buf = await loadBuffer(path);
+      if (token !== loadToken) return; // song changed mid-decode
+      stopSource();
+      cancelRaf();
+      activeKey = key;
+      activeBuffer = buf;
+      if (currentTime >= duration()) currentTime = 0;
+      startSource(currentTime);
+      playing = true;
+      playbackError = null;
+      tick();
+    } catch (e) {
+      playing = false;
+      playbackError = `Playback failed: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 
   function pause() {
@@ -107,9 +162,11 @@
     playing = false;
   }
 
-  function togglePlay() {
-    if (playing) pause();
-    else play();
+  // Toggle playback of a specific source: pause if it's the one playing, else
+  // (re)start it — which also switches the audible source.
+  function toggleSource(key: string) {
+    if (playing && activeKey === key) pause();
+    else playKey(key);
   }
 
   // Scrubbing: while dragging, audio is silenced (no per-move source restarts,
@@ -127,29 +184,27 @@
   }
 
   function scrubEnd() {
-    if (resumeAfterScrub) play();
+    if (resumeAfterScrub) playKey(activeKey);
     resumeAfterScrub = false;
   }
 
-  // Decode the audio whenever the open song changes; reset playback state.
+  // Reset playback and pre-decode the original whenever the open song changes.
   $effect(() => {
     const path = inspection.audioPath;
+    loadToken++;
     stopSource();
     cancelRaf();
     playing = false;
     currentTime = 0;
-    audioBuffer = null;
+    activeKey = "mix";
+    activeBuffer = null;
+    buffers = new Map();
     if (!path) return;
-    let cancelled = false;
+    const token = loadToken;
     (async () => {
-      const resp = await fetch(convertFileSrc(path));
-      const bytes = await resp.arrayBuffer();
-      const decoded = await ensureCtx().decodeAudioData(bytes);
-      if (!cancelled) audioBuffer = decoded;
+      const buf = await loadBuffer(path);
+      if (token === loadToken) activeBuffer = buf;
     })();
-    return () => {
-      cancelled = true;
-    };
   });
 
   onDestroy(() => {
@@ -182,6 +237,25 @@
     features.filter(
       (e): e is [string, HeatmapFeature] => e[1].render === "heatmap",
     ),
+  );
+
+  // Split a keyed feature map by render mode, preserving insertion order. Used
+  // for each stem's feature map (the mix uses the dedicated $derived above).
+  function splitFeatures(map: Record<string, MixFeature>) {
+    const entries = Object.entries(map);
+    return {
+      continuous: entries.filter(
+        (e): e is [string, ContinuousFeature] => e[1].render === "continuous",
+      ),
+      heatmaps: entries.filter(
+        (e): e is [string, HeatmapFeature] => e[1].render === "heatmap",
+      ),
+    };
+  }
+
+  // Separated stems grouped by engine, then stem (empty on pre-M4 profiles).
+  const stems = $derived(
+    inspection.profile ? Object.entries(inspection.profile.stems) : [],
   );
 
   // Full time extent shared by every graph's x axis, from the timeline.
@@ -274,19 +348,29 @@
       </p>
     </header>
 
-    <!-- Playback transport -->
+    <!-- Playback transport. The top button plays the original mix; each stem has
+         its own play button below. Only one source is audible at a time, and the
+         playhead is shared across every graph. -->
     <div class="flex items-center gap-3">
       <button
-        onclick={togglePlay}
-        disabled={!audioBuffer}
+        onclick={() => toggleSource("mix")}
+        disabled={!inspection.audioPath}
         class="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
       >
-        {playing ? "Pause" : "Play"}
+        {playing && activeKey === "mix" ? "Pause" : "Play"} original
       </button>
       <span class="text-sm tabular-nums text-neutral-500 dark:text-neutral-400">
         {formatTime(currentTime)} / {formatTime(duration())}
       </span>
+      {#if activeKey !== "mix"}
+        <span class="text-xs text-neutral-500 dark:text-neutral-400">
+          ♪ {activeKey.split("::")[1]}
+        </span>
+      {/if}
     </div>
+    {#if playbackError}
+      <p class="text-xs text-red-500">{playbackError}</p>
+    {/if}
 
     <!-- Scalar features: one value each, shown as a labeled grid. -->
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -381,5 +465,83 @@
         </div>
       {/each}
     </div>
+
+    <!-- Per-stem features, grouped by separation engine then stem. Reuses the
+         mix graph components and shares the playhead/scrub. -->
+    {#each stems as [engine, engineStems] (engine)}
+      <section class="flex flex-col gap-3">
+        <h3 class="text-lg font-semibold tracking-tight">
+          Stems <span class="text-sm font-normal text-neutral-500"
+            >· {engine}</span
+          >
+        </h3>
+        {#each Object.entries(engineStems) as [stemName, stemData] (stemName)}
+          {@const sf = splitFeatures(stemData.features)}
+          {@const stemKey = `${engine}::${stemName}`}
+          <div
+            class="flex flex-col gap-4 rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+          >
+            <div class="flex items-center gap-3">
+              <button
+                onclick={() => toggleSource(stemKey)}
+                class="rounded-md border border-indigo-600 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 {playing &&
+                activeKey === stemKey
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-500 dark:text-white'
+                  : ''}"
+              >
+                {playing && activeKey === stemKey ? "Pause" : "Play"}
+              </button>
+              <p class="text-sm font-semibold capitalize">{stemName}</p>
+            </div>
+            {#each sf.continuous as [name, feature], i (name)}
+              <div>
+                <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+                  {humanize(name)}
+                  <span class="text-neutral-400 dark:text-neutral-600"
+                    >· {feature.unit}</span
+                  >
+                </p>
+                <ContinuousGraph
+                  {feature}
+                  frameRateHz={inspection.profile.timeline.frame_rate_hz}
+                  label={`${stemName} ${name}`}
+                  color={PALETTE[i % PALETTE.length]}
+                  playheadSec={currentTime}
+                  follow={playing}
+                  onSeek={scrub}
+                  onScrubStart={scrubStart}
+                  onScrubEnd={scrubEnd}
+                />
+              </div>
+            {/each}
+            {#if inspection.songDir}
+              {#each sf.heatmaps as [name, feature] (name)}
+                <div>
+                  <p
+                    class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
+                  >
+                    {humanize(name)}
+                    <span class="text-neutral-400 dark:text-neutral-600"
+                      >· {feature.shape[0]}×{feature.shape[1]}
+                      {feature.unit}</span
+                    >
+                  </p>
+                  <HeatmapGraph
+                    path={`${inspection.songDir}/${feature.sidecar}`}
+                    frameRateHz={inspection.profile.timeline.frame_rate_hz}
+                    normalize="per-row"
+                    playheadSec={currentTime}
+                    follow={playing}
+                    onSeek={scrub}
+                    onScrubStart={scrubStart}
+                    onScrubEnd={scrubEnd}
+                  />
+                </div>
+              {/each}
+            {/if}
+          </div>
+        {/each}
+      </section>
+    {/each}
   {/if}
 </section>
