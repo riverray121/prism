@@ -81,7 +81,7 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
     return con.execute(
         """
         SELECT id, title, artist, duration_sec, sample_rate, source_path,
-               status, imported_at
+               status, imported_at, current_stage, current_stage_progress
         FROM songs
         ORDER BY imported_at
         """
@@ -117,15 +117,62 @@ def mark_analyzing(con: sqlite3.Connection, song_id: str) -> None:
     con.execute("UPDATE songs SET status='analyzing' WHERE id=?", (song_id,))
 
 
+def mark_stage(
+    con: sqlite3.Connection, song_id: str, stage: str, progress: float
+) -> None:
+    """Record the worker's current stage + 0-1 progress for the analyzing song.
+
+    The snapshot reads these so the UI stays a pure function of song rows.
+    """
+    con.execute(
+        "UPDATE songs SET current_stage=?, current_stage_progress=? WHERE id=?",
+        (stage, progress, song_id),
+    )
+
+
 def mark_analyzed(con: sqlite3.Connection, song_id: str, analyzed_at: str) -> None:
     con.execute(
-        "UPDATE songs SET status='analyzed', analyzed_at=? WHERE id=?",
+        """
+        UPDATE songs
+        SET status='analyzed', analyzed_at=?,
+            current_stage=NULL, current_stage_progress=NULL
+        WHERE id=?
+        """,
         (analyzed_at, song_id),
     )
 
 
 def mark_failed(con: sqlite3.Connection, song_id: str, error_message: str) -> None:
     con.execute(
-        "UPDATE songs SET status='failed', error_message=? WHERE id=?",
+        """
+        UPDATE songs
+        SET status='failed', error_message=?,
+            current_stage=NULL, current_stage_progress=NULL
+        WHERE id=?
+        """,
         (error_message, song_id),
     )
+
+
+def fail_interrupted(con: sqlite3.Connection, error_message: str) -> list[str]:
+    """Mark any row left 'analyzing' as failed; return the affected song ids.
+
+    Called at sidecar startup: a row stuck in 'analyzing' means a prior run crashed
+    or was quit mid-analysis (now common — separation is long-running). Failing it
+    avoids a crash loop and lets the user retry explicitly.
+    """
+    ids = [
+        row["id"]
+        for row in con.execute("SELECT id FROM songs WHERE status='analyzing'")
+    ]
+    if ids:
+        con.execute(
+            """
+            UPDATE songs
+            SET status='failed', error_message=?,
+                current_stage=NULL, current_stage_progress=NULL
+            WHERE status='analyzing'
+            """,
+            (error_message,),
+        )
+    return ids

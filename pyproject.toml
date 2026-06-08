@@ -4,9 +4,11 @@ version = "0.1.0"
 description = "Prism analysis sidecar"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "audio-separator>=0.44.2",
     "librosa>=0.11.0",
     "mutagen>=1.47.0",
     "numpy>=2.4.6",
+    "onnxruntime>=1.26.0",
     "pydantic>=2",
     "pyloudnorm>=0.2.0",
     "torch>=2.12.0",

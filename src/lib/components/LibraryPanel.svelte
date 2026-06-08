@@ -37,6 +37,20 @@
     const secs = total % 60;
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   }
+
+  // Status label: while analyzing, show the current stage and its progress.
+  function statusLabel(song: {
+    status: string;
+    current_stage: string | null;
+    current_stage_progress: number | null;
+  }): string {
+    if (song.status !== "analyzing" || !song.current_stage) return song.status;
+    const pct =
+      song.current_stage_progress === null
+        ? ""
+        : ` ${Math.round(song.current_stage_progress * 100)}%`;
+    return `${song.current_stage}${pct}`;
+  }
 </script>
 
 <section class="flex w-full max-w-2xl flex-col gap-4">
@@ -93,7 +107,9 @@
               >
                 {formatDuration(song.duration_sec)}
               </td>
-              <td class="px-3 py-2 text-neutral-500">{song.status}</td>
+              <td class="px-3 py-2 tabular-nums text-neutral-500"
+                >{statusLabel(song)}</td
+              >
               <td class="px-3 py-2 text-right">
                 {#if song.status === "unanalyzed" || song.status === "failed"}
                   <button

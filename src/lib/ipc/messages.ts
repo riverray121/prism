@@ -12,6 +12,9 @@ export const SongSchema = z.object({
   source_path: z.string(),
   status: z.string(),
   imported_at: z.string(),
+  // Multi-stage analysis progress; null unless status is 'analyzing'.
+  current_stage: z.string().nullable().default(null),
+  current_stage_progress: z.number().nullable().default(null),
 });
 export type Song = z.infer<typeof SongSchema>;
 
@@ -81,6 +84,15 @@ export const MixFeatureSchema = z.discriminatedUnion("render", [
 ]);
 export type MixFeature = z.infer<typeof MixFeatureSchema>;
 
+// One separated stem: its audio file (relative to profile.json) plus the same
+// keyed feature map as the mix, so per-stem features render through the same
+// components. Keyed by engine, then stem (see docs/profile-schema.md).
+export const StemSchema = z.object({
+  audio_file: z.string(),
+  features: z.record(z.string(), MixFeatureSchema),
+});
+export type Stem = z.infer<typeof StemSchema>;
+
 export const ProfileSchema = z.object({
   schema_version: z.string(),
   song: z.object({
@@ -98,6 +110,8 @@ export const ProfileSchema = z.object({
     frame_count: z.number(),
   }),
   mix: z.record(z.string(), MixFeatureSchema),
+  // engine -> stem -> Stem. Absent on pre-M4 profiles, so defaults to empty.
+  stems: z.record(z.string(), z.record(z.string(), StemSchema)).default({}),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 

@@ -101,6 +101,13 @@ def handle(msg: dict) -> None:
 
 def main() -> None:
     log.info("sidecar started")
+    # Any row left 'analyzing' is from a run that crashed or was quit mid-analysis
+    # (now common — separation is long-running). Fail it so it isn't retried in a
+    # loop; the user can re-queue explicitly.
+    with library.connect() as con:
+        interrupted = library.fail_interrupted(con, "Analysis interrupted")
+    if interrupted:
+        log.info("marked %d interrupted song(s) as failed", len(interrupted))
     # Background worker drains the analysis queue while this thread reads stdin.
     threading.Thread(target=worker.run, args=(emit_snapshot,), daemon=True).start()
     # Read one JSON command per line from stdin; write one JSON event per line to stdout.

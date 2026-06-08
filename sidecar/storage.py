@@ -44,13 +44,15 @@ def write_profile(
     frame_rate_hz: float,
     frame_count: int,
     mix: dict[str, dict],
+    stems: dict[str, dict] | None = None,
 ) -> None:
     """Write profile.json for an analyzed song.
 
     ``mix`` is the keyed map of feature envelopes (see docs/profile-schema.md);
     the worker assembles it and aligns every continuous feature to frame_count.
-    Sidecar paths in the profile are relative to profile.json itself, so
-    source_file is just the filename.
+    ``stems`` is keyed by separation engine, then stem, each holding an
+    ``audio_file`` path and a ``features`` map. Sidecar/audio paths in the profile
+    are relative to profile.json itself, so source_file is just the filename.
     """
     profile = {
         "schema_version": SCHEMA_VERSION,
@@ -69,6 +71,7 @@ def write_profile(
             "frame_count": frame_count,
         },
         "mix": mix,
+        "stems": stems or {},
     }
     path = SONGS_DIR / song["id"] / "profile.json"
     path.write_text(json.dumps(profile, indent=2))
@@ -77,8 +80,10 @@ def write_profile(
 def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:
     """Write a heatmap matrix as an uncompressed float32 .npy sidecar.
 
-    Returns the path relative to profile.json (e.g. ``heatmaps/mfcc.npy``), which
-    is what the feature's ``sidecar`` field stores.
+    ``name`` may include a subdirectory for nesting (e.g. ``mfcc`` for a mix
+    heatmap, ``htdemucs_ft/vocals_mfcc`` for a per-stem one). Returns the path
+    relative to profile.json (e.g. ``heatmaps/mfcc.npy``), which is what the
+    feature's ``sidecar`` field stores.
     """
     rel = f"heatmaps/{name}.npy"
     path = SONGS_DIR / song_id / rel
@@ -87,6 +92,21 @@ def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:
     # arrays, and the frontend .npy parser only reads C-order.
     np.save(path, np.ascontiguousarray(matrix, dtype=np.float32))
     return rel
+
+
+def cleanup_partial(song_id: str) -> None:
+    """Remove partial separation output for a failed song so a retry starts clean.
+
+    Drops the whole ``stems/`` tree and per-engine heatmap subdirs; mix-level
+    .npy sidecars are left (they're overwritten on retry and harmless if stale).
+    """
+    song_dir = SONGS_DIR / song_id
+    shutil.rmtree(song_dir / "stems", ignore_errors=True)
+    heatmaps_dir = song_dir / "heatmaps"
+    if heatmaps_dir.is_dir():
+        for child in heatmaps_dir.iterdir():
+            if child.is_dir():  # per-engine stem-heatmap subdir
+                shutil.rmtree(child, ignore_errors=True)
 
 
 def read_profile(song_id: str) -> dict:

@@ -36,6 +36,9 @@ class Song(BaseModel):
     source_path: str
     status: str
     imported_at: str
+    # Multi-stage analysis progress (null unless status='analyzing').
+    current_stage: str | None = None
+    current_stage_progress: float | None = None
 
 
 class LibrarySongsEvent(BaseModel):

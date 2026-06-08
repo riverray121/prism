@@ -126,18 +126,11 @@ One JSON message per line.
 { "type": "library.songs", "songs": [ /* full library snapshot, see below */ ] }
 { "type": "library.import_failed", "path": "...", "error": "..." }
 { "type": "profile", "song_id": "...", "profile": { /* profile.json contents */ } }
-{ "type": "job.started",         "song_id": "..." }
-{ "type": "job.stage_started",   "song_id": "...", "stage": "separate", "engine": "bs_roformer" }
-{ "type": "job.stage_progress",  "song_id": "...", "stage": "separate", "engine": "bs_roformer", "progress": 0.42 }
-{ "type": "job.stage_completed", "song_id": "...", "stage": "separate", "engine": "bs_roformer" }
-{ "type": "job.completed",       "song_id": "..." }
-{ "type": "job.failed",          "song_id": "...", "stage": "separate", "engine": "bs_roformer", "error": "..." }
-{ "type": "job.cancelled",       "song_id": "..." }
 ```
 
-`library.import` copies each file into the managed library and assigns a UUID; `library.list` requests the current state. Both reply with a `library.songs` snapshot — the full song list, not a delta — which the frontend renders wholesale. Per-song fields: `id`, `title`, `artist`, `duration_sec`, `sample_rate`, `source_path` (relative to the library root), `status`, `imported_at`. There is no request/response correlation; the snapshot model keeps the UI a pure function of the latest event. `profile.get` reads an analyzed song's `profile.json` and replies with a `profile` event carrying the parsed contents; the frontend owns no disk access.
+`library.import` copies each file into the managed library and assigns a UUID; `library.list` requests the current state. Both reply with a `library.songs` snapshot — the full song list, not a delta — which the frontend renders wholesale. Per-song fields: `id`, `title`, `artist`, `duration_sec`, `sample_rate`, `source_path` (relative to the library root), `status`, `imported_at`, and (while analyzing) `current_stage` / `current_stage_progress`. There is no request/response correlation; the snapshot model keeps the UI a pure function of the latest event. `profile.get` reads an analyzed song's `profile.json` and replies with a `profile` event carrying the parsed contents; the frontend owns no disk access.
 
-`stage_progress` is meaningful primarily for the separation stage (each engine exposes a progress callback); it carries the `engine` currently running, since the stage iterates the configured engine set. DSP and ML stages emit only `stage_started` / `stage_completed`.
+**Analysis progress rides the snapshot, not a separate event stream.** Rather than a parallel `job.*` event channel, the multi-stage worker writes its progress onto the song row — `current_stage` (`dsp-mix` / `separate` / `dsp-stem`) and `current_stage_progress` (0–1) — and emits a `library.songs` snapshot on each change. This keeps the single snapshot model: the UI is a pure function of the latest song list, with no second source of truth to reconcile. Stage progress is coarse per stage (boundaries today; the separation stage will wire each engine's progress callback as the engine set grows).
 
 ---
 

@@ -1,8 +1,15 @@
 """Single background worker that analyzes queued songs sequentially.
 
 The queue is the set of songs rows with status='queued', oldest first. The
-worker claims one, runs every mix-level feature off a single loaded signal, and
-writes status + profile.json (+ heatmap .npy sidecars). No cross-song parallelism.
+worker claims one and runs it through ordered stages off a single loaded signal:
+
+  dsp-mix   -> every mix-level feature (+ heatmap .npy sidecars)
+  separate  -> a configured set of separation engines (audio-separator)
+  dsp-stem  -> the per-stem feature pass on every engine's stems
+
+Stage + 0-1 progress are written to the song row (current_stage /
+current_stage_progress) so the UI stays a pure function of snapshots. No
+cross-song parallelism.
 """
 
 import logging
@@ -13,8 +20,8 @@ from datetime import datetime, timezone
 import librosa
 import numpy as np
 
-from . import library, storage
-from .features import amplitude, chords, frequency, rhythm, spatial, timbre, tonal
+from . import library, separation, storage
+from .features import amplitude, chords, frequency, rhythm, spatial, stem, timbre, tonal
 
 log = logging.getLogger("sidecar.worker")
 
@@ -80,7 +87,7 @@ def _analyze(
     for name, matrix in heatmaps.items():
         matrix = matrix[:, :frame_count]
         heatmaps[name] = matrix
-        mix[name] = _heatmap_envelope(name, matrix)
+        mix[name] = _heatmap_envelope(name, matrix, f"heatmaps/{name}.npy")
 
     return frame_rate_hz, frame_count, mix, heatmaps
 
@@ -105,14 +112,15 @@ _HEATMAP_META = {
 }
 
 
-def _heatmap_envelope(name: str, matrix: np.ndarray) -> dict:
+def _heatmap_envelope(name: str, matrix: np.ndarray, sidecar: str) -> dict:
+    """Build a heatmap feature envelope referencing its .npy sidecar by path."""
     meta = _HEATMAP_META[name]
     return {
         "render": "heatmap",
         "category": meta["category"],
         "source": "librosa",
         "unit": meta["unit"],
-        "sidecar": f"heatmaps/{name}.npy",
+        "sidecar": sidecar,
         "shape": [int(matrix.shape[0]), int(matrix.shape[1])],
         "axes": meta["axes"],
     }
@@ -132,6 +140,58 @@ def _claim_next() -> dict | None:
     return dict(row)
 
 
+def _set_stage(
+    song_id: str, stage: str, progress: float, on_change: Callable[[], None]
+) -> None:
+    """Record the worker's current stage + progress and push a snapshot."""
+    with library.connect() as con:
+        library.mark_stage(con, song_id, stage, progress)
+    on_change()
+
+
+def _separate_and_analyze_stems(
+    song_id: str,
+    audio_path,
+    sr: int,
+    hop: int,
+    frame_count: int,
+    on_change: Callable[[], None],
+) -> dict[str, dict]:
+    """Run each configured engine's separation + per-stem DSP; return the stems map.
+
+    For each engine: separate into stem WAVs (separate stage), then run the per-stem
+    feature pass on every stem (dsp-stem stage), writing per-stem mfcc heatmaps. The
+    returned map is ``{engine: {stem: {audio_file, features}}}`` for the profile.
+    """
+    stems_root = storage.SONGS_DIR / song_id / "stems"
+    engines = separation.DEFAULT_ENGINES
+    result: dict[str, dict] = {}
+
+    for i, engine in enumerate(engines):
+        _set_stage(song_id, "separate", i / len(engines), on_change)
+        stem_paths = separation.separate(audio_path, stems_root / engine, engine)
+
+        engine_stems: dict[str, dict] = {}
+        items = list(stem_paths.items())
+        for j, (stem_name, path) in enumerate(items):
+            _set_stage(song_id, "dsp-stem", j / len(items), on_change)
+            ys, _ = librosa.load(path, sr=sr, mono=True)
+            features, heatmaps = stem.stem_features(ys, sr, hop, frame_count)
+            for hname, matrix in heatmaps.items():
+                rel = f"{engine}/{stem_name}_{hname}"
+                storage.write_heatmap(song_id, rel, matrix)
+                features[hname] = _heatmap_envelope(
+                    hname, matrix, f"heatmaps/{rel}.npy"
+                )
+            engine_stems[stem_name] = {
+                "audio_file": f"stems/{engine}/{stem_name}.wav",
+                "features": features,
+            }
+        result[engine] = engine_stems
+
+    return result
+
+
 def _process(song: dict, on_change: Callable[[], None]) -> None:
     song_id = song["id"]
     on_change()  # reflect 'analyzing'
@@ -140,10 +200,20 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
         # Load once, keeping channels for spatial features; derive mono for the rest.
         y_stereo, sr = librosa.load(audio_path, mono=False)
         y = librosa.to_mono(y_stereo)
+        hop = max(1, round(sr / TARGET_FRAME_RATE_HZ))
+
+        # Stage: mix-level DSP. Heatmap payloads go to .npy sidecars; only their
+        # envelopes sit in the profile.
+        _set_stage(song_id, "dsp-mix", 0.0, on_change)
         frame_rate_hz, frame_count, mix, heatmaps = _analyze(y, y_stereo, sr)
-        # Heatmap payloads go to .npy sidecars; only their envelopes sit in the profile.
         for name, matrix in heatmaps.items():
             storage.write_heatmap(song_id, name, matrix)
+
+        # Stages: separation + per-stem DSP across the configured engine set.
+        stems = _separate_and_analyze_stems(
+            song_id, audio_path, sr, hop, frame_count, on_change
+        )
+
         analyzed_at = _now()
         storage.write_profile(
             song,
@@ -151,18 +221,22 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
             frame_rate_hz=frame_rate_hz,
             frame_count=frame_count,
             mix=mix,
+            stems=stems,
         )
         with library.connect() as con:
             library.mark_analyzed(con, song_id, analyzed_at)
         log.info(
-            "analyzed %s bpm=%.1f features=%d frames=%d",
+            "analyzed %s bpm=%.1f features=%d frames=%d engines=%d",
             song_id,
             mix["bpm"]["value"],
             len(mix),
             frame_count,
+            len(stems),
         )
     except Exception as exc:
         log.exception("analysis failed: %s", song_id)
+        # Drop partial separation output so a retry starts clean.
+        storage.cleanup_partial(song_id)
         with library.connect() as con:
             library.mark_failed(con, song_id, str(exc))
     on_change()  # reflect 'analyzed' or 'failed'
