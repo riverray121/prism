@@ -26,10 +26,18 @@ CREATE TABLE IF NOT EXISTS songs (
     status                 TEXT NOT NULL DEFAULT 'unanalyzed',
     current_stage          TEXT,
     current_stage_progress REAL,
+    current_engine         TEXT,
     analyzed_at            TEXT,
     error_message          TEXT
 );
 """
+
+# Columns added after the initial schema. Applied as non-destructive ALTERs so an
+# existing dev DB gains them without a wipe (CREATE TABLE IF NOT EXISTS is a no-op
+# on an existing table, so new columns must be added explicitly).
+_ADDED_COLUMNS = {
+    "current_engine": "TEXT",
+}
 
 
 @contextmanager
@@ -49,6 +57,11 @@ def connect() -> Iterator[sqlite3.Connection]:
         except sqlite3.OperationalError:
             pass
     con.execute(_SCHEMA)
+    # Add any columns introduced after the initial schema to an existing table.
+    existing = {row["name"] for row in con.execute("PRAGMA table_info(songs)")}
+    for name, decl in _ADDED_COLUMNS.items():
+        if name not in existing:
+            con.execute(f"ALTER TABLE songs ADD COLUMN {name} {decl}")
     try:
         yield con
         con.commit()
@@ -81,7 +94,8 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
     return con.execute(
         """
         SELECT id, title, artist, duration_sec, sample_rate, source_path,
-               status, imported_at, current_stage, current_stage_progress
+               status, imported_at, current_stage, current_stage_progress,
+               current_engine
         FROM songs
         ORDER BY imported_at
         """
@@ -118,15 +132,24 @@ def mark_analyzing(con: sqlite3.Connection, song_id: str) -> None:
 
 
 def mark_stage(
-    con: sqlite3.Connection, song_id: str, stage: str, progress: float
+    con: sqlite3.Connection,
+    song_id: str,
+    stage: str,
+    progress: float,
+    engine: str | None = None,
 ) -> None:
-    """Record the worker's current stage + 0-1 progress for the analyzing song.
+    """Record the worker's current stage, 0-1 progress, and engine (if any).
 
-    The snapshot reads these so the UI stays a pure function of song rows.
+    The snapshot reads these so the UI stays a pure function of song rows. ``engine``
+    is the separation engine currently running, or None for non-separation stages.
     """
     con.execute(
-        "UPDATE songs SET current_stage=?, current_stage_progress=? WHERE id=?",
-        (stage, progress, song_id),
+        """
+        UPDATE songs
+        SET current_stage=?, current_stage_progress=?, current_engine=?
+        WHERE id=?
+        """,
+        (stage, progress, engine, song_id),
     )
 
 
@@ -135,7 +158,7 @@ def mark_analyzed(con: sqlite3.Connection, song_id: str, analyzed_at: str) -> No
         """
         UPDATE songs
         SET status='analyzed', analyzed_at=?,
-            current_stage=NULL, current_stage_progress=NULL
+            current_stage=NULL, current_stage_progress=NULL, current_engine=NULL
         WHERE id=?
         """,
         (analyzed_at, song_id),
@@ -147,7 +170,7 @@ def mark_failed(con: sqlite3.Connection, song_id: str, error_message: str) -> No
         """
         UPDATE songs
         SET status='failed', error_message=?,
-            current_stage=NULL, current_stage_progress=NULL
+            current_stage=NULL, current_stage_progress=NULL, current_engine=NULL
         WHERE id=?
         """,
         (error_message, song_id),
@@ -170,7 +193,7 @@ def fail_interrupted(con: sqlite3.Connection, error_message: str) -> list[str]:
             """
             UPDATE songs
             SET status='failed', error_message=?,
-                current_stage=NULL, current_stage_progress=NULL
+                current_stage=NULL, current_stage_progress=NULL, current_engine=NULL
             WHERE status='analyzing'
             """,
             (error_message,),

@@ -39,6 +39,8 @@ class Song(BaseModel):
     # Multi-stage analysis progress (null unless status='analyzing').
     current_stage: str | None = None
     current_stage_progress: float | None = None
+    # Separation engine currently running, during the separate/dsp-stem stages.
+    current_engine: str | None = None
 
 
 class LibrarySongsEvent(BaseModel):

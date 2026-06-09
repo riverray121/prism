@@ -38,18 +38,20 @@
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   }
 
-  // Status label: while analyzing, show the current stage and its progress.
+  // Status label: while analyzing, show the current stage, engine, and progress.
   function statusLabel(song: {
     status: string;
     current_stage: string | null;
     current_stage_progress: number | null;
+    current_engine: string | null;
   }): string {
     if (song.status !== "analyzing" || !song.current_stage) return song.status;
+    const engine = song.current_engine ? ` · ${song.current_engine}` : "";
     const pct =
       song.current_stage_progress === null
         ? ""
         : ` ${Math.round(song.current_stage_progress * 100)}%`;
-    return `${song.current_stage}${pct}`;
+    return `${song.current_stage}${engine}${pct}`;
   }
 </script>
 

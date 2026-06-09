@@ -466,82 +466,90 @@
       {/each}
     </div>
 
-    <!-- Per-stem features, grouped by separation engine then stem. Reuses the
-         mix graph components and shares the playhead/scrub. -->
-    {#each stems as [engine, engineStems] (engine)}
-      <section class="flex flex-col gap-3">
-        <h3 class="text-lg font-semibold tracking-tight">
-          Stems <span class="text-sm font-normal text-neutral-500"
-            >· {engine}</span
-          >
-        </h3>
-        {#each Object.entries(engineStems) as [stemName, stemData] (stemName)}
-          {@const sf = splitFeatures(stemData.features)}
-          {@const stemKey = `${engine}::${stemName}`}
-          <div
-            class="flex flex-col gap-4 rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-          >
-            <div class="flex items-center gap-3">
-              <button
-                onclick={() => toggleSource(stemKey)}
-                class="rounded-md border border-indigo-600 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 {playing &&
-                activeKey === stemKey
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-500 dark:text-white'
-                  : ''}"
+    <!-- Per-stem features, grouped by separation engine then stem, so the same
+         stem can be compared across engines. Reuses the mix graph components and
+         shares the playhead/scrub. -->
+    {#if stems.length > 0}
+      <section class="flex flex-col gap-6">
+        <h3 class="text-lg font-semibold tracking-tight">Stems</h3>
+        {#each stems as [engine, engineStems] (engine)}
+          <div class="flex flex-col gap-3">
+            <h4
+              class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400"
+            >
+              {engine}
+            </h4>
+            {#each Object.entries(engineStems) as [stemName, stemData] (stemName)}
+              {@const sf = splitFeatures(stemData.features)}
+              {@const stemKey = `${engine}::${stemName}`}
+              <div
+                class="flex flex-col gap-4 rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
               >
-                {playing && activeKey === stemKey ? "Pause" : "Play"}
-              </button>
-              <p class="text-sm font-semibold capitalize">{stemName}</p>
-            </div>
-            {#each sf.continuous as [name, feature], i (name)}
-              <div>
-                <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-                  {humanize(name)}
-                  <span class="text-neutral-400 dark:text-neutral-600"
-                    >· {feature.unit}</span
+                <div class="flex items-center gap-3">
+                  <button
+                    onclick={() => toggleSource(stemKey)}
+                    class="rounded-md border border-indigo-600 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 {playing &&
+                    activeKey === stemKey
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-500 dark:text-white'
+                      : ''}"
                   >
-                </p>
-                <ContinuousGraph
-                  {feature}
-                  frameRateHz={inspection.profile.timeline.frame_rate_hz}
-                  label={`${stemName} ${name}`}
-                  color={PALETTE[i % PALETTE.length]}
-                  playheadSec={currentTime}
-                  follow={playing}
-                  onSeek={scrub}
-                  onScrubStart={scrubStart}
-                  onScrubEnd={scrubEnd}
-                />
+                    {playing && activeKey === stemKey ? "Pause" : "Play"}
+                  </button>
+                  <p class="text-sm font-semibold capitalize">{stemName}</p>
+                </div>
+                {#each sf.continuous as [name, feature], i (name)}
+                  <div>
+                    <p
+                      class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
+                    >
+                      {humanize(name)}
+                      <span class="text-neutral-400 dark:text-neutral-600"
+                        >· {feature.unit}</span
+                      >
+                    </p>
+                    <ContinuousGraph
+                      {feature}
+                      frameRateHz={inspection.profile.timeline.frame_rate_hz}
+                      label={`${stemName} ${name}`}
+                      color={PALETTE[i % PALETTE.length]}
+                      playheadSec={currentTime}
+                      follow={playing}
+                      onSeek={scrub}
+                      onScrubStart={scrubStart}
+                      onScrubEnd={scrubEnd}
+                    />
+                  </div>
+                {/each}
+                {#if inspection.songDir}
+                  {#each sf.heatmaps as [name, feature] (name)}
+                    <div>
+                      <p
+                        class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
+                      >
+                        {humanize(name)}
+                        <span class="text-neutral-400 dark:text-neutral-600"
+                          >· {feature.shape[0]}×{feature.shape[1]}
+                          {feature.unit}</span
+                        >
+                      </p>
+                      <HeatmapGraph
+                        path={`${inspection.songDir}/${feature.sidecar}`}
+                        frameRateHz={inspection.profile.timeline.frame_rate_hz}
+                        normalize="per-row"
+                        playheadSec={currentTime}
+                        follow={playing}
+                        onSeek={scrub}
+                        onScrubStart={scrubStart}
+                        onScrubEnd={scrubEnd}
+                      />
+                    </div>
+                  {/each}
+                {/if}
               </div>
             {/each}
-            {#if inspection.songDir}
-              {#each sf.heatmaps as [name, feature] (name)}
-                <div>
-                  <p
-                    class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
-                  >
-                    {humanize(name)}
-                    <span class="text-neutral-400 dark:text-neutral-600"
-                      >· {feature.shape[0]}×{feature.shape[1]}
-                      {feature.unit}</span
-                    >
-                  </p>
-                  <HeatmapGraph
-                    path={`${inspection.songDir}/${feature.sidecar}`}
-                    frameRateHz={inspection.profile.timeline.frame_rate_hz}
-                    normalize="per-row"
-                    playheadSec={currentTime}
-                    follow={playing}
-                    onSeek={scrub}
-                    onScrubStart={scrubStart}
-                    onScrubEnd={scrubEnd}
-                  />
-                </div>
-              {/each}
-            {/if}
           </div>
         {/each}
       </section>
-    {/each}
+    {/if}
   {/if}
 </section>

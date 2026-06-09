@@ -15,6 +15,8 @@ export const SongSchema = z.object({
   // Multi-stage analysis progress; null unless status is 'analyzing'.
   current_stage: z.string().nullable().default(null),
   current_stage_progress: z.number().nullable().default(null),
+  // Separation engine currently running, during the separate/dsp-stem stages.
+  current_engine: z.string().nullable().default(null),
 });
 export type Song = z.infer<typeof SongSchema>;
 

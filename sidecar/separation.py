@@ -23,13 +23,18 @@ from . import models
 log = logging.getLogger("sidecar.separation")
 
 # Engine id -> audio-separator model filename. The id is the key used on disk
-# (stems/{engine}/) and in the profile (stems.{engine}).
+# (stems/{engine}/) and in the profile (stems.{engine}). The RoFormers run on the
+# Apple GPU via torch/MPS (MDXC architecture) and emit vocals/instrumental;
+# htdemucs_ft emits vocals/drums/bass/other.
 ENGINES = {
     "htdemucs_ft": "htdemucs_ft.yaml",
+    "bs_roformer": "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
+    "mel_band_roformer": "model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt",
 }
 
-# Engines run per song, in order. One engine in slice 1; the full set lands later.
-DEFAULT_ENGINES = ["htdemucs_ft"]
+# Engines run per song, in order. Kept on disk side-by-side for comparison; the
+# ensemble preset is a planned fast-follow.
+DEFAULT_ENGINES = ["htdemucs_ft", "bs_roformer", "mel_band_roformer"]
 
 # audio-separator's default output filename is ``{input}_(Vocals)_{model}.wav``;
 # this pulls the stem label out of the parenthesized group.

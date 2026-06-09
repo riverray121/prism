@@ -141,11 +141,15 @@ def _claim_next() -> dict | None:
 
 
 def _set_stage(
-    song_id: str, stage: str, progress: float, on_change: Callable[[], None]
+    song_id: str,
+    stage: str,
+    progress: float,
+    on_change: Callable[[], None],
+    engine: str | None = None,
 ) -> None:
-    """Record the worker's current stage + progress and push a snapshot."""
+    """Record the worker's current stage, progress, engine and push a snapshot."""
     with library.connect() as con:
-        library.mark_stage(con, song_id, stage, progress)
+        library.mark_stage(con, song_id, stage, progress, engine)
     on_change()
 
 
@@ -168,13 +172,13 @@ def _separate_and_analyze_stems(
     result: dict[str, dict] = {}
 
     for i, engine in enumerate(engines):
-        _set_stage(song_id, "separate", i / len(engines), on_change)
+        _set_stage(song_id, "separate", i / len(engines), on_change, engine)
         stem_paths = separation.separate(audio_path, stems_root / engine, engine)
 
         engine_stems: dict[str, dict] = {}
         items = list(stem_paths.items())
         for j, (stem_name, path) in enumerate(items):
-            _set_stage(song_id, "dsp-stem", j / len(items), on_change)
+            _set_stage(song_id, "dsp-stem", j / len(items), on_change, engine)
             ys, _ = librosa.load(path, sr=sr, mono=True)
             features, heatmaps = stem.stem_features(ys, sr, hop, frame_count)
             for hname, matrix in heatmaps.items():
