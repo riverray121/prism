@@ -21,6 +21,10 @@ export function queueAnalysis(songIds: string[]): Promise<void> {
   return sendCommand({ type: "queue.add", song_ids: songIds });
 }
 
+export function cancelAnalysis(songId: string): Promise<void> {
+  return sendCommand({ type: "queue.cancel", song_id: songId });
+}
+
 export function getProfile(songId: string): Promise<void> {
   return sendCommand({ type: "profile.get", song_id: songId });
 }

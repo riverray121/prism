@@ -1,7 +1,7 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
 
-  import { importFiles, queueAnalysis } from "$lib/ipc";
+  import { cancelAnalysis, importFiles, queueAnalysis } from "$lib/ipc";
   import { library } from "$lib/state/library.svelte";
   import { open as openInspection } from "$lib/state/inspection.svelte";
 
@@ -21,6 +21,11 @@
   // Queue a song for analysis.
   function analyze(songId: string) {
     return queueAnalysis([songId]);
+  }
+
+  // Remove a queued song from the analysis queue.
+  function cancel(songId: string) {
+    return cancelAnalysis(songId);
   }
 
   // Uppercase file extension from the stored source path (e.g. "FLAC", "MP3").
@@ -129,6 +134,13 @@
                     class="rounded bg-neutral-200 px-2 py-1 text-xs font-medium hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700"
                   >
                     {song.status === "failed" ? "Retry" : "Analyze"}
+                  </button>
+                {:else if song.status === "queued"}
+                  <button
+                    onclick={() => cancel(song.id)}
+                    class="rounded bg-neutral-200 px-2 py-1 text-xs font-medium hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+                  >
+                    Cancel
                   </button>
                 {/if}
               </td>

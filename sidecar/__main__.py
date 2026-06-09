@@ -15,6 +15,7 @@ from .schema import (
     ListCommand,
     ProfileEvent,
     QueueAddCommand,
+    QueueCancelCommand,
     SettingsEvent,
     Song,
     UpdateSettingsCommand,
@@ -89,6 +90,11 @@ def handle(msg: dict) -> None:
                 con, cmd.song_ids, datetime.now(timezone.utc).isoformat()
             )
         emit_snapshot()  # reflect 'queued'; the worker picks up from here
+    elif msg_type == "queue.cancel":
+        cmd = QueueCancelCommand.model_validate(msg)
+        with library.connect() as con:
+            library.cancel_queued(con, cmd.song_id)
+        emit_snapshot()
     elif msg_type == "profile.get":
         cmd = GetProfileCommand.model_validate(msg)
         try:

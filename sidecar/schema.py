@@ -19,6 +19,11 @@ class QueueAddCommand(BaseModel):
     song_ids: list[str]
 
 
+class QueueCancelCommand(BaseModel):
+    type: Literal["queue.cancel"]
+    song_id: str
+
+
 class GetProfileCommand(BaseModel):
     type: Literal["profile.get"]
     song_id: str
