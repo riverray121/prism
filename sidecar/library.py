@@ -5,11 +5,12 @@ subset (the analysis-progress columns fill in from M2 on). Connections are
 opened per operation so a worker thread can hold its own without sharing state.
 """
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from collections.abc import Iterator
 
-from . import storage
+from . import separation, storage
 
 # Full column set per docs/design-doc.md. Progress/analysis columns are nullable
 # and unused until later milestones.
@@ -27,8 +28,18 @@ CREATE TABLE IF NOT EXISTS songs (
     current_stage          TEXT,
     current_stage_progress REAL,
     current_engine         TEXT,
+    current_step           INTEGER,
+    total_steps            INTEGER,
     analyzed_at            TEXT,
     error_message          TEXT
+);
+"""
+
+# Key-value store for global app settings (e.g. selected analysis engines).
+_SETTINGS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 """
 
@@ -37,6 +48,8 @@ CREATE TABLE IF NOT EXISTS songs (
 # on an existing table, so new columns must be added explicitly).
 _ADDED_COLUMNS = {
     "current_engine": "TEXT",
+    "current_step": "INTEGER",
+    "total_steps": "INTEGER",
 }
 
 
@@ -57,6 +70,7 @@ def connect() -> Iterator[sqlite3.Connection]:
         except sqlite3.OperationalError:
             pass
     con.execute(_SCHEMA)
+    con.execute(_SETTINGS_SCHEMA)
     # Add any columns introduced after the initial schema to an existing table.
     existing = {row["name"] for row in con.execute("PRAGMA table_info(songs)")}
     for name, decl in _ADDED_COLUMNS.items():
@@ -94,8 +108,8 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
     return con.execute(
         """
         SELECT id, title, artist, duration_sec, sample_rate, source_path,
-               status, imported_at, current_stage, current_stage_progress,
-               current_engine
+               status, imported_at, current_stage, current_engine,
+               current_step, total_steps
         FROM songs
         ORDER BY imported_at
         """
@@ -135,21 +149,25 @@ def mark_stage(
     con: sqlite3.Connection,
     song_id: str,
     stage: str,
-    progress: float,
+    *,
     engine: str | None = None,
+    step: int | None = None,
+    total: int | None = None,
 ) -> None:
-    """Record the worker's current stage, 0-1 progress, and engine (if any).
+    """Record the worker's current stage, engine, and discrete step (k of total).
 
-    The snapshot reads these so the UI stays a pure function of song rows. ``engine``
-    is the separation engine currently running, or None for non-separation stages.
+    The snapshot reads these so the UI stays a pure function of song rows. Progress
+    is reported as a step count (engine k of total), not a percentage — the
+    separation backends expose no intra-step progress. ``engine``/``step``/``total``
+    are None for non-separation stages (e.g. dsp-mix).
     """
     con.execute(
         """
         UPDATE songs
-        SET current_stage=?, current_stage_progress=?, current_engine=?
+        SET current_stage=?, current_engine=?, current_step=?, total_steps=?
         WHERE id=?
         """,
-        (stage, progress, engine, song_id),
+        (stage, engine, step, total, song_id),
     )
 
 
@@ -158,7 +176,8 @@ def mark_analyzed(con: sqlite3.Connection, song_id: str, analyzed_at: str) -> No
         """
         UPDATE songs
         SET status='analyzed', analyzed_at=?,
-            current_stage=NULL, current_stage_progress=NULL, current_engine=NULL
+            current_stage=NULL, current_engine=NULL,
+            current_step=NULL, total_steps=NULL
         WHERE id=?
         """,
         (analyzed_at, song_id),
@@ -170,7 +189,8 @@ def mark_failed(con: sqlite3.Connection, song_id: str, error_message: str) -> No
         """
         UPDATE songs
         SET status='failed', error_message=?,
-            current_stage=NULL, current_stage_progress=NULL, current_engine=NULL
+            current_stage=NULL, current_engine=NULL,
+            current_step=NULL, total_steps=NULL
         WHERE id=?
         """,
         (error_message, song_id),
@@ -193,9 +213,44 @@ def fail_interrupted(con: sqlite3.Connection, error_message: str) -> list[str]:
             """
             UPDATE songs
             SET status='failed', error_message=?,
-                current_stage=NULL, current_stage_progress=NULL, current_engine=NULL
+                current_stage=NULL, current_engine=NULL,
+                current_step=NULL, total_steps=NULL
             WHERE status='analyzing'
             """,
             (error_message,),
         )
     return ids
+
+
+# --- Settings (key-value JSON store) ---------------------------------------
+
+
+def get_setting(con: sqlite3.Connection, key: str, default=None):
+    """Return a JSON-decoded setting value, or ``default`` if unset."""
+    row = con.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return json.loads(row["value"]) if row is not None else default
+
+
+def set_setting(con: sqlite3.Connection, key: str, value) -> None:
+    """Upsert a JSON-encoded setting value."""
+    con.execute(
+        """
+        INSERT INTO settings (key, value) VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """,
+        (key, json.dumps(value)),
+    )
+
+
+def get_engines(con: sqlite3.Connection) -> list[str]:
+    """Separation engines selected for analysis, in canonical order.
+
+    Defaults to every available engine when unset. Invalid/removed engine ids in
+    the saved selection are dropped; an empty selection means mix-only (no stems).
+    """
+    available = list(separation.ENGINES)
+    selected = get_setting(con, "engines", None)
+    if selected is None:
+        return available
+    chosen = set(selected)
+    return [e for e in available if e in chosen]

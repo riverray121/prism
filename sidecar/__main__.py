@@ -5,16 +5,19 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import ipc, library, metadata, storage, worker
+from . import ipc, library, metadata, separation, storage, worker
 from .schema import (
     GetProfileCommand,
+    GetSettingsCommand,
     ImportCommand,
     ImportFailedEvent,
     LibrarySongsEvent,
     ListCommand,
     ProfileEvent,
     QueueAddCommand,
+    SettingsEvent,
     Song,
+    UpdateSettingsCommand,
 )
 
 # Log to stderr so the stdout JSON-lines channel stays clean.
@@ -36,6 +39,13 @@ def library_snapshot() -> LibrarySongsEvent:
 
 def emit_snapshot() -> None:
     ipc.emit(library_snapshot())
+
+
+def emit_settings() -> None:
+    """Emit the current analysis settings (selected + available engines)."""
+    with library.connect() as con:
+        engines = library.get_engines(con)
+    ipc.emit(SettingsEvent(engines=engines, available_engines=list(separation.ENGINES)))
 
 
 def import_one(path_str: str) -> None:
@@ -95,6 +105,16 @@ def handle(msg: dict) -> None:
             )
         except FileNotFoundError:
             log.warning("no profile for %s", cmd.song_id)
+    elif msg_type == "settings.get":
+        GetSettingsCommand.model_validate(msg)
+        emit_settings()
+    elif msg_type == "settings.update":
+        cmd = UpdateSettingsCommand.model_validate(msg)
+        # Keep only known engine ids; the frontend may lag the available set.
+        valid = [e for e in cmd.engines if e in separation.ENGINES]
+        with library.connect() as con:
+            library.set_setting(con, "engines", valid)
+        emit_settings()
     else:
         log.warning("unknown command: %r", msg)
 
@@ -108,6 +128,7 @@ def main() -> None:
         interrupted = library.fail_interrupted(con, "Analysis interrupted")
     if interrupted:
         log.info("marked %d interrupted song(s) as failed", len(interrupted))
+    emit_settings()  # let the UI render the analysis-settings panel on connect
     # Background worker drains the analysis queue while this thread reads stdin.
     threading.Thread(target=worker.run, args=(emit_snapshot,), daemon=True).start()
     # Read one JSON command per line from stdin; write one JSON event per line to stdout.

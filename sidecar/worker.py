@@ -7,9 +7,9 @@ worker claims one and runs it through ordered stages off a single loaded signal:
   separate  -> a configured set of separation engines (audio-separator)
   dsp-stem  -> the per-stem feature pass on every engine's stems
 
-Stage + 0-1 progress are written to the song row (current_stage /
-current_stage_progress) so the UI stays a pure function of snapshots. No
-cross-song parallelism.
+Stage + discrete step (engine k of total) are written to the song row
+(current_stage / current_engine / current_step / total_steps) so the UI stays a
+pure function of snapshots. No cross-song parallelism.
 """
 
 import logging
@@ -143,13 +143,15 @@ def _claim_next() -> dict | None:
 def _set_stage(
     song_id: str,
     stage: str,
-    progress: float,
     on_change: Callable[[], None],
+    *,
     engine: str | None = None,
+    step: int | None = None,
+    total: int | None = None,
 ) -> None:
-    """Record the worker's current stage, progress, engine and push a snapshot."""
+    """Record the worker's current stage (+ engine step k/total) and push a snapshot."""
     with library.connect() as con:
-        library.mark_stage(con, song_id, stage, progress, engine)
+        library.mark_stage(con, song_id, stage, engine=engine, step=step, total=total)
     on_change()
 
 
@@ -168,17 +170,23 @@ def _separate_and_analyze_stems(
     returned map is ``{engine: {stem: {audio_file, features}}}`` for the profile.
     """
     stems_root = storage.SONGS_DIR / song_id / "stems"
-    engines = separation.DEFAULT_ENGINES
+    # Engine set is a user setting (Analysis settings panel); empty = mix-only.
+    with library.connect() as con:
+        engines = library.get_engines(con)
+    total = len(engines)
     result: dict[str, dict] = {}
 
     for i, engine in enumerate(engines):
-        _set_stage(song_id, "separate", i / len(engines), on_change, engine)
+        _set_stage(
+            song_id, "separate", on_change, engine=engine, step=i + 1, total=total
+        )
         stem_paths = separation.separate(audio_path, stems_root / engine, engine)
 
         engine_stems: dict[str, dict] = {}
-        items = list(stem_paths.items())
-        for j, (stem_name, path) in enumerate(items):
-            _set_stage(song_id, "dsp-stem", j / len(items), on_change, engine)
+        for stem_name, path in stem_paths.items():
+            _set_stage(
+                song_id, "dsp-stem", on_change, engine=engine, step=i + 1, total=total
+            )
             ys, _ = librosa.load(path, sr=sr, mono=True)
             features, heatmaps = stem.stem_features(ys, sr, hop, frame_count)
             for hname, matrix in heatmaps.items():
@@ -208,7 +216,7 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
 
         # Stage: mix-level DSP. Heatmap payloads go to .npy sidecars; only their
         # envelopes sit in the profile.
-        _set_stage(song_id, "dsp-mix", 0.0, on_change)
+        _set_stage(song_id, "dsp-mix", on_change)
         frame_rate_hz, frame_count, mix, heatmaps = _analyze(y, y_stereo, sr)
         for name, matrix in heatmaps.items():
             storage.write_heatmap(song_id, name, matrix)

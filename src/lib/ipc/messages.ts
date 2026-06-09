@@ -14,9 +14,11 @@ export const SongSchema = z.object({
   imported_at: z.string(),
   // Multi-stage analysis progress; null unless status is 'analyzing'.
   current_stage: z.string().nullable().default(null),
-  current_stage_progress: z.number().nullable().default(null),
   // Separation engine currently running, during the separate/dsp-stem stages.
   current_engine: z.string().nullable().default(null),
+  // Discrete progress: engine current_step of total_steps (no percentage).
+  current_step: z.number().nullable().default(null),
+  total_steps: z.number().nullable().default(null),
 });
 export type Song = z.infer<typeof SongSchema>;
 
@@ -125,10 +127,19 @@ export const ProfileEventSchema = z.object({
   song_dir: z.string(),
 });
 
+// Analysis settings: which separation engines are selected, and the full set the
+// sidecar can run (so the UI renders the complete toggle list).
+export const SettingsEventSchema = z.object({
+  type: z.literal("settings"),
+  engines: z.array(z.string()),
+  available_engines: z.array(z.string()),
+});
+
 // All events the sidecar can send on stdout.
 export const SidecarEventSchema = z.discriminatedUnion("type", [
   LibrarySongsEventSchema,
   ImportFailedEventSchema,
   ProfileEventSchema,
+  SettingsEventSchema,
 ]);
 export type SidecarEvent = z.infer<typeof SidecarEventSchema>;

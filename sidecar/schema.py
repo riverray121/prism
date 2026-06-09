@@ -24,6 +24,16 @@ class GetProfileCommand(BaseModel):
     song_id: str
 
 
+class GetSettingsCommand(BaseModel):
+    type: Literal["settings.get"]
+
+
+class UpdateSettingsCommand(BaseModel):
+    type: Literal["settings.update"]
+    # Separation engine ids selected for analysis (subset of available engines).
+    engines: list[str]
+
+
 # Sidecar -> frontend events.
 
 
@@ -38,9 +48,12 @@ class Song(BaseModel):
     imported_at: str
     # Multi-stage analysis progress (null unless status='analyzing').
     current_stage: str | None = None
-    current_stage_progress: float | None = None
     # Separation engine currently running, during the separate/dsp-stem stages.
     current_engine: str | None = None
+    # Discrete progress: engine ``current_step`` of ``total_steps`` (no percentage —
+    # the separation backends expose no intra-step progress).
+    current_step: int | None = None
+    total_steps: int | None = None
 
 
 class LibrarySongsEvent(BaseModel):
@@ -64,3 +77,11 @@ class ProfileEvent(BaseModel):
     # Absolute path to the song folder, for resolving sidecar paths (heatmap
     # .npy files) against the profile's relative sidecar fields.
     song_dir: str
+
+
+class SettingsEvent(BaseModel):
+    type: Literal["settings"] = "settings"
+    # Engine ids currently selected for analysis.
+    engines: list[str]
+    # All engine ids the sidecar can run, so the UI can render the full toggle set.
+    available_engines: list[str]

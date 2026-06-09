@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
+  import AnalysisSettings from "$lib/components/AnalysisSettings.svelte";
   import InspectionView from "$lib/components/InspectionView.svelte";
   import LibraryPanel from "$lib/components/LibraryPanel.svelte";
-  import { listLibrary, onSidecarEvent } from "$lib/ipc";
+  import { getSettings, listLibrary, onSidecarEvent } from "$lib/ipc";
   import { library } from "$lib/state/library.svelte";
   import { inspection } from "$lib/state/inspection.svelte";
+  import { settings } from "$lib/state/settings.svelte";
 
-  // Subscribe to sidecar events and request the current library on mount.
+  // Subscribe to sidecar events and request the current library + settings on mount.
   onMount(() => {
     const off = onSidecarEvent((event) => {
       if (event.type === "library.songs") {
@@ -21,9 +23,14 @@
           inspection.audioPath = event.audio_path;
           inspection.songDir = event.song_dir;
         }
+      } else if (event.type === "settings") {
+        settings.engines = event.engines;
+        settings.availableEngines = event.available_engines;
+        settings.loaded = true;
       }
     });
     listLibrary();
+    getSettings();
     return off;
   });
 </script>
@@ -38,6 +45,7 @@
 
   {#if inspection.songId === null}
     <LibraryPanel />
+    <AnalysisSettings />
   {:else}
     <InspectionView />
   {/if}

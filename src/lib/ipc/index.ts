@@ -25,6 +25,14 @@ export function getProfile(songId: string): Promise<void> {
   return sendCommand({ type: "profile.get", song_id: songId });
 }
 
+export function getSettings(): Promise<void> {
+  return sendCommand({ type: "settings.get" });
+}
+
+export function updateSettings(engines: string[]): Promise<void> {
+  return sendCommand({ type: "settings.update", engines });
+}
+
 // Subscribe to validated sidecar events. Each stdout line is parsed and checked
 // against the schema; malformed or unknown lines are logged and dropped.
 // Returns an unsubscribe function.

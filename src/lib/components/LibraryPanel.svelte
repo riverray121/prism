@@ -38,20 +38,30 @@
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   }
 
-  // Status label: while analyzing, show the current stage, engine, and progress.
+  // Human verb per pipeline stage.
+  const STAGE_VERB: Record<string, string> = {
+    "dsp-mix": "analyzing mix",
+    separate: "separating",
+    "dsp-stem": "stem features",
+  };
+
+  // Status label: while analyzing, show the stage, engine, and step count
+  // (engine k of N) — discrete progress, no misleading percentage.
   function statusLabel(song: {
     status: string;
     current_stage: string | null;
-    current_stage_progress: number | null;
     current_engine: string | null;
+    current_step: number | null;
+    total_steps: number | null;
   }): string {
     if (song.status !== "analyzing" || !song.current_stage) return song.status;
-    const engine = song.current_engine ? ` · ${song.current_engine}` : "";
-    const pct =
-      song.current_stage_progress === null
-        ? ""
-        : ` ${Math.round(song.current_stage_progress * 100)}%`;
-    return `${song.current_stage}${engine}${pct}`;
+    const base = STAGE_VERB[song.current_stage] ?? song.current_stage;
+    const engine = song.current_engine ? ` ${song.current_engine}` : "";
+    const step =
+      song.current_step && song.total_steps
+        ? ` (${song.current_step}/${song.total_steps})`
+        : "";
+    return `${base}${engine}${step}`;
   }
 </script>
 

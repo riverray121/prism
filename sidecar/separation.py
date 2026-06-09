@@ -7,9 +7,9 @@ runs one engine and writes its native stem set as canonical lowercase WAVs
 auto-download into the shared model cache (``models.MODELS_DIR``), matching the
 M3 download-on-first-run pattern.
 
-The engine set is config: ``DEFAULT_ENGINES`` lists which engines run per song.
-Slice 1 is a single engine (htdemucs_ft, Demucs on MPS); more engines slot into
-``ENGINES`` behind this same interface.
+``ENGINES`` is the full set of available engines; which ones actually run per song
+is a user setting (see ``library.get_engines``). New engines slot into ``ENGINES``
+behind this same interface.
 """
 
 import contextlib
@@ -31,10 +31,6 @@ ENGINES = {
     "bs_roformer": "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
     "mel_band_roformer": "model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt",
 }
-
-# Engines run per song, in order. Kept on disk side-by-side for comparison; the
-# ensemble preset is a planned fast-follow.
-DEFAULT_ENGINES = ["htdemucs_ft", "bs_roformer", "mel_band_roformer"]
 
 # audio-separator's default output filename is ``{input}_(Vocals)_{model}.wav``;
 # this pulls the stem label out of the parenthesized group.
