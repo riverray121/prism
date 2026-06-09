@@ -245,12 +245,12 @@ def set_setting(con: sqlite3.Connection, key: str, value) -> None:
 def get_engines(con: sqlite3.Connection) -> list[str]:
     """Separation engines selected for analysis, in canonical order.
 
-    Defaults to every available engine when unset. Invalid/removed engine ids in
-    the saved selection are dropped; an empty selection means mix-only (no stems).
+    Defaults to ``separation.DEFAULT_ENGINES`` when unset. Invalid/removed engine
+    ids in the saved selection are dropped; an empty selection means mix-only.
     """
     available = list(separation.ENGINES)
     selected = get_setting(con, "engines", None)
     if selected is None:
-        return available
+        return [e for e in separation.DEFAULT_ENGINES if e in available]
     chosen = set(selected)
     return [e for e in available if e in chosen]

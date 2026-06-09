@@ -17,6 +17,25 @@ def zero_crossing_rate(y: np.ndarray, hop: int) -> dict:
     }
 
 
+def transient_sharpness(y: np.ndarray, sr: int, hop: int) -> dict:
+    """Attack sharpness over time: the onset-strength envelope, normalized 0-1.
+
+    A proxy for how percussive/sharp the attacks are at each moment — high during
+    crisp hits, low during sustained or smooth passages.
+    """
+    env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
+    peak = float(env.max()) if env.size else 0.0
+    norm = env / peak if peak > 0 else env
+    return {
+        "render": "continuous",
+        "category": "timbre",
+        "source": "librosa.onset",
+        "unit": "normalized",
+        "range": [0, 1],
+        "data": [float(x) for x in norm],
+    }
+
+
 def mfcc(y: np.ndarray, sr: int, hop: int, n_mfcc: int = 13) -> np.ndarray:
     """Timbre fingerprint: MFCC matrix of shape (n_mfcc, frames).
 

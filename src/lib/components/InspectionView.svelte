@@ -247,6 +247,9 @@
       continuous: entries.filter(
         (e): e is [string, ContinuousFeature] => e[1].render === "continuous",
       ),
+      events: entries.filter(
+        (e): e is [string, EventFeature] => e[1].render === "event",
+      ),
       heatmaps: entries.filter(
         (e): e is [string, HeatmapFeature] => e[1].render === "heatmap",
       ),
@@ -497,6 +500,28 @@
                   </button>
                   <p class="text-sm font-semibold capitalize">{stemName}</p>
                 </div>
+                {#each sf.events as [name, feature] (name)}
+                  <div>
+                    <p
+                      class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
+                    >
+                      {humanize(name)}
+                      <span class="text-neutral-400 dark:text-neutral-600"
+                        >· {feature.events.length} events</span
+                      >
+                    </p>
+                    <EventGraph
+                      events={feature.events}
+                      maxTimeSec={durationSec}
+                      playheadSec={currentTime}
+                      follow={playing}
+                      height={64}
+                      onSeek={scrub}
+                      onScrubStart={scrubStart}
+                      onScrubEnd={scrubEnd}
+                    />
+                  </div>
+                {/each}
                 {#each sf.continuous as [name, feature], i (name)}
                   <div>
                     <p

@@ -35,6 +35,29 @@ def _infer_downbeats(y: np.ndarray, sr: int, beat_frames: np.ndarray) -> np.ndar
     return librosa.frames_to_time(beat_frames[phase::METER], sr=sr)
 
 
+def onsets(y: np.ndarray, sr: int, hop: int) -> dict:
+    """Onset events with peak-normalized attack strength.
+
+    Detects note/hit onsets from the onset-strength envelope (sampled on the
+    timeline hop) and attaches each onset's strength (0-1) as an event attr.
+    """
+    onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
+    onset_frames = librosa.onset.onset_detect(
+        onset_envelope=onset_env, sr=sr, hop_length=hop, backtrack=False
+    )
+    times = librosa.frames_to_time(onset_frames, sr=sr, hop_length=hop)
+    peak = float(onset_env.max()) if onset_env.size else 0.0
+    strengths = onset_env[onset_frames] / peak if peak > 0 else onset_env[onset_frames]
+    return {
+        "render": "event",
+        "category": "rhythm",
+        "source": "librosa.onset",
+        "events": [
+            {"t": float(t), "strength": float(s)} for t, s in zip(times, strengths)
+        ],
+    }
+
+
 def rhythm_features(y: np.ndarray, sr: int) -> dict[str, dict]:
     """Global tempo, beat positions, and downbeats from one beat-tracking pass.
 

@@ -33,6 +33,11 @@ ENGINES = {
     "mel_band_roformer": "model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt",
 }
 
+# Engines selected by default (when the user hasn't chosen a set). Just the
+# fine-tuned 4-stem Demucs — the others are opt-in via Analysis settings, since
+# they add cost and the RoFormers/6-stem overlap its stems.
+DEFAULT_ENGINES = ["htdemucs_ft"]
+
 # audio-separator's default output filename is ``{input}_(Vocals)_{model}.wav``;
 # this pulls the stem label out of the parenthesized group.
 _STEM_RE = re.compile(r"_\(([^)]+)\)_")

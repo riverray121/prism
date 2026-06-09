@@ -782,6 +782,7 @@ dependencies = [
     { name = "onnxruntime" },
     { name = "pydantic" },
     { name = "pyloudnorm" },
+    { name = "scipy" },
     { name = "torch" },
 ]
 
@@ -794,6 +795,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = ">=1.26.0" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pyloudnorm", specifier = ">=0.2.0" },
+    { name = "scipy", specifier = ">=1.17.1" },
     { name = "torch", specifier = ">=2.12.0" },
 ]
 

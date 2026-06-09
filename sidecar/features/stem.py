@@ -14,20 +14,22 @@ sharpness, pitch, and vibrato arrive in a later slice.
 import librosa
 import numpy as np
 
-from . import amplitude, frequency, timbre
+from . import amplitude, frequency, pitch, rhythm, timbre
 
 # STFT window for the per-stem magnitude spectrogram; matches the worker's mix N_FFT.
 _N_FFT = 2048
 
 
 def stem_features(
-    y: np.ndarray, sr: int, hop: int, frame_count: int
+    y: np.ndarray, sr: int, hop: int, frame_count: int, stem_name: str
 ) -> tuple[dict[str, dict], dict[str, np.ndarray]]:
     """Compute per-stem features off one mono stem signal.
 
-    Returns (features, heatmaps): ``features`` are continuous/scalar envelopes keyed
-    by feature name; ``heatmaps`` are raw matrices for the worker to write as
-    sidecars. Both are aligned to ``frame_count``.
+    Feature set depends on the stem: every stem gets energy, spectral centroid,
+    onsets, transient sharpness, and an MFCC heatmap; non-percussion stems also get
+    a pitch contour (pYIN); vocals additionally get vibrato. Returns
+    (features, heatmaps): ``features`` are envelopes keyed by name; ``heatmaps`` are
+    raw matrices for the worker to write as sidecars. Both aligned to ``frame_count``.
     """
     # Magnitude spectrogram shared by the spectral features, as in the mix pass.
     spectrum = np.abs(librosa.stft(y, n_fft=_N_FFT, hop_length=hop))
@@ -35,12 +37,25 @@ def stem_features(
     features: dict[str, dict] = {
         "energy": amplitude.rms(y, sr, hop),
         "spectral_centroid": frequency.spectral_centroid(spectrum, sr),
+        "onsets": rhythm.onsets(y, sr, hop),
+        "transient_sharpness": timbre.transient_sharpness(y, sr, hop),
     }
+    # Pitch for melodic (non-percussion) stems; vibrato for vocals only.
+    if stem_name != "drums":
+        f0_cents, pitch_feat, confidence_feat = pitch.pitch(y, sr, hop)
+        features["pitch"] = pitch_feat
+        features["pitch_confidence"] = confidence_feat
+        if stem_name == "vocals":
+            rate_feat, depth_feat = pitch.vibrato(f0_cents, sr / hop)
+            features["vibrato_rate"] = rate_feat
+            features["vibrato_depth"] = depth_feat
+
     heatmaps: dict[str, np.ndarray] = {
         "mfcc": timbre.mfcc(y, sr, hop),
     }
 
-    # Align to the shared timeline: truncate continuous data and heatmap columns.
+    # Align to the shared timeline: truncate continuous data and heatmap columns;
+    # event features (onsets) carry absolute times and need no truncation.
     for f in features.values():
         if f["render"] == "continuous":
             f["data"] = f["data"][:frame_count]

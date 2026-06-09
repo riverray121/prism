@@ -188,7 +188,7 @@ def _separate_and_analyze_stems(
                 song_id, "dsp-stem", on_change, engine=engine, step=i + 1, total=total
             )
             ys, _ = librosa.load(path, sr=sr, mono=True)
-            features, heatmaps = stem.stem_features(ys, sr, hop, frame_count)
+            features, heatmaps = stem.stem_features(ys, sr, hop, frame_count, stem_name)
             for hname, matrix in heatmaps.items():
                 rel = f"{engine}/{stem_name}_{hname}"
                 storage.write_heatmap(song_id, rel, matrix)
