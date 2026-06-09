@@ -1,12 +1,6 @@
 # Ideas Backlog
 
-Unscoped possibilities not yet committed to a milestone. Distinct from:
-
-- `build-order.md` Milestone 6 — aspirational/`[WIP]` features that already have a home.
-- `feature-catalog.md` "Open items" — unresolved decisions for catalogued features.
-- `design-doc.md` "Next Steps" — downstream pipeline stages (mapping tool, hardware controller).
-
-Promote an item here to a milestone in `build-order.md` once it's committed.
+Unscoped possibilities not yet committed to a milestone — just ideas, no plan attached. Promote an item here to a milestone in `build-order.md` if it's ever committed.
 
 ---
 

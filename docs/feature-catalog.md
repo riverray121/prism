@@ -23,14 +23,12 @@ ML features carry a per-frame `confidence`. DSP features omit it.
 
 ### Rhythm
 
-| Name               | Render     | Source              | Unit / Range        | Notes                                                     |
-| ------------------ | ---------- | ------------------- | ------------------- | --------------------------------------------------------- |
-| `bpm`              | scalar     | librosa.beat        | float, ~60–200      | global tempo                                              |
-| `beats`            | event      | librosa.beat        | time                | beat positions                                            |
-| `downbeats`        | event      | madmom              | time + bar position | bar boundaries                                            |
-| `swing`            | scalar     | derived             | 0–1                 | [WIP] mean offset of off-beats from grid; proxy algorithm |
-| `rhythmic_density` | continuous | derived from onsets | onsets/sec          | windowed onset rate                                       |
-| `silence`          | segment    | librosa             | start/end           | regions below threshold                                   |
+| Name        | Render  | Source       | Unit / Range        | Notes                   |
+| ----------- | ------- | ------------ | ------------------- | ----------------------- | --- | ------------------ | ---------- | ------------------- | ---------- | ------------------- |
+| `bpm`       | scalar  | librosa.beat | float, ~60–200      | global tempo            |
+| `beats`     | event   | librosa.beat | time                | beat positions          |
+| `downbeats` | event   | madmom       | time + bar position | bar boundaries          |     | `rhythmic_density` | continuous | derived from onsets | onsets/sec | windowed onset rate |
+| `silence`   | segment | librosa      | start/end           | regions below threshold |
 
 ### Frequency
 
@@ -59,29 +57,25 @@ ML features carry a per-frame `confidence`. DSP features omit it.
 
 ### Tonal
 
-| Name                  | Render     | Source              | Unit / Range             | Notes                                 |
-| --------------------- | ---------- | ------------------- | ------------------------ | ------------------------------------- |
-| `key`                 | scalar     | librosa \| essentia | string (e.g. `C major`)  | global key                            |
-| `key_confidence`      | scalar     | same                | 0–1                      |                                       |
-| `chords`              | event      | madmom \| essentia  | time + `{root, quality}` | chord change events                   |
-| `chroma`              | heatmap    | librosa             | 12×time                  | pitch-class energy; sidecar candidate |
-| `harmonic_complexity` | continuous | derived             | 0–1                      | [WIP] chord novelty / tension proxy   |
-| `tuning_deviation`    | scalar     | librosa             | cents                    | deviation from A=440                  |
+| Name             | Render  | Source              | Unit / Range             | Notes                                 |
+| ---------------- | ------- | ------------------- | ------------------------ | ------------------------------------- | --- | ------------------ | ------ | ------- | ----- | -------------------- |
+| `key`            | scalar  | librosa \| essentia | string (e.g. `C major`)  | global key                            |
+| `key_confidence` | scalar  | same                | 0–1                      |                                       |
+| `chords`         | event   | madmom \| essentia  | time + `{root, quality}` | chord change events                   |
+| `chroma`         | heatmap | librosa             | 12×time                  | pitch-class energy; sidecar candidate |     | `tuning_deviation` | scalar | librosa | cents | deviation from A=440 |
 
 ### Timbre
 
-| Name                 | Render     | Source   | Unit / Range | Notes                                        |
-| -------------------- | ---------- | -------- | ------------ | -------------------------------------------- |
-| `mfcc`               | heatmap    | librosa  | 13×time      | timbre fingerprint; sidecar candidate        |
-| `zero_crossing_rate` | continuous | librosa  | 0–1          | noisiness                                    |
-| `roughness`          | continuous | essentia | 0–1          | dissonance; depends on essentia availability |
+| Name                 | Render     | Source  | Unit / Range | Notes                                 |
+| -------------------- | ---------- | ------- | ------------ | ------------------------------------- |
+| `mfcc`               | heatmap    | librosa | 13×time      | timbre fingerprint; sidecar candidate |
+| `zero_crossing_rate` | continuous | librosa | 0–1          | noisiness                             |
 
 ### Spatial
 
-| Name            | Render     | Source            | Unit / Range | Notes                             |
-| --------------- | ---------- | ----------------- | ------------ | --------------------------------- |
-| `stereo_width`  | continuous | derived (L/R)     | 0–1          | inverse of L/R correlation        |
-| `reverb_amount` | continuous | derived heuristic | 0–1          | [WIP] approximate; low confidence |
+| Name           | Render     | Source        | Unit / Range | Notes                      |
+| -------------- | ---------- | ------------- | ------------ | -------------------------- |
+| `stereo_width` | continuous | derived (L/R) | 0–1          | inverse of L/R correlation |
 
 ### Structure (ML)
 
@@ -97,13 +91,6 @@ ML features carry a per-frame `confidence`. DSP features omit it.
 | -------------- | ---------- | ------------------ | -------------------------- | ------------------------------------------------------------ |
 | `sound_tags`   | continuous | PANNs              | per-class probability, 0–1 | [WIP] top-K tags over time; class subset TBD                 |
 | `timbral_axes` | continuous | derived from PANNs | 0–1 per axis               | [WIP] curated axes (synth↔organic, smooth↔harsh); design TBD |
-
-### Emotional (ML)
-
-| Name      | Render     | Source    | Unit / Range | Notes                                             |
-| --------- | ---------- | --------- | ------------ | ------------------------------------------------- |
-| `valence` | continuous | model TBD | 0–1          | [WIP] positive ↔ negative; no committed model     |
-| `tension` | continuous | model TBD | 0–1          | [WIP] tension / release curve; no committed model |
 
 ---
 
@@ -141,5 +128,3 @@ Stems come from the multi-engine separation stage (see `design-doc.md` and `buil
 
 - **PANNs class subset** — pick ~20–40 music-relevant classes from the 527 AudioSet labels. Configurable.
 - **`timbral_axes` design** — concrete axis definitions and how they're computed from PANNs outputs.
-- **`valence` / `tension` model** — no committed model. Likely derived from PANNs embeddings + a small mapping, or a separate pretrained model.
-- **`essentia` availability** — pip-install on M-series Macs can be friction; if it blocks, drop `roughness` to [WIP] or substitute a librosa-based proxy.

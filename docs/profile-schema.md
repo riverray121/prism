@@ -136,10 +136,10 @@ Sampled on the implicit 100 Hz timeline. `data` length equals `timeline.frame_co
 ML continuous features add a parallel `confidence` array of equal length. WIP features add `"status": "wip"`:
 
 ```json
-"valence": {
+"timbral_axes": {
   "render": "continuous",
-  "category": "emotional",
-  "source": "model_tbd",
+  "category": "timbre",
+  "source": "panns",
   "unit": "normalized",
   "range": [0, 1],
   "status": "wip",

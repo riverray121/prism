@@ -75,7 +75,7 @@ Each song passes through four stages in order:
 1. **DSP-mix** — librosa/Essentia features on the full mix
 2. **Stem separation** — run a configured set of separation engines (via `audio-separator`); write each engine's stem WAVs to disk under `stems/{engine}/`
 3. **DSP-per-stem** — librosa features on every separated stem, for every engine
-4. **ML classification** — PANNs, section detection, motif recurrence, novelty, valence/tension
+4. **ML classification** — PANNs, section detection, motif recurrence, novelty
 
 ### Queue
 
@@ -140,12 +140,12 @@ Canonical feature list lives in [`feature-catalog.md`](./feature-catalog.md), wi
 
 ### DSP layer (deterministic — librosa / Essentia)
 
-- **Rhythm:** BPM, beat grid, downbeats, swing, rhythmic density, silence
+- **Rhythm:** BPM, beat grid, downbeats, rhythmic density, silence
 - **Frequency:** per-band energy (6 bands), spectral centroid / flux / flatness / rolloff, spectrogram
 - **Amplitude:** RMS, peak, LUFS loudness, dynamic range
-- **Tonal:** key, chord events, chroma, harmonic complexity, tuning deviation
-- **Timbre:** MFCCs, zero-crossing rate, roughness
-- **Spatial:** stereo width, reverb amount
+- **Tonal:** key, chord events, chroma, tuning deviation
+- **Timbre:** MFCCs, zero-crossing rate
+- **Spatial:** stereo width
 
 ### ML layer (pretrained, runs locally)
 
@@ -154,7 +154,6 @@ Canonical feature list lives in [`feature-catalog.md`](./feature-catalog.md), wi
 - **Section detection** (hybrid heuristics + ML): intro / verse / chorus / drop / breakdown / outro
 - **Motif / phrase recurrence**
 - **Novelty score** (per-frame, self-similarity)
-- **Emotional valence, tension/release** _(aspirational — no committed model yet)_
 
 No models trained from scratch — all pretrained, all run locally.
 
@@ -234,7 +233,7 @@ A per-feature **Y-axis dropdown** switches between that feature's dimensions (e.
 | Volume, ADSR, transients | Section detection (hybrid)        |
 | MFCC, ZCR, flatness      | Motif recurrence                  |
 | Key/chord (mostly)       | Novel vs repeated sounds (hybrid) |
-| Stereo width, reverb     | Emotional valence                 |
+| Stereo width             |                                   |
 
 ---
 
