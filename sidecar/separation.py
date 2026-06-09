@@ -23,11 +23,12 @@ from . import models
 log = logging.getLogger("sidecar.separation")
 
 # Engine id -> audio-separator model filename. The id is the key used on disk
-# (stems/{engine}/) and in the profile (stems.{engine}). The RoFormers run on the
-# Apple GPU via torch/MPS (MDXC architecture) and emit vocals/instrumental;
-# htdemucs_ft emits vocals/drums/bass/other.
+# (stems/{engine}/) and in the profile (stems.{engine}). All run on the Apple GPU
+# via torch/MPS. htdemucs_ft emits vocals/drums/bass/other; htdemucs_6s adds
+# guitar/piano; the RoFormers (MDXC architecture) emit vocals/instrumental.
 ENGINES = {
     "htdemucs_ft": "htdemucs_ft.yaml",
+    "htdemucs_6s": "htdemucs_6s.yaml",
     "bs_roformer": "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
     "mel_band_roformer": "model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt",
 }

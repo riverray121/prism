@@ -5,6 +5,7 @@
   // Friendly labels for known engine ids; falls back to the raw id.
   const LABELS: Record<string, string> = {
     htdemucs_ft: "Demucs (htdemucs_ft) — vocals/drums/bass/other",
+    htdemucs_6s: "Demucs 6-stem (htdemucs_6s) — + guitar/piano",
     bs_roformer: "BS-RoFormer — vocals/instrumental",
     mel_band_roformer: "Mel-Band RoFormer — vocals/instrumental",
   };

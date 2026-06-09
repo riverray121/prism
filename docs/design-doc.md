@@ -149,7 +149,7 @@ Canonical feature list lives in [`feature-catalog.md`](./feature-catalog.md), wi
 
 ### ML layer (pretrained, runs locally)
 
-- **Stem separation (multi-engine, via `audio-separator`):** a configured set of engines — Demucs, MDX/MDX23C, VR, and RoFormer (BS-RoFormer / Mel-Band RoFormer), plus built-in ensemble — each separating the mix into its native stem set (e.g. drums/bass/other/vocals), written to disk as WAVs under `stems/{engine}/`. Every engine's output is kept so analyses are directly comparable. Each stem then gets its own DSP feature pass (energy, onsets, transients, brightness, MFCC; pitch for melodic stems; vibrato for vocals)
+- **Stem separation (multi-engine, via `audio-separator`):** a configured set of engines — Demucs, MDX/MDX23C, VR, and RoFormer (BS-RoFormer / Mel-Band RoFormer) — each separating the mix into its native stem set (e.g. drums/bass/other/vocals), written to disk as WAVs under `stems/{engine}/`. Every engine's output is kept so analyses are directly comparable. Each stem then gets its own DSP feature pass (energy, onsets, transients, brightness, MFCC; pitch for melodic stems; vibrato for vocals)
 - **Sound-type classification (PANNs):** per-frame tag probabilities + curated timbral axes
 - **Section detection** (hybrid heuristics + ML): intro / verse / chorus / drop / breakdown / outro
 - **Motif / phrase recurrence**

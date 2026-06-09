@@ -30,6 +30,19 @@ remaps the visualizer config automatically.
 
 ---
 
+## Ensemble separation
+
+`audio-separator` can blend multiple separation models' outputs for the same stem (avg/median/
+min/max in wave or FFT domain, via named presets like `vocal_balanced`) — independent model
+errors partly cancel, yielding a marginally cleaner result than any single model. Marginal SDR
+gain over the best single model; the cost is loading and running N models at once.
+
+Parked because it's the heaviest path: on the 18 GiB M3 Pro dev machine, the two-model
+`vocal_balanced` preset overcommits unified memory and thrashes swap. Revisit on a higher-RAM
+machine, or with a memory-budgeted runner that loads models one at a time.
+
+---
+
 ## Music Source Restoration (MSR)
 
 [`ModistAndrew/xlance-msr`](https://github.com/ModistAndrew/xlance-msr) — XLANCELAB's
