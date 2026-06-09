@@ -56,9 +56,9 @@ Render modes covered: `scalar`, `continuous`, `event`, `heatmap` (`segment` arri
 - `chords` (event) → **M3**, via the BTC transformer (PyTorch) — torch enters here.
 - `downbeats` (event) → **M3** — needs `madmom` or an alternative; decided alongside chords.
 - `silence` (segment), `rhythmic_density` (continuous) → **M5** — `silence` introduces the `segment` render mode, which lands with `sections`.
-- `swing`, `harmonic_complexity`, `reverb_amount`, `roughness` (`[WIP]`; `roughness` needs essentia/AGPL) → **M6** — aspirational/refinement.
+- `swing`, `harmonic_complexity`, `reverb_amount`, `roughness` (`[WIP]`; `roughness` needs essentia/AGPL) → **`ideas.md`** — aspirational/refinement, unscoped.
 - `sections`/`motifs`/`novelty` and PANNs `sound_tags`/`timbral_axes` (ML) → **M5** (already planned).
-- `valence`/`tension` (`[WIP]` emotional ML) → **M6** (already planned).
+- `valence`/`tension` (`[WIP]` emotional ML) → **`ideas.md`** — aspirational, unscoped.
 
 Deliverable: complete mix-level DSP for everything cheap and dependency-light; deeper-dependency, segment-mode, ML, and WIP features reassigned above.
 
@@ -90,6 +90,8 @@ First long-running stage; introduces the multi-stage worker. Sub-progress and fa
 - Failure handling end-to-end: kill the sidecar mid-separation and confirm the "Analysis interrupted" startup logic works; clean up the partial song folder on failure.
 - Cancellation of queued songs.
 - Dashboard: stem section grouped by engine, per-stem features comparable across engines (reuse existing graph components).
+- **6-stem separation.** Add Demucs `htdemucs_6s` to the engine set — it splits into vocals/drums/bass/**guitar**/**piano**/other (two more melodic stems than the 4-stem default). Drops into the `ENGINES` config like any other engine; the wider stem set flows through the existing per-stem DSP pass and UI unchanged.
+- **Drum sub-separation (later slice).** A second separation stage applied to a `drums` stem, splitting it into kick/snare/toms/hh/ride/crash via `MDX23C-DrumSep-aufr33-jarredou.ckpt`. Requires the `Separator` interface to accept a stem WAV as input and a sub-stem level in the schema (`stems/{engine}/drums/{sub}.wav`); only runs for engines that emit a `drums` stem (Demucs). The same per-stem DSP pass applies to each sub-stem.
 
 **Apple Silicon acceleration.** `audio-separator` accelerates on the Apple GPU via ONNX Runtime's CoreML provider (M1+, macOS Sonoma+); Demucs uses MPS. If CoreML/MPS proves flaky for the RoFormer/MDX engines, [`mlx-audio-separator`](https://github.com/ssmall256/mlx-audio-separator) (MLX-native, same engine families, ~1.85× faster, near drop-in) is the fallback backend — slot it behind the same `Separator` interface. Speed is not a goal; this is only about getting the engines running on-GPU at all.
 
@@ -116,9 +118,7 @@ Deliverable: all stable features from the catalog.
 - Metadata editing in the library
 - Library filters (status, missing metadata)
 - Better error / retry UX
-- Aspirational / `[WIP]` features — implement or drop: `valence`, `tension`, `swing`, `harmonic_complexity`, `reverb_amount`, `roughness` (the last needs essentia/AGPL — use a librosa proxy or drop)
 - YouTube import — paste a URL, auto-download the audio as FLAC via `yt-dlp` (`yt-dlp -f bestaudio -x --audio-format flac -o "%(title)s (YouTube).%(ext)s" <url>`), then run it through the normal import flow
-- Color palettes — select from or create named palettes of colors that go well together; swapping a palette remaps the visualizer config automatically
 
 Deliverable: shipping-quality v1.
 
@@ -126,6 +126,7 @@ Deliverable: shipping-quality v1.
 
 ## Notes
 
+- **Unscoped ideas live in `ideas.md`.** Possibilities not yet committed to a milestone (separation extras, source restoration, etc.) are parked in `docs/ideas.md`; promote one here when it's committed.
 - **Skip cancellation until M4.** Don't queue more than one song until then — there's nothing to cancel.
 - **No restart logic in M1.** Just don't quit during analysis. Add the "interrupted → failed" startup query in M4 (with the multi-stage worker) when failure scenarios become common.
 - **Spectrogram heatmap rendering** may want a custom Canvas2D pass rather than a uPlot plugin. Decide when M2 hits it.

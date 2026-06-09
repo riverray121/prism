@@ -142,6 +142,4 @@ Stems come from the multi-engine separation stage (see `design-doc.md` and `buil
 - **PANNs class subset** — pick ~20–40 music-relevant classes from the 527 AudioSet labels. Configurable.
 - **`timbral_axes` design** — concrete axis definitions and how they're computed from PANNs outputs.
 - **`valence` / `tension` model** — no committed model. Likely derived from PANNs embeddings + a small mapping, or a separate pretrained model.
-- **Heatmap storage** — `spectrogram`, `chroma`, all `mfcc` features are dense matrices. Likely stored as sidecar files (`.npy` or compressed) referenced from the JSON, not inline. Decided in the storage / Component 4 design.
-- **`madmom` vs. `librosa` for downbeats and chords** — madmom is more accurate but heavier and has dependency friction. Confirm during scaffolding.
 - **`essentia` availability** — pip-install on M-series Macs can be friction; if it blocks, drop `roughness` to [WIP] or substitute a librosa-based proxy.

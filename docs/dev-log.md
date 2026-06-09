@@ -38,6 +38,8 @@
   - **Slice 2b (fast-follow)** — ensemble via the `vocal_balanced` preset (different code path; pulls 2 extra specialized checkpoints; ~doubles per-song separation time).
   - **Slice 3** — rest of the per-stem catalog: `onsets` (event), `transient_sharpness`, `pitch`/`pitch_confidence` (pyin, melodic stems), vocals `vibrato_rate`/`vibrato_depth`.
   - **Slice 4** — queued-song cancellation (`queue.cancel`); running-song cancel stays v2.
+  - **Slice 5 — 6-stem separation.** Add Demucs `htdemucs_6s` (vocals/drums/bass/guitar/piano/other) to the `ENGINES` config; wider stem set flows through the existing per-stem DSP + UI unchanged.
+  - **Slice 6 — drum sub-separation.** Two-stage: after an engine emits a `drums` stem, run a drum-separation model (`MDX23C-DrumSep-aufr33-jarredou.ckpt`) on it to split kick/snare/toms/hh/ride/crash. Needs the `Separator` interface to accept a stem WAV as input and write nested sub-stems (`stems/{engine}/drums/{kick,snare,…}.wav`); the schema gains a sub-stem level under any stem. Only runs for engines that produce a `drums` stem (Demucs).
 - **M5 — ML classification + structure** (PANNs, sections/msaf, motifs, novelty) + deferred mix DSP (`silence`, `rhythmic_density`).
 - **M6 — single UI/UX redesign + favorites/polish.** All UI design happens here, in one pass: the dashboard (shared time axis, shared zoom/playhead, Y-axis dropdown per feature) and consolidating the zoom/scrub/playhead code duplicated across `ContinuousGraph`/`EventGraph`/`HeatmapGraph` into one shared time-axis layer. No incremental dashboard or UI design before M6.
 

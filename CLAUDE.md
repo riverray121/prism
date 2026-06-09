@@ -59,5 +59,6 @@ Design and process are documented in `docs/`:
 - `docs/profile-schema.md` — JSON profile spec
 - `docs/build-order.md` — milestones
 - `docs/development.md` — tooling and engineering practices
+- `docs/ideas.md` — unscoped ideas backlog (not yet committed to a milestone)
 
 Update these docs when decisions change. Don't let them drift.
