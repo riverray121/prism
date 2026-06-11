@@ -267,3 +267,9 @@ def get_engines(con: sqlite3.Connection) -> list[str]:
         return [e for e in separation.DEFAULT_ENGINES if e in available]
     chosen = set(selected)
     return [e for e in available if e in chosen]
+
+
+def get_drum_subsep(con: sqlite3.Connection) -> bool:
+    """Whether to sub-separate drums stems into kick/snare/etc. Default off (extra
+    model + time per drums stem)."""
+    return bool(get_setting(con, "drum_subsep", False))

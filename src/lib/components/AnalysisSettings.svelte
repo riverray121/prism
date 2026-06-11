@@ -22,8 +22,26 @@
         )
       : settings.engines.filter((e) => e !== engine);
     settings.engines = next;
-    updateSettings(next);
+    updateSettings({ engines: next });
   }
+
+  // Toggle drum sub-separation (splits a drums stem into kick/snare/etc.).
+  function toggleDrumSubsep(on: boolean) {
+    settings.drumSubsep = on;
+    updateSettings({ drum_subsep: on });
+  }
+
+  // Engines that emit a `drums` stem (Demucs variants) — the only ones drum
+  // sub-separation can run on; the RoFormers output vocals/instrumental.
+  const DRUMS_ENGINES = new Set(["htdemucs_ft", "htdemucs_6s"]);
+  // Anchor the nested drum sub-sep box under the last drums-producing engine.
+  const lastDrumsEngine = $derived(
+    settings.availableEngines.filter((e) => DRUMS_ENGINES.has(e)).at(-1),
+  );
+  // Drum sub-sep is only meaningful when a drums-producing engine is selected.
+  const canDrumSubsep = $derived(
+    settings.engines.some((e) => DRUMS_ENGINES.has(e)),
+  );
 </script>
 
 <section class="flex w-full max-w-2xl flex-col gap-3">
@@ -48,6 +66,26 @@
           />
           {label(engine)}
         </label>
+        {#if engine === lastDrumsEngine}
+          <!-- Nested under the Demucs engines: drum sub-sep needs their drums stem. -->
+          <label
+            class="ml-6 flex items-center gap-2 text-sm {canDrumSubsep
+              ? ''
+              : 'opacity-50'}"
+            title={canDrumSubsep
+              ? ""
+              : "Select a Demucs engine to enable drum sub-separation"}
+          >
+            <input
+              type="checkbox"
+              class="size-4 accent-indigo-600"
+              disabled={!canDrumSubsep}
+              checked={settings.drumSubsep && canDrumSubsep}
+              onchange={(e) => toggleDrumSubsep(e.currentTarget.checked)}
+            />
+            ↳ Drum sub-separation — kick/snare/toms/hh/ride/crash
+          </label>
+        {/if}
       {/each}
       {#if settings.engines.length === 0}
         <p class="text-xs text-amber-600 dark:text-amber-500">

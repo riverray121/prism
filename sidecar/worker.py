@@ -155,6 +155,30 @@ def _set_stage(
     on_change()
 
 
+def _stem_entry(
+    song_id: str,
+    stem_path,
+    sr: int,
+    hop: int,
+    frame_count: int,
+    stem_name: str,
+    heatmap_prefix: str,
+    audio_file: str,
+) -> dict:
+    """Run the per-stem DSP pass on one stem WAV; return its profile entry.
+
+    Writes the stem's mfcc heatmap under ``heatmaps/{heatmap_prefix}/{stem}_*.npy``
+    and registers its envelope. Used for both top-level stems and drum sub-stems.
+    """
+    ys, _ = librosa.load(stem_path, sr=sr, mono=True)
+    features, heatmaps = stem.stem_features(ys, sr, hop, frame_count, stem_name)
+    for hname, matrix in heatmaps.items():
+        rel = f"{heatmap_prefix}/{stem_name}_{hname}"
+        storage.write_heatmap(song_id, rel, matrix)
+        features[hname] = _heatmap_envelope(hname, matrix, f"heatmaps/{rel}.npy")
+    return {"audio_file": audio_file, "features": features}
+
+
 def _separate_and_analyze_stems(
     song_id: str,
     audio_path,
@@ -166,13 +190,16 @@ def _separate_and_analyze_stems(
     """Run each configured engine's separation + per-stem DSP; return the stems map.
 
     For each engine: separate into stem WAVs (separate stage), then run the per-stem
-    feature pass on every stem (dsp-stem stage), writing per-stem mfcc heatmaps. The
-    returned map is ``{engine: {stem: {audio_file, features}}}`` for the profile.
+    feature pass on every stem (dsp-stem stage). When drum sub-separation is enabled,
+    a `drums` stem is further split into kick/snare/etc., each analyzed and attached
+    under the drums entry's ``substems``. Returns
+    ``{engine: {stem: {audio_file, features[, substems]}}}`` for the profile.
     """
     stems_root = storage.SONGS_DIR / song_id / "stems"
-    # Engine set is a user setting (Analysis settings panel); empty = mix-only.
+    # Engine set + drum sub-separation are user settings (Analysis settings panel).
     with library.connect() as con:
         engines = library.get_engines(con)
+        drum_subsep = library.get_drum_subsep(con)
     total = len(engines)
     result: dict[str, dict] = {}
 
@@ -187,18 +214,42 @@ def _separate_and_analyze_stems(
             _set_stage(
                 song_id, "dsp-stem", on_change, engine=engine, step=i + 1, total=total
             )
-            ys, _ = librosa.load(path, sr=sr, mono=True)
-            features, heatmaps = stem.stem_features(ys, sr, hop, frame_count, stem_name)
-            for hname, matrix in heatmaps.items():
-                rel = f"{engine}/{stem_name}_{hname}"
-                storage.write_heatmap(song_id, rel, matrix)
-                features[hname] = _heatmap_envelope(
-                    hname, matrix, f"heatmaps/{rel}.npy"
+            entry = _stem_entry(
+                song_id,
+                path,
+                sr,
+                hop,
+                frame_count,
+                stem_name,
+                engine,
+                f"stems/{engine}/{stem_name}.wav",
+            )
+            # Second stage: split the drums stem into kick/snare/etc.
+            if drum_subsep and stem_name == "drums":
+                _set_stage(
+                    song_id,
+                    "drum-subsep",
+                    on_change,
+                    engine=engine,
+                    step=i + 1,
+                    total=total,
                 )
-            engine_stems[stem_name] = {
-                "audio_file": f"stems/{engine}/{stem_name}.wav",
-                "features": features,
-            }
+                sub_dir = stems_root / engine / "drums"
+                sub_paths = separation.separate_drums(path, sub_dir)
+                entry["substems"] = {
+                    sub: _stem_entry(
+                        song_id,
+                        sub_path,
+                        sr,
+                        hop,
+                        frame_count,
+                        sub,
+                        f"{engine}/drums",
+                        f"stems/{engine}/drums/{sub}.wav",
+                    )
+                    for sub, sub_path in sub_paths.items()
+                }
+            engine_stems[stem_name] = entry
         result[engine] = engine_stems
 
     return result

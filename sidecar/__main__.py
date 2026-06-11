@@ -43,10 +43,17 @@ def emit_snapshot() -> None:
 
 
 def emit_settings() -> None:
-    """Emit the current analysis settings (selected + available engines)."""
+    """Emit the current analysis settings (engines + drum sub-separation)."""
     with library.connect() as con:
         engines = library.get_engines(con)
-    ipc.emit(SettingsEvent(engines=engines, available_engines=list(separation.ENGINES)))
+        drum_subsep = library.get_drum_subsep(con)
+    ipc.emit(
+        SettingsEvent(
+            engines=engines,
+            available_engines=list(separation.ENGINES),
+            drum_subsep=drum_subsep,
+        )
+    )
 
 
 def import_one(path_str: str) -> None:
@@ -116,10 +123,13 @@ def handle(msg: dict) -> None:
         emit_settings()
     elif msg_type == "settings.update":
         cmd = UpdateSettingsCommand.model_validate(msg)
-        # Keep only known engine ids; the frontend may lag the available set.
-        valid = [e for e in cmd.engines if e in separation.ENGINES]
         with library.connect() as con:
-            library.set_setting(con, "engines", valid)
+            if cmd.engines is not None:
+                # Keep only known engine ids; the frontend may lag the available set.
+                valid = [e for e in cmd.engines if e in separation.ENGINES]
+                library.set_setting(con, "engines", valid)
+            if cmd.drum_subsep is not None:
+                library.set_setting(con, "drum_subsep", bool(cmd.drum_subsep))
         emit_settings()
     else:
         log.warning("unknown command: %r", msg)

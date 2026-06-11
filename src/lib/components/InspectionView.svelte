@@ -42,13 +42,17 @@
     return ctx;
   }
 
-  // Resolve a source key to its absolute file path (null if unavailable).
+  // Resolve a source key to its absolute file path (null if unavailable). Keys:
+  // "mix", "{engine}::{stem}", or "{engine}::{stem}::{substem}" (drum sub-stems).
   function pathForKey(key: string): string | null {
     if (key === "mix") return inspection.audioPath;
     const prof = inspection.profile;
     if (!prof || !inspection.songDir) return null;
-    const [engine, stem] = key.split("::");
-    const audioFile = prof.stems[engine]?.[stem]?.audio_file;
+    const [engine, stem, sub] = key.split("::");
+    const stemObj = prof.stems[engine]?.[stem];
+    const audioFile = sub
+      ? stemObj?.substems?.[sub]?.audio_file
+      : stemObj?.audio_file;
     return audioFile ? `${inspection.songDir}/${audioFile}` : null;
   }
 
@@ -261,6 +265,11 @@
     inspection.profile ? Object.entries(inspection.profile.stems) : [],
   );
 
+  // Shared timeline frame rate; safe fallback when no profile is loaded.
+  const frameRateHz = $derived(
+    inspection.profile?.timeline.frame_rate_hz ?? 100,
+  );
+
   // Full time extent shared by every graph's x axis, from the timeline.
   const durationSec = $derived(
     inspection.profile
@@ -367,7 +376,7 @@
       </span>
       {#if activeKey !== "mix"}
         <span class="text-xs text-neutral-500 dark:text-neutral-400">
-          ♪ {activeKey.split("::")[1]}
+          ♪ {activeKey.split("::").at(-1)}
         </span>
       {/if}
     </div>
@@ -500,75 +509,33 @@
                   </button>
                   <p class="text-sm font-semibold capitalize">{stemName}</p>
                 </div>
-                {#each sf.events as [name, feature] (name)}
-                  <div>
-                    <p
-                      class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
-                    >
-                      {humanize(name)}
-                      <span class="text-neutral-400 dark:text-neutral-600"
-                        >· {feature.events.length} events</span
-                      >
-                    </p>
-                    <EventGraph
-                      events={feature.events}
-                      maxTimeSec={durationSec}
-                      playheadSec={currentTime}
-                      follow={playing}
-                      height={64}
-                      onSeek={scrub}
-                      onScrubStart={scrubStart}
-                      onScrubEnd={scrubEnd}
-                    />
+                {@render featureGraphs(sf, stemName)}
+                {#if stemData.substems}
+                  <div
+                    class="ml-2 flex flex-col gap-4 border-l-2 border-neutral-200 pl-3 dark:border-neutral-800"
+                  >
+                    {#each Object.entries(stemData.substems) as [subName, subData] (subName)}
+                      {@const subKey = `${engine}::${stemName}::${subName}`}
+                      {@const ssf = splitFeatures(subData.features)}
+                      <div class="flex flex-col gap-3">
+                        <div class="flex items-center gap-3">
+                          <button
+                            onclick={() => toggleSource(subKey)}
+                            class="rounded-md border border-indigo-600 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 {playing &&
+                            activeKey === subKey
+                              ? 'bg-indigo-600 text-white hover:bg-indigo-500 dark:text-white'
+                              : ''}"
+                          >
+                            {playing && activeKey === subKey ? "Pause" : "Play"}
+                          </button>
+                          <p class="text-sm font-medium capitalize">
+                            {subName}
+                          </p>
+                        </div>
+                        {@render featureGraphs(ssf, subName)}
+                      </div>
+                    {/each}
                   </div>
-                {/each}
-                {#each sf.continuous as [name, feature], i (name)}
-                  <div>
-                    <p
-                      class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
-                    >
-                      {humanize(name)}
-                      <span class="text-neutral-400 dark:text-neutral-600"
-                        >· {feature.unit}</span
-                      >
-                    </p>
-                    <ContinuousGraph
-                      {feature}
-                      frameRateHz={inspection.profile.timeline.frame_rate_hz}
-                      label={`${stemName} ${name}`}
-                      color={PALETTE[i % PALETTE.length]}
-                      playheadSec={currentTime}
-                      follow={playing}
-                      onSeek={scrub}
-                      onScrubStart={scrubStart}
-                      onScrubEnd={scrubEnd}
-                    />
-                  </div>
-                {/each}
-                {#if inspection.songDir}
-                  {#each sf.heatmaps as [name, feature] (name)}
-                    <div>
-                      <p
-                        class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
-                      >
-                        {humanize(name)}
-                        <span class="text-neutral-400 dark:text-neutral-600"
-                          >· {feature.shape[0]}×{feature.shape[1]}
-                          {feature.unit}</span
-                        >
-                      </p>
-                      <HeatmapGraph
-                        path={`${inspection.songDir}/${feature.sidecar}`}
-                        frameRateHz={inspection.profile.timeline.frame_rate_hz}
-                        normalize="per-row"
-                        playheadSec={currentTime}
-                        follow={playing}
-                        onSeek={scrub}
-                        onScrubStart={scrubStart}
-                        onScrubEnd={scrubEnd}
-                      />
-                    </div>
-                  {/each}
                 {/if}
               </div>
             {/each}
@@ -578,3 +545,74 @@
     {/if}
   {/if}
 </section>
+
+<!-- Renders a feature group (events, continuous, heatmaps) for a stem or sub-stem,
+     reused so stems and drum sub-stems share one layout. -->
+{#snippet featureGraphs(
+  sf: ReturnType<typeof splitFeatures>,
+  labelPrefix: string,
+)}
+  {#each sf.events as [name, feature] (name)}
+    <div>
+      <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+        {humanize(name)}
+        <span class="text-neutral-400 dark:text-neutral-600"
+          >· {feature.events.length} events</span
+        >
+      </p>
+      <EventGraph
+        events={feature.events}
+        maxTimeSec={durationSec}
+        playheadSec={currentTime}
+        follow={playing}
+        height={64}
+        onSeek={scrub}
+        onScrubStart={scrubStart}
+        onScrubEnd={scrubEnd}
+      />
+    </div>
+  {/each}
+  {#each sf.continuous as [name, feature], i (name)}
+    <div>
+      <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+        {humanize(name)}
+        <span class="text-neutral-400 dark:text-neutral-600"
+          >· {feature.unit}</span
+        >
+      </p>
+      <ContinuousGraph
+        {feature}
+        {frameRateHz}
+        label={`${labelPrefix} ${name}`}
+        color={PALETTE[i % PALETTE.length]}
+        playheadSec={currentTime}
+        follow={playing}
+        onSeek={scrub}
+        onScrubStart={scrubStart}
+        onScrubEnd={scrubEnd}
+      />
+    </div>
+  {/each}
+  {#if inspection.songDir}
+    {#each sf.heatmaps as [name, feature] (name)}
+      <div>
+        <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+          {humanize(name)}
+          <span class="text-neutral-400 dark:text-neutral-600"
+            >· {feature.shape[0]}×{feature.shape[1]} {feature.unit}</span
+          >
+        </p>
+        <HeatmapGraph
+          path={`${inspection.songDir}/${feature.sidecar}`}
+          {frameRateHz}
+          normalize="per-row"
+          playheadSec={currentTime}
+          follow={playing}
+          onSeek={scrub}
+          onScrubStart={scrubStart}
+          onScrubEnd={scrubEnd}
+        />
+      </div>
+    {/each}
+  {/if}
+{/snippet}

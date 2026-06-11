@@ -48,6 +48,7 @@
     "dsp-mix": "analyzing mix",
     separate: "separating",
     "dsp-stem": "stem features",
+    "drum-subsep": "drum sub-sep",
   };
 
   // Status label: while analyzing, show the stage, engine, and step count

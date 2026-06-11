@@ -91,9 +91,18 @@ export type MixFeature = z.infer<typeof MixFeatureSchema>;
 // One separated stem: its audio file (relative to profile.json) plus the same
 // keyed feature map as the mix, so per-stem features render through the same
 // components. Keyed by engine, then stem (see docs/profile-schema.md).
+// A drum sub-stem (kick/snare/etc.): same shape as a stem, but never nested further.
+export const SubStemSchema = z.object({
+  audio_file: z.string(),
+  features: z.record(z.string(), MixFeatureSchema),
+});
+export type SubStem = z.infer<typeof SubStemSchema>;
+
 export const StemSchema = z.object({
   audio_file: z.string(),
   features: z.record(z.string(), MixFeatureSchema),
+  // Present on a drums stem when drum sub-separation ran.
+  substems: z.record(z.string(), SubStemSchema).optional(),
 });
 export type Stem = z.infer<typeof StemSchema>;
 
@@ -133,6 +142,7 @@ export const SettingsEventSchema = z.object({
   type: z.literal("settings"),
   engines: z.array(z.string()),
   available_engines: z.array(z.string()),
+  drum_subsep: z.boolean(),
 });
 
 // All events the sidecar can send on stdout.

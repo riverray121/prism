@@ -38,23 +38,26 @@ ENGINES = {
 # they add cost and the RoFormers/6-stem overlap its stems.
 DEFAULT_ENGINES = ["htdemucs_ft"]
 
+# Drum-separation model: splits a drums stem into kick/snare/toms/hh/ride/crash.
+# Run as a second stage on an engine's ``drums`` stem (see worker drum sub-sep).
+DRUM_SEP_MODEL = "MDX23C-DrumSep-aufr33-jarredou.ckpt"
+
 # audio-separator's default output filename is ``{input}_(Vocals)_{model}.wav``;
 # this pulls the stem label out of the parenthesized group.
 _STEM_RE = re.compile(r"_\(([^)]+)\)_")
 
 
-def separate(source: Path, out_dir: Path, engine: str) -> dict[str, Path]:
-    """Separate ``source`` with one ``engine`` into ``out_dir``; return {stem: path}.
+def _run_separator(source: Path, out_dir: Path, model_filename: str) -> dict[str, Path]:
+    """Separate ``source`` with one model into ``out_dir``; return {stem: path}.
 
     Stems are written as canonical lowercase WAVs (``{stem}.wav``). ``out_dir`` is
-    created if missing. Raises KeyError for an unknown engine.
+    created if missing. The shared core behind ``separate`` (top-level engines) and
+    ``separate_drums`` (drum sub-separation).
     """
     # Heavy import (torch/onnxruntime backends) deferred to first separation.
     from audio_separator.separator import Separator
 
-    model_filename = ENGINES[engine]
     out_dir.mkdir(parents=True, exist_ok=True)
-
     sep = Separator(
         model_file_dir=str(models.MODELS_DIR),
         output_dir=str(out_dir),
@@ -77,5 +80,21 @@ def separate(source: Path, out_dir: Path, engine: str) -> dict[str, Path]:
         if src.resolve() != dest.resolve():
             src.replace(dest)
         stems[stem] = dest
+    return stems
+
+
+def separate(source: Path, out_dir: Path, engine: str) -> dict[str, Path]:
+    """Separate ``source`` with one ``engine`` into ``out_dir``; return {stem: path}.
+
+    Raises KeyError for an unknown engine.
+    """
+    stems = _run_separator(source, out_dir, ENGINES[engine])
     log.info("separated %s with %s -> %s", source.name, engine, sorted(stems))
+    return stems
+
+
+def separate_drums(drums_path: Path, out_dir: Path) -> dict[str, Path]:
+    """Sub-separate a drums stem into kick/snare/toms/hh/ride/crash into ``out_dir``."""
+    stems = _run_separator(drums_path, out_dir, DRUM_SEP_MODEL)
+    log.info("drum sub-separation -> %s", sorted(stems))
     return stems

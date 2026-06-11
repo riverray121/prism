@@ -33,8 +33,11 @@ export function getSettings(): Promise<void> {
   return sendCommand({ type: "settings.get" });
 }
 
-export function updateSettings(engines: string[]): Promise<void> {
-  return sendCommand({ type: "settings.update", engines });
+export function updateSettings(update: {
+  engines?: string[];
+  drum_subsep?: boolean;
+}): Promise<void> {
+  return sendCommand({ type: "settings.update", ...update });
 }
 
 // Subscribe to validated sidecar events. Each stdout line is parsed and checked

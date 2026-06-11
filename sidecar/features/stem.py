@@ -19,6 +19,9 @@ from . import amplitude, frequency, pitch, rhythm, timbre
 # STFT window for the per-stem magnitude spectrogram; matches the worker's mix N_FFT.
 _N_FFT = 2048
 
+# Percussion stems get no pitch contour: the drums stem and its drum sub-stems.
+_PERCUSSION = {"drums", "kick", "snare", "toms", "hh", "ride", "crash"}
+
 
 def stem_features(
     y: np.ndarray, sr: int, hop: int, frame_count: int, stem_name: str
@@ -41,7 +44,7 @@ def stem_features(
         "transient_sharpness": timbre.transient_sharpness(y, sr, hop),
     }
     # Pitch for melodic (non-percussion) stems; vibrato for vocals only.
-    if stem_name != "drums":
+    if stem_name not in _PERCUSSION:
         f0_cents, pitch_feat, confidence_feat = pitch.pitch(y, sr, hop)
         features["pitch"] = pitch_feat
         features["pitch_confidence"] = confidence_feat

@@ -35,8 +35,11 @@ class GetSettingsCommand(BaseModel):
 
 class UpdateSettingsCommand(BaseModel):
     type: Literal["settings.update"]
+    # Partial update: each field is applied only if present.
     # Separation engine ids selected for analysis (subset of available engines).
-    engines: list[str]
+    engines: list[str] | None = None
+    # Whether to sub-separate drums stems into kick/snare/etc.
+    drum_subsep: bool | None = None
 
 
 # Sidecar -> frontend events.
@@ -90,3 +93,5 @@ class SettingsEvent(BaseModel):
     engines: list[str]
     # All engine ids the sidecar can run, so the UI can render the full toggle set.
     available_engines: list[str]
+    # Whether drums stems are sub-separated into kick/snare/etc.
+    drum_subsep: bool

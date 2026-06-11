@@ -26,6 +26,7 @@
       } else if (event.type === "settings") {
         settings.engines = event.engines;
         settings.availableEngines = event.available_engines;
+        settings.drumSubsep = event.drum_subsep;
         settings.loaded = true;
       }
     });

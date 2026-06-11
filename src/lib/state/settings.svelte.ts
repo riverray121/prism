@@ -5,5 +5,6 @@
 export const settings = $state<{
   engines: string[];
   availableEngines: string[];
+  drumSubsep: boolean;
   loaded: boolean;
-}>({ engines: [], availableEngines: [], loaded: false });
+}>({ engines: [], availableEngines: [], drumSubsep: false, loaded: false });
