@@ -21,7 +21,17 @@ import librosa
 import numpy as np
 
 from . import library, separation, storage
-from .features import amplitude, chords, frequency, rhythm, spatial, stem, timbre, tonal
+from .features import (
+    amplitude,
+    chords,
+    frequency,
+    rhythm,
+    spatial,
+    stem,
+    structure,
+    timbre,
+    tonal,
+)
 
 log = logging.getLogger("sidecar.worker")
 
@@ -50,8 +60,12 @@ def _analyze(
     spectrum = np.abs(librosa.stft(y, n_fft=N_FFT, hop_length=hop))
 
     key_env, key_conf = tonal.key(y, sr)
+    # bpm (scalar) + beats, downbeats (event); sections reuses the beat grid.
+    rhythm_feats = rhythm.rhythm_features(y, sr)
+    beat_times = [ev["t"] for ev in rhythm_feats["beats"]["events"]]
     mix: dict[str, dict] = {
-        **rhythm.rhythm_features(y, sr),  # bpm (scalar) + beats, downbeats (event)
+        **rhythm_feats,
+        "sections": structure.sections(y, sr, beat_times),
         "rms": amplitude.rms(y, sr, hop),
         "silence": amplitude.silence(y, sr, hop),
         "peak": amplitude.peak(y, sr, hop),
