@@ -101,11 +101,16 @@ Deliverable: full DSP pipeline including stems from multiple separation engines,
 
 ## Milestone 5 — ML classification + structure
 
-- PANNs sound classification (model download + caching, class subset decision) — `sound_tags`, `timbral_axes`
-- Section detection (msaf) — `sections`, the first `segment` render mode
-- Motif recurrence + novelty — `motifs`, `novelty`
-- `silence` (segment) and `rhythmic_density` (continuous) — mix-level DSP deferred from M2; `silence` rides the new `segment` render mode
-- Confidence rendering in the dashboard (reduced opacity, error bars, or similar)
+The semantic/structural layer: what's sounding, how the song is built, what repeats. All mix-level. Introduces the `segment` render mode (the last of the five) and PANNs.
+
+Build in this order:
+
+- **Slice 0 — de-risk dependencies.** Before designing anything around them, prove `msaf` and PANNs install and run on Python 3.12 / arm64 in a throwaway env (import + one run on a single track). `msaf` is the real risk — an older research framework with a stale, pinned dependency tree (same M-series build friction that pinned Python to 3.12 for madmom/essentia). If it won't install, section detection falls back to a hand-rolled self-similarity-matrix (SSM) approach on librosa chroma/MFCC, and slice 2's design changes accordingly. PANNs is lower-risk (torch is already in from M3) but still gets a one-off checkpoint-load-and-run check.
+- **Slice 1 — `segment` render mode + `silence`.** Build and de-risk the new render mode end-to-end (storage shape `{start, end, label, attrs}` + a frontend segment lane) on the cheapest feature before any ML touches it. `silence` (regions below threshold) is the vehicle.
+- **Slice 2 — `sections` (msaf or hand-rolled SSM).** The headline structural feature; rides the segment mode. Pure audio structure — boundaries + grouping of similar spans; mapping generic groups to named labels (intro/verse/chorus/drop/breakdown/outro) is a heuristic pass on audio cues, not lyrics.
+- **Slice 3 — `novelty` + `motifs`.** Both derive from a self-similarity matrix over chroma/MFCC. **Compute the SSM once and share it** across sections (if hand-rolled), novelty, and motifs rather than recomputing per feature. `novelty` = per-frame "how new is this?"; `motifs` (`[WIP]`) = clustered recurring phrases, algorithm TBD.
+- **Slice 4 — PANNs `sound_tags`** (+ `rhythmic_density`, trivial continuous — slot it wherever). Model download + caching via the M3 registry; pick the ~20–40-class music-relevant subset of the 527 AudioSet labels.
+- **Slice 5 — `timbral_axes` + confidence rendering.** The `[WIP]` refinement pass: curated perceptual axes from PANNs embeddings (axis design TBD), plus showing per-frame ML confidence in the UI (reduced opacity, error bars, or similar — minimal, not the M6 redesign).
 
 Deliverable: all stable features from the catalog.
 
@@ -113,6 +118,7 @@ Deliverable: all stable features from the catalog.
 
 ## Milestone 6 — Favorites, polish, aspirational
 
+- **Slice 0 — code review.** Before the UI rework and shipping-quality polish, review the full codebase accumulated across M1–M5 (sidecar pipeline, IPC, frontend) for correctness bugs and reuse/simplification/efficiency cleanups. The walking-skeleton path carried intentional debt (duplicated graph interaction code, ad-hoc growth) — fix or document it here so the rework builds on a clean base.
 - **UI/UX design doc + dashboard rework.** Write a dedicated UI design doc (visual language, layout, interaction model, component system) now that the full feature set exists, then rework the frontend against it. The UI built through M1–M5 is intentionally minimal and functional — treat it as a replaceable presentation layer, not the final design. See the frontend layering contract in `development.md`. This is the single place all UI design happens; nothing UI is designed piecemeal before here. Scope includes the **dashboard** (stacked graphs on a shared time axis, shared zoom/playhead across all lanes, Y-axis dropdown per feature) and **consolidating the zoom/scrub/playhead interaction code** currently duplicated across the concrete graph components (`ContinuousGraph`, `EventGraph`, `HeatmapGraph`) into one shared time-axis layer.
 - Favorites UI + persistence (`favorites` field in profile.json)
 - Metadata editing in the library
