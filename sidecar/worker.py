@@ -53,6 +53,7 @@ def _analyze(
     mix: dict[str, dict] = {
         **rhythm.rhythm_features(y, sr),  # bpm (scalar) + beats, downbeats (event)
         "rms": amplitude.rms(y, sr, hop),
+        "silence": amplitude.silence(y, sr, hop),
         "peak": amplitude.peak(y, sr, hop),
         "loudness_lufs": amplitude.loudness_lufs(y, sr, hop),
         "dynamic_range": amplitude.dynamic_range(y, sr),

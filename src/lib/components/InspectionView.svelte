@@ -5,12 +5,14 @@
   import ContinuousGraph from "$lib/components/ContinuousGraph.svelte";
   import EventGraph from "$lib/components/EventGraph.svelte";
   import HeatmapGraph from "$lib/components/HeatmapGraph.svelte";
+  import SegmentGraph from "$lib/components/SegmentGraph.svelte";
   import type {
     ContinuousFeature,
     EventFeature,
     HeatmapFeature,
     MixFeature,
     ScalarFeature,
+    SegmentFeature,
   } from "$lib/ipc/messages";
   import { close, inspection } from "$lib/state/inspection.svelte";
 
@@ -237,6 +239,11 @@
       (e): e is [string, EventFeature] => e[1].render === "event",
     ),
   );
+  const segmentFeatures = $derived(
+    features.filter(
+      (e): e is [string, SegmentFeature] => e[1].render === "segment",
+    ),
+  );
   const heatmaps = $derived(
     features.filter(
       (e): e is [string, HeatmapFeature] => e[1].render === "heatmap",
@@ -399,6 +406,29 @@
         </div>
       {/each}
     </div>
+
+    <!-- Segment features: labeled time-span lanes on the shared time axis. -->
+    {#each segmentFeatures as [name, feature] (name)}
+      <div
+        class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+      >
+        <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+          {humanize(name)}
+          <span class="text-neutral-400 dark:text-neutral-600"
+            >· {feature.segments.length} segments</span
+          >
+        </p>
+        <SegmentGraph
+          segments={feature.segments}
+          maxTimeSec={durationSec}
+          playheadSec={currentTime}
+          follow={playing}
+          onSeek={scrub}
+          onScrubStart={scrubStart}
+          onScrubEnd={scrubEnd}
+        />
+      </div>
+    {/each}
 
     <!-- Event features: vertical tick lanes on the shared time axis. -->
     {#each events as [name, feature] (name)}

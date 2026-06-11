@@ -72,6 +72,35 @@ def loudness_lufs(y: np.ndarray, sr: int, hop: int) -> dict:
     }
 
 
+# Silence detection: a frame is silent below this many dB under the signal peak,
+# and only runs of at least MIN_SILENCE_SEC count as a segment (sub-perceptual
+# gaps between notes would otherwise litter the lane).
+SILENCE_TOP_DB = 60.0
+MIN_SILENCE_SEC = 0.2
+
+
+def silence(y: np.ndarray, sr: int, hop: int) -> dict:
+    """Silent regions as segments: spans quieter than SILENCE_TOP_DB below peak."""
+    intervals = librosa.effects.split(y, top_db=SILENCE_TOP_DB, hop_length=hop)
+    total = len(y) / sr
+    # Complement of the non-silent intervals, in seconds.
+    segments = []
+    prev_end = 0.0
+    for start, end in intervals:
+        gap_end = float(start) / sr
+        if gap_end - prev_end >= MIN_SILENCE_SEC:
+            segments.append({"start": prev_end, "end": gap_end, "label": "silence"})
+        prev_end = float(end) / sr
+    if total - prev_end >= MIN_SILENCE_SEC:
+        segments.append({"start": prev_end, "end": total, "label": "silence"})
+    return {
+        "render": "segment",
+        "category": "amplitude",
+        "source": "librosa",
+        "segments": segments,
+    }
+
+
 def dynamic_range(y: np.ndarray, sr: int) -> dict:
     """Crest factor over the whole song in dB: ratio of peak to RMS amplitude."""
     rms_all = float(np.sqrt(np.mean(np.square(y)))) if y.size else 0.0

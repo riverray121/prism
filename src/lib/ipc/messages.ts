@@ -66,6 +66,23 @@ export const EventFeatureSchema = z.object({
 });
 export type EventFeature = z.infer<typeof EventFeatureSchema>;
 
+// Segment: labeled time spans. ML segment features (e.g. sections) carry
+// confidence and other extra attrs per segment, so unknown keys pass through.
+export const SegmentSchema = z
+  .object({
+    start: z.number(),
+    end: z.number(),
+    label: z.string(),
+  })
+  .passthrough();
+export const SegmentFeatureSchema = z.object({
+  render: z.literal("segment"),
+  category: z.string(),
+  source: z.string(),
+  segments: z.array(SegmentSchema),
+});
+export type SegmentFeature = z.infer<typeof SegmentFeatureSchema>;
+
 // Heatmap: a 2D matrix stored in a .npy sidecar; the JSON holds only the
 // reference and shape. shape is [rows, cols], axes names each dimension.
 export const HeatmapFeatureSchema = z.object({
@@ -79,11 +96,12 @@ export const HeatmapFeatureSchema = z.object({
 });
 export type HeatmapFeature = z.infer<typeof HeatmapFeatureSchema>;
 
-// One mix feature. Grows with new render modes (segment).
+// One mix feature, discriminated by render mode (all five modes covered).
 export const MixFeatureSchema = z.discriminatedUnion("render", [
   ScalarFeatureSchema,
   ContinuousFeatureSchema,
   EventFeatureSchema,
+  SegmentFeatureSchema,
   HeatmapFeatureSchema,
 ]);
 export type MixFeature = z.infer<typeof MixFeatureSchema>;
