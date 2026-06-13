@@ -220,20 +220,29 @@
     over.addEventListener(
       "wheel",
       (e) => {
-        e.preventDefault();
         const { min, max } = u.scales.x;
         if (min == null || max == null) return;
         const full = maxX();
         const range = max - min;
 
-        const mouseWheel =
-          e.deltaMode !== 0 ||
-          (e.deltaX === 0 &&
-            Number.isInteger(e.deltaY) &&
-            Math.abs(e.deltaY) >= 50);
-
-        if (!e.ctrlKey && !mouseWheel) {
-          if (range >= full - 1e-6) return;
+        // Pinch / ctrl+wheel zooms (below). A horizontal two-finger swipe pans a
+        // zoomed view. Anything else is a page scroll: forward it to the viewport
+        // explicitly, because the absolutely-positioned uPlot overlay swallows
+        // the wheel in this webview and the page would otherwise not scroll while
+        // the cursor is over a graph.
+        if (!e.ctrlKey) {
+          e.preventDefault();
+          const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+          if (!horizontal || range >= full - 1e-6) {
+            const k =
+              e.deltaMode === 1
+                ? 16
+                : e.deltaMode === 2
+                  ? window.innerHeight
+                  : 1;
+            window.scrollBy(e.deltaX * k, e.deltaY * k);
+            return;
+          }
           const dv = (e.deltaX * range) / (over.clientWidth || 1);
           let nmin = min + dv;
           let nmax = max + dv;
@@ -249,9 +258,9 @@
           return;
         }
 
-        const intensity = e.ctrlKey
-          ? Math.min(Math.abs(e.deltaY) * 0.035, 2)
-          : 1;
+        // Pinch / ctrl+wheel: zoom centered on the cursor.
+        e.preventDefault();
+        const intensity = Math.min(Math.abs(e.deltaY) * 0.035, 2);
         const step = Math.pow(ZOOM_FACTOR, intensity);
         const nrange = e.deltaY < 0 ? range * step : range / step;
         const center = timeAtEvent(u, e);
