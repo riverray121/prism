@@ -161,8 +161,12 @@
                 ctx.lineTo(x1, bottom);
               }
               ctx.stroke();
-              // Label inside the band when it fits.
-              const label = seg.label;
+              // Label (with ML confidence when present) inside the band when it fits.
+              const conf = (seg as { confidence?: unknown }).confidence;
+              const label =
+                typeof conf === "number"
+                  ? `${seg.label} ${Math.round(conf * 100)}%`
+                  : seg.label;
               if (label) {
                 const w = ctx.measureText(label).width;
                 if (w + 8 * dpr < x1 - x0) {

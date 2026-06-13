@@ -110,9 +110,9 @@ Build in this order:
 - **Slice 2 — `sections` (hand-rolled SSM).** The headline structural feature; rides the segment mode. Boundaries from Foote checkerboard-kernel novelty over a librosa recurrence matrix (chroma/MFCC); grouping via spectral clustering on the recurrence graph (librosa documents this approach; scikit-learn is the only candidate new dep). Pure audio structure — mapping generic groups to named labels (intro/verse/chorus/drop/breakdown/outro) is a heuristic pass on audio cues, not lyrics.
 - **Slice 3 — `novelty` + `motifs`.** Both derive from the same self-similarity matrix as sections. **Compute the SSM once and share it** across sections, novelty, and motifs rather than recomputing per feature. `novelty` = per-frame "how new is this?"; `motifs` (`[WIP]`) = clustered recurring phrases, algorithm TBD.
 - **Slice 4 — PANNs `sound_tags`** (+ `rhythmic_density`, trivial continuous — slot it wherever). Model download + caching via the M3 registry; pick the ~20–40-class music-relevant subset of the 527 AudioSet labels.
-- **Slice 5 — `timbral_axes` + confidence rendering.** The `[WIP]` refinement pass: curated perceptual axes from PANNs embeddings (axis design TBD), plus showing per-frame ML confidence in the UI (reduced opacity, error bars, or similar — minimal, not the M6 redesign).
+- **Slice 5 — `timbral_axes` + confidence rendering. Done.** Realized timbral_axes as three curated continuous axes (`electronic_organic`, `percussive_tonal`, `instrumental_vocal`) derived from PANNs class-probability contrasts rather than raw embedding projection — interpretable, no second inference. Confidence shown as numeric percentages in chord/section/motif labels.
 
-Deliverable: all stable features from the catalog.
+Deliverable: all stable features from the catalog. **M5 complete.**
 
 ---
 

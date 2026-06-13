@@ -133,18 +133,19 @@ Sampled on the implicit 100 Hz timeline. `data` length equals `timeline.frame_co
 }
 ```
 
-ML continuous features add a parallel `confidence` array of equal length. WIP features add `"status": "wip"`:
+ML continuous features may add a parallel `confidence` array of equal length. WIP features add `"status": "wip"`.
+
+`timbral_axes` is realized as three separate continuous features, each a 0–1 per-frame contrast between two groups of PANNs class probabilities (0.5 = balanced / nothing detected): `electronic_organic`, `percussive_tonal`, `instrumental_vocal` (value → 1 favors the second pole). v1 omits the confidence array.
 
 ```json
-"timbral_axes": {
+"electronic_organic": {
   "render": "continuous",
   "category": "timbre",
   "source": "panns",
   "unit": "normalized",
   "range": [0, 1],
   "status": "wip",
-  "data":       [/* ... */],
-  "confidence": [/* ... */]
+  "data": [/* ... frame_count values ... */]
 }
 ```
 
@@ -206,6 +207,23 @@ Payload lives in a sidecar `.npy` file. The JSON entry contains only the referen
 ```
 
 `axes` names the meaning of each matrix dimension in order.
+
+### tags
+
+Many named per-frame probability tracks in one `.npy` matrix (`[rows, frames]`, 0–1), rendered as one line graph per row. Used by `sound_tags` (PANNs): `labels[i]` names row `i`, in row order. `shape` is `[rows, frame_count]`.
+
+```json
+"sound_tags": {
+  "render": "tags",
+  "category": "semantic",
+  "source": "panns",
+  "status": "wip",
+  "unit": "probability",
+  "sidecar": "heatmaps/sound_tags.npy",
+  "labels": ["Guitar", "Piano", "Singing", "Electronic music"],
+  "shape": [4, 23452]
+}
+```
 
 ---
 

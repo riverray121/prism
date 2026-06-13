@@ -109,11 +109,14 @@ def _analyze(
         heatmaps[name] = matrix
         mix[name] = _heatmap_envelope(name, matrix, f"heatmaps/{name}.npy")
 
-    # sound_tags (PANNs): builds its own envelope (dynamic class labels) and
-    # arrives already frame_count-aligned, so it bypasses the heatmap-envelope
-    # loop above; its matrix still rides the heatmaps dict to be written to disk.
-    tags_env, tags_matrix = semantic.sound_tags(y, sr, frame_count)
+    # PANNs (one inference): sound_tags + the timbral axes. sound_tags builds its
+    # own envelope (dynamic class labels) and arrives frame_count-aligned, so it
+    # bypasses the heatmap-envelope loop above; its matrix still rides the
+    # heatmaps dict to be written to disk. The axes are continuous, already
+    # frame_count-length, added straight to the mix.
+    tags_env, tags_matrix, axes = semantic.panns_features(y, sr, frame_count)
     mix["sound_tags"] = tags_env
+    mix.update(axes)
     heatmaps["sound_tags"] = tags_matrix
 
     return frame_rate_hz, frame_count, mix, heatmaps

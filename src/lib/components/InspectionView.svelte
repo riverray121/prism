@@ -327,14 +327,24 @@
     sus4: "sus4",
   };
 
-  // Label a chord event (root/quality passed through the event schema). 'N' (no
-  // chord) and 'X' (unknown) carry no quality and render as-is.
+  // Append an ML confidence percentage to a label, when the item carries one.
+  function withConfidence(
+    label: string,
+    item: { confidence?: unknown },
+  ): string {
+    return typeof item.confidence === "number"
+      ? `${label} ${Math.round(item.confidence * 100)}%`
+      : label;
+  }
+
+  // Label a chord event (root/quality passed through the event schema), with the
+  // model's confidence. 'N' (no chord) and 'X' (unknown) carry no quality.
   function chordLabel(ev: EventFeature["events"][number]): string | null {
-    const c = ev as { root?: string; quality?: string };
+    const c = ev as { root?: string; quality?: string; confidence?: number };
     if (!c.root) return null;
-    if (c.root === "N" || c.root === "X") return c.root;
+    if (c.root === "N" || c.root === "X") return withConfidence(c.root, c);
     const q = c.quality ?? "";
-    return c.root + (CHORD_QUALITY[q] ?? q);
+    return withConfidence(c.root + (CHORD_QUALITY[q] ?? q), c);
   }
 
   function formatScalar(f: ScalarFeature): string {
@@ -495,7 +505,7 @@
           <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
             {humanize(name)}
             <span class="text-neutral-400 dark:text-neutral-600"
-              >· {feature.unit}</span
+              >· {feature.unit}{feature.status === "wip" ? " · wip" : ""}</span
             >
           </p>
           <ContinuousGraph

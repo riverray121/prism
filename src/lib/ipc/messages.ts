@@ -51,6 +51,8 @@ export const ContinuousFeatureSchema = z.object({
   source: z.string(),
   unit: z.string(),
   range: z.tuple([z.number(), z.number()]).optional(),
+  // Present (="wip") on provisional ML features, e.g. the timbral axes.
+  status: z.string().optional(),
   data: z.array(z.number()),
 });
 export type ContinuousFeature = z.infer<typeof ContinuousFeatureSchema>;
