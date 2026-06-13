@@ -130,14 +130,22 @@ def mark_queued(con: sqlite3.Connection, song_ids: list[str], queued_at: str) ->
 
 
 def cancel_queued(con: sqlite3.Connection, song_id: str) -> None:
-    """Remove a queued song from the queue, returning it to 'unanalyzed'.
+    """Remove a queued song from the queue, restoring its pre-queue status.
 
+    A song re-queued from 'analyzed' (its profile.json still exists, analyzed_at
+    set) returns to 'analyzed'; a never-analyzed song returns to 'unanalyzed'.
     Guarded to ``status='queued'`` so it can't cancel a song the worker has already
     claimed (status='analyzing') — a running song must finish (see design doc); the
     WHERE also resolves the claim race (the worker flips queued→analyzing atomically).
     """
     con.execute(
-        "UPDATE songs SET status='unanalyzed', queued_at=NULL WHERE id=? AND status='queued'",
+        """
+        UPDATE songs
+        SET status = CASE WHEN analyzed_at IS NOT NULL THEN 'analyzed'
+                          ELSE 'unanalyzed' END,
+            queued_at = NULL
+        WHERE id=? AND status='queued'
+        """,
         (song_id,),
     )
 
