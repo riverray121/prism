@@ -2,6 +2,10 @@
 
 import librosa
 import numpy as np
+from scipy.ndimage import uniform_filter1d
+
+# Window for the rhythmic-density running rate, in seconds.
+DENSITY_WINDOW_SEC = 2.0
 
 # Assumed time signature for downbeat inference. The heuristic picks one of
 # METER beat phases as the bar start; non-4/4 meters will be wrong (see
@@ -55,6 +59,31 @@ def onsets(y: np.ndarray, sr: int, hop: int) -> dict:
         "events": [
             {"t": float(t), "strength": float(s)} for t, s in zip(times, strengths)
         ],
+    }
+
+
+def rhythmic_density(y: np.ndarray, sr: int, hop: int) -> dict:
+    """Running onset rate (onsets/sec) over a sliding window.
+
+    Detects onsets on the timeline hop, lays them on the frame grid as a binary
+    train, then takes a windowed running mean scaled to onsets per second.
+    """
+    onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
+    onset_frames = librosa.onset.onset_detect(
+        onset_envelope=onset_env, sr=sr, hop_length=hop, backtrack=False
+    )
+    frame_rate = sr / hop
+    train = np.zeros(len(onset_env))
+    train[onset_frames] = 1.0
+    win = max(1, int(round(DENSITY_WINDOW_SEC * frame_rate)))
+    # mean-over-window * frame_rate = count-over-window / window_seconds.
+    density = uniform_filter1d(train, size=win) * frame_rate
+    return {
+        "render": "continuous",
+        "category": "rhythm",
+        "source": "librosa.onset",
+        "unit": "onsets/sec",
+        "data": [float(x) for x in density],
     }
 
 

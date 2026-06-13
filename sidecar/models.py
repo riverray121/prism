@@ -32,6 +32,13 @@ _REGISTRY = {
         "sha256": "1673d23f8f9a55ae7f9e8b80a51da616debb22675b8d8b67ea6ce0ef37b0ab51",
         "filename": "btc_model_large_voca.pt",
     },
+    # PANNs Cnn14 framewise SED (sound_tags). Mirrors panns-inference's default
+    # checkpoint; fetched here via urllib+checksum instead of its wget+os.system.
+    "panns_cnn14_sed": {
+        "url": "https://zenodo.org/record/3987831/files/Cnn14_DecisionLevelMax_mAP%3D0.385.pth?download=1",
+        "sha256": "dd3b4043a87d4ec13df8082c0fcfee3fb5084151808e47e060987a95eabdd142",
+        "filename": "Cnn14_DecisionLevelMax.pth",
+    },
 }
 
 

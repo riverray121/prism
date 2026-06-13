@@ -96,13 +96,29 @@ export const HeatmapFeatureSchema = z.object({
 });
 export type HeatmapFeature = z.infer<typeof HeatmapFeatureSchema>;
 
-// One mix feature, discriminated by render mode (all five modes covered).
+// Tags: many named per-frame probability tracks in one .npy matrix
+// ([rows, frames], 0-1). One row per labels[i]; rendered as one line per row.
+// status "wip" flags the feature as provisional (see profile-schema.md).
+export const TagsFeatureSchema = z.object({
+  render: z.literal("tags"),
+  category: z.string(),
+  source: z.string(),
+  unit: z.string(),
+  status: z.string().optional(),
+  sidecar: z.string(),
+  labels: z.array(z.string()),
+  shape: z.array(z.number()),
+});
+export type TagsFeature = z.infer<typeof TagsFeatureSchema>;
+
+// One mix feature, discriminated by render mode.
 export const MixFeatureSchema = z.discriminatedUnion("render", [
   ScalarFeatureSchema,
   ContinuousFeatureSchema,
   EventFeatureSchema,
   SegmentFeatureSchema,
   HeatmapFeatureSchema,
+  TagsFeatureSchema,
 ]);
 export type MixFeature = z.infer<typeof MixFeatureSchema>;
 

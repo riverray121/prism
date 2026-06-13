@@ -26,6 +26,7 @@ from .features import (
     chords,
     frequency,
     rhythm,
+    semantic,
     spatial,
     stem,
     structure,
@@ -71,6 +72,7 @@ def _analyze(
         ),
         "rms": amplitude.rms(y, sr, hop),
         "silence": amplitude.silence(y, sr, hop),
+        "rhythmic_density": rhythm.rhythmic_density(y, sr, hop),
         "peak": amplitude.peak(y, sr, hop),
         "loudness_lufs": amplitude.loudness_lufs(y, sr, hop),
         "dynamic_range": amplitude.dynamic_range(y, sr),
@@ -106,6 +108,13 @@ def _analyze(
         matrix = matrix[:, :frame_count]
         heatmaps[name] = matrix
         mix[name] = _heatmap_envelope(name, matrix, f"heatmaps/{name}.npy")
+
+    # sound_tags (PANNs): builds its own envelope (dynamic class labels) and
+    # arrives already frame_count-aligned, so it bypasses the heatmap-envelope
+    # loop above; its matrix still rides the heatmaps dict to be written to disk.
+    tags_env, tags_matrix = semantic.sound_tags(y, sr, frame_count)
+    mix["sound_tags"] = tags_env
+    heatmaps["sound_tags"] = tags_matrix
 
     return frame_rate_hz, frame_count, mix, heatmaps
 

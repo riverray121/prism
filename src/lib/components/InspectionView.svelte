@@ -6,6 +6,7 @@
   import EventGraph from "$lib/components/EventGraph.svelte";
   import HeatmapGraph from "$lib/components/HeatmapGraph.svelte";
   import SegmentGraph from "$lib/components/SegmentGraph.svelte";
+  import TagsGraph from "$lib/components/TagsGraph.svelte";
   import type {
     ContinuousFeature,
     EventFeature,
@@ -13,6 +14,7 @@
     MixFeature,
     ScalarFeature,
     SegmentFeature,
+    TagsFeature,
   } from "$lib/ipc/messages";
   import { close, inspection } from "$lib/state/inspection.svelte";
 
@@ -248,6 +250,9 @@
     features.filter(
       (e): e is [string, HeatmapFeature] => e[1].render === "heatmap",
     ),
+  );
+  const tagFeatures = $derived(
+    features.filter((e): e is [string, TagsFeature] => e[1].render === "tags"),
   );
 
   // Split a keyed feature map by render mode, preserving insertion order. Used
@@ -507,6 +512,35 @@
         </div>
       {/each}
     </div>
+
+    <!-- Tag features (sound_tags): one line graph per present class, loaded from
+         a shared .npy matrix. -->
+    {#if inspection.songDir}
+      {#each tagFeatures as [name, feature] (name)}
+        <div
+          class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+            {humanize(name)}
+            <span class="text-neutral-400 dark:text-neutral-600">
+              · {feature.labels.length} classes{feature.status === "wip"
+                ? " · wip"
+                : ""}</span
+            >
+          </p>
+          <TagsGraph
+            path={`${inspection.songDir}/${feature.sidecar}`}
+            labels={feature.labels}
+            frameRateHz={inspection.profile.timeline.frame_rate_hz}
+            playheadSec={currentTime}
+            follow={playing}
+            onSeek={scrub}
+            onScrubStart={scrubStart}
+            onScrubEnd={scrubEnd}
+          />
+        </div>
+      {/each}
+    {/if}
 
     <!-- Per-stem features, grouped by separation engine then stem, so the same
          stem can be compared across engines. Reuses the mix graph components and
