@@ -60,12 +60,15 @@ def _analyze(
     spectrum = np.abs(librosa.stft(y, n_fft=N_FFT, hop_length=hop))
 
     key_env, key_conf = tonal.key(y, sr)
-    # bpm (scalar) + beats, downbeats (event); sections reuses the beat grid.
+    # bpm (scalar) + beats, downbeats (event); the structure pass (sections,
+    # novelty, motifs — one shared SSM) reuses the beat grid.
     rhythm_feats = rhythm.rhythm_features(y, sr)
     beat_times = [ev["t"] for ev in rhythm_feats["beats"]["events"]]
     mix: dict[str, dict] = {
         **rhythm_feats,
-        "sections": structure.sections(y, sr, beat_times),
+        **structure.structure_features(
+            y, sr, beat_times, len(y) // hop + 1, frame_rate_hz
+        ),
         "rms": amplitude.rms(y, sr, hop),
         "silence": amplitude.silence(y, sr, hop),
         "peak": amplitude.peak(y, sr, hop),

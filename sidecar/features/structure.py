@@ -34,6 +34,17 @@ MIN_K, MAX_K = 2, 8
 # (novelty is kernel-mass normalized, not peak normalized, so this is absolute;
 # a featureless song produces no boundaries instead of amplified noise).
 NOVELTY_MIN = 0.05
+# Motif mining: minimum phrase length in cells (~1 bar), occurrence-merge
+# overlap fraction, strongest-pairs cap (bounds the clustering cost), and the
+# maximum number of motif clusters reported.
+MIN_MOTIF_CELLS = 4
+MOTIF_OVERLAP = 0.5
+MOTIF_PAIR_CAP = 200
+MAX_MOTIFS = 8
+# A recurrence link only counts as a repeat if its similarity exceeds the SSM
+# median by this margin; in a featureless SSM (everything similar to
+# everything) no link stands out, so no motifs are mined from it.
+MOTIF_CONTRAST = 0.1
 
 
 def _grid_times(duration: float, beat_times: list[float]) -> np.ndarray:
@@ -67,10 +78,13 @@ def ssm(
 
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=HOP)
     # Drop MFCC 0 (overall energy, which would dominate the cosine) and z-score
-    # each coefficient across time so all contribute comparably.
+    # each coefficient across time so all contribute comparably. The absolute
+    # floor on the std keeps near-constant rows (e.g. steady tones, silence)
+    # from amplifying numerical noise into fake structure; musical MFCC rows
+    # vary far above it.
     mfcc = librosa.feature.mfcc(y=y, sr=sr, hop_length=HOP, n_mfcc=20)[1:]
     mfcc = (mfcc - mfcc.mean(axis=1, keepdims=True)) / (
-        mfcc.std(axis=1, keepdims=True) + 1e-9
+        mfcc.std(axis=1, keepdims=True) + 1.0
     )
     # Aggregate over cells (median is robust to transients). sync splits around
     # the given indices, so passing only the inner boundaries yields exactly one
@@ -79,14 +93,11 @@ def ssm(
     chroma_sync = librosa.util.sync(chroma, inner, aggregate=np.median)
     mfcc_sync = librosa.util.sync(mfcc, inner, aggregate=np.median)
 
-    # Stack both views, each feature-normalized so neither dominates the cosine.
-    x = np.vstack(
-        [
-            librosa.util.normalize(chroma_sync, axis=0),
-            librosa.util.normalize(mfcc_sync, axis=0),
-        ]
-    )
-    x = librosa.util.normalize(x, axis=0)  # unit columns -> dot = cosine
+    # Stack both views: chroma max-normalized per cell (its usual 0-1 form),
+    # z-scored MFCC as-is — already scale-comparable, and near-zero for
+    # constant signals (per-cell renormalizing would re-amplify noise there).
+    x = np.vstack([librosa.util.normalize(chroma_sync, axis=0), mfcc_sync])
+    x = librosa.util.normalize(x, axis=0, norm=2)  # L2-unit columns -> dot = cosine
     s = np.clip(x.T @ x, 0.0, 1.0)
     return s, grid
 
@@ -115,15 +126,13 @@ def _novelty_curve(s: np.ndarray) -> np.ndarray:
     return np.clip(nov, 0.0, None) / pos_mass
 
 
-def _boundaries(s: np.ndarray) -> np.ndarray:
+def _boundaries(nov: np.ndarray, n: int) -> np.ndarray:
     """Section boundaries as cell indices (always including 0 and n)."""
-    n = s.shape[0]
-    nov = _novelty_curve(s)
     wait = min(MIN_SECTION_CELLS, max(1, n // 4))
     peaks = librosa.util.peak_pick(
         nov,
-        pre_max=wait // 2,
-        post_max=wait // 2,
+        pre_max=max(1, wait // 2),
+        post_max=max(1, wait // 2),
         pre_avg=wait,
         post_avg=wait,
         delta=0.05,
@@ -135,18 +144,12 @@ def _boundaries(s: np.ndarray) -> np.ndarray:
     return np.array([0, *peaks, n], dtype=int)
 
 
-def _embedding(s: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Per-cell spectral embedding of the recurrence structure.
-
-    Builds the McFee & Ellis affinity graph (path-smoothed recurrence blended
-    with a local time-adjacency link), then returns the eigenvectors and
-    eigenvalues of its normalized Laplacian.
-    """
+def _recurrence(s: np.ndarray) -> np.ndarray:
+    """Long-range recurrence links straight from the dense SSM: drop the
+    near-diagonal band (trivial self-similarity), keep each row's strongest
+    links, then median-filter along time-lag diagonals so repeats survive as
+    paths instead of speckle. Shared by section grouping and motif mining."""
     n = s.shape[0]
-    # Long-range recurrence links straight from the dense SSM: drop the
-    # near-diagonal band (trivial self-similarity), keep each row's strongest
-    # links, then median-filter along time-lag diagonals so repeats survive as
-    # paths instead of speckle.
     width = min(3, max(1, n // 8))
     rec = s.copy()
     offsets = np.abs(np.subtract.outer(np.arange(n), np.arange(n)))
@@ -156,9 +159,20 @@ def _embedding(s: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         thresh = np.partition(rec, n - k, axis=1)[:, n - k][:, None]
         rec[rec < thresh] = 0.0
     rec = np.maximum(rec, rec.T)
-    rec = librosa.segment.timelag_filter(scipy.ndimage.median_filter)(
+    return librosa.segment.timelag_filter(scipy.ndimage.median_filter)(
         rec, size=(1, min(7, n))
     )
+
+
+def _embedding(s: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per-cell spectral embedding of the recurrence structure.
+
+    Builds the McFee & Ellis affinity graph (path-smoothed recurrence blended
+    with a local time-adjacency link), then returns the eigenvectors and
+    eigenvalues of its normalized Laplacian.
+    """
+    n = s.shape[0]
+    rec = _recurrence(s)
     # Local linkage: connect temporal neighbors, weighted by their similarity.
     path = np.diag(np.diag(s, k=1), k=1)
     path = path + path.T
@@ -199,10 +213,10 @@ def _group(s: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     seg_vecs = np.array(
         [basis[a:b].mean(axis=0) for a, b in zip(bounds[:-1], bounds[1:])]
     )
-    seg_vecs = librosa.util.normalize(seg_vecs, axis=1)
+    seg_vecs = librosa.util.normalize(seg_vecs, axis=1, norm=2)
 
     centroids, labels = kmeans2(seg_vecs, k, minit="++", seed=1)
-    centroids = librosa.util.normalize(centroids, axis=1)
+    centroids = librosa.util.normalize(centroids, axis=1, norm=2)
     conf = np.clip((seg_vecs * centroids[labels]).sum(axis=1), 0.0, 1.0)
     return labels, conf
 
@@ -238,10 +252,10 @@ def _name_groups(
     return names
 
 
-def sections(y: np.ndarray, sr: int, beat_times: list[float]) -> dict:
-    """Song sections as a segment feature: SSM boundaries + grouped, named spans."""
-    s, grid = ssm(y, sr, beat_times)
-    bounds = _boundaries(s)
+def _sections_envelope(
+    y: np.ndarray, sr: int, s: np.ndarray, grid: np.ndarray, bounds: np.ndarray
+) -> dict:
+    """Sections as a segment feature: grouped, named spans between boundaries."""
     bounds_sec = grid[bounds]
     groups, conf = _group(s, bounds)
 
@@ -274,4 +288,152 @@ def sections(y: np.ndarray, sr: int, beat_times: list[float]) -> dict:
         "category": "structure",
         "source": "ssm",
         "segments": segments,
+    }
+
+
+def _novelty_envelope(
+    nov: np.ndarray, grid: np.ndarray, n_frames: int, frame_rate_hz: float
+) -> dict:
+    """Per-frame "how new is this?" on the shared timeline: the cell-level
+    novelty curve interpolated from cell centers onto the frame grid."""
+    frame_times = np.arange(n_frames) / frame_rate_hz
+    if len(nov) >= 2:
+        centers = (grid[:-1] + grid[1:]) / 2.0
+        data = np.interp(frame_times, centers, np.clip(nov, 0.0, 1.0))
+    else:
+        data = np.zeros(n_frames)
+    return {
+        "render": "continuous",
+        "category": "structure",
+        "source": "ssm",
+        "unit": "normalized",
+        "range": [0, 1],
+        "data": [float(x) for x in data],
+    }
+
+
+def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
+    """Contiguous True runs in a boolean array, as (start, end) half-open."""
+    if not mask.any():
+        return []
+    edges = np.flatnonzero(np.diff(np.concatenate(([0], mask.astype(int), [0]))))
+    return list(zip(edges[::2], edges[1::2]))
+
+
+def _motifs(s: np.ndarray, grid: np.ndarray) -> dict:
+    """Recurring phrases mined from the recurrence matrix ([WIP]).
+
+    Every sufficiently long diagonal run of recurrence links at lag L means the
+    spans [i, j) and [i+L, j+L) repeat each other. Both spans become motif
+    occurrences; occurrences are clustered by pair-linkage plus span overlap
+    (union-find), and the strongest clusters are reported as M1, M2, ...
+    """
+    n = s.shape[0]
+    occs: list[tuple[int, int, float]] = []  # (start_cell, end_cell, strength)
+    pairs: list[tuple[int, int]] = []
+    if n > MIN_MOTIF_CELLS:
+        rec = _recurrence(s)
+        rec = np.where(rec >= float(np.median(s)) + MOTIF_CONTRAST, rec, 0.0)
+        found: list[tuple[float, int, int, int]] = []  # (score, i0, length, lag)
+        for lag in range(MIN_MOTIF_CELLS, n - MIN_MOTIF_CELLS + 1):
+            diag = np.diag(rec, k=lag)
+            for r0, r1 in _runs(diag > 0):
+                length = min(r1 - r0, lag)  # cap so the two spans can't overlap
+                if length < MIN_MOTIF_CELLS:
+                    continue
+                strength = float(diag[r0 : r0 + length].mean())
+                found.append((strength * length, r0, length, lag))
+        # Strongest pairs only; bounds the O(m^2) overlap clustering below.
+        found.sort(reverse=True)
+        for _, i0, length, lag in found[:MOTIF_PAIR_CAP]:
+            strength = float(np.diag(rec, k=lag)[i0 : i0 + length].mean())
+            a = len(occs)
+            occs.append((i0, i0 + length, strength))
+            b = len(occs)
+            occs.append((i0 + lag, i0 + lag + length, strength))
+            pairs.append((a, b))
+
+    # Union-find: same motif if pair-linked or substantially overlapping.
+    parent = list(range(len(occs)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i: int, j: int) -> None:
+        parent[find(i)] = find(j)
+
+    for a, b in pairs:
+        union(a, b)
+    for i in range(len(occs)):
+        for j in range(i + 1, len(occs)):
+            lo = max(occs[i][0], occs[j][0])
+            hi = min(occs[i][1], occs[j][1])
+            shorter = min(occs[i][1] - occs[i][0], occs[j][1] - occs[j][0])
+            if hi - lo >= MOTIF_OVERLAP * shorter:
+                union(i, j)
+
+    # Merge each cluster's near-duplicate spans into distinct occurrences. Only
+    # substantial overlap merges (same criterion as the union step) — touching
+    # spans are separate occurrences (e.g. a chorus repeated back-to-back).
+    clusters: dict[int, list[tuple[int, int, float]]] = {}
+    for i, occ in enumerate(occs):
+        clusters.setdefault(find(i), []).append(occ)
+    motifs = []
+    for members in clusters.values():
+        members.sort()
+        merged: list[list[float]] = []
+        for a, b, w in members:
+            if merged:
+                pa, pb, pw = merged[-1]
+                overlap = min(pb, b) - max(pa, a)
+                if overlap >= MOTIF_OVERLAP * min(b - a, pb - pa):
+                    merged[-1][1] = max(pb, b)
+                    merged[-1][2] = max(pw, w)
+                    continue
+            merged.append([a, b, w])
+        if len(merged) >= 2:
+            coverage = sum(b - a for a, b, _ in merged)
+            motifs.append((coverage, merged))
+
+    # Strongest clusters, numbered in order of first appearance.
+    motifs.sort(reverse=True)
+    kept = sorted(motifs[:MAX_MOTIFS], key=lambda m: m[1][0][0])
+    segments = [
+        {
+            "start": float(grid[int(a)]),
+            "end": float(grid[int(b)]),
+            "label": f"M{idx + 1}",
+            "confidence": float(np.clip(w, 0.0, 1.0)),
+        }
+        for idx, (_, merged) in enumerate(kept)
+        for a, b, w in merged
+    ]
+    segments.sort(key=lambda seg: seg["start"])
+    return {
+        "render": "segment",
+        "category": "structure",
+        "source": "ssm",
+        "status": "wip",
+        "segments": segments,
+    }
+
+
+def structure_features(
+    y: np.ndarray, sr: int, beat_times: list[float], n_frames: int, frame_rate_hz: float
+) -> dict[str, dict]:
+    """Sections, novelty, and motifs from one shared SSM pass.
+
+    ``n_frames``/``frame_rate_hz`` define the shared continuous timeline that
+    the novelty curve is resampled onto.
+    """
+    s, grid = ssm(y, sr, beat_times)
+    nov = _novelty_curve(s)
+    bounds = _boundaries(nov, s.shape[0])
+    return {
+        "sections": _sections_envelope(y, sr, s, grid, bounds),
+        "novelty": _novelty_envelope(nov, grid, n_frames, frame_rate_hz),
+        "motifs": _motifs(s, grid),
     }
