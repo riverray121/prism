@@ -136,6 +136,18 @@
                   >
                     {song.status === "failed" ? "Retry" : "Analyze"}
                   </button>
+                {:else if song.status === "analyzed"}
+                  <!-- stopPropagation: the row click opens the inspection view. -->
+                  <button
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      analyze(song.id);
+                    }}
+                    title="Run analysis again (overwrites the existing profile)"
+                    class="rounded bg-neutral-200 px-2 py-1 text-xs font-medium hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+                  >
+                    Re-analyze
+                  </button>
                 {:else if song.status === "queued"}
                   <button
                     onclick={() => cancel(song.id)}

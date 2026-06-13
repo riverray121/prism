@@ -117,12 +117,13 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
 
 
 def mark_queued(con: sqlite3.Connection, song_ids: list[str], queued_at: str) -> None:
-    """Queue songs for analysis. Re-queues failed/unanalyzed rows; clears prior error."""
+    """Queue songs for analysis; clears prior error. Analyzed songs may be
+    re-queued (the worker overwrites their profile); analyzing/queued may not."""
     con.executemany(
         """
         UPDATE songs
         SET status='queued', queued_at=?, error_message=NULL
-        WHERE id=? AND status IN ('unanalyzed', 'failed')
+        WHERE id=? AND status IN ('unanalyzed', 'failed', 'analyzed')
         """,
         [(queued_at, song_id) for song_id in song_ids],
     )
