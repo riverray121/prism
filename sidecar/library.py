@@ -59,11 +59,17 @@ def connect() -> Iterator[sqlite3.Connection]:
     storage.LIBRARY_ROOT.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(storage.DB_PATH)
     con.row_factory = sqlite3.Row
+    # Under WAL two writers still serialize; with the default busy_timeout of 0 the
+    # second writer fails instantly with 'database is locked'. The worker writes
+    # frequently (per-stage) while the main thread writes on import/queue/settings,
+    # so wait instead of failing. (This does not cover the WAL-switch below, which
+    # takes an exclusive lock and ignores busy_timeout — handled separately.)
+    con.execute("PRAGMA busy_timeout=5000")
     # WAL (worker writes while the UI reads) is a persistent DB property, so set
-    # it once. Switching to WAL takes an exclusive lock and ignores busy_timeout,
-    # so on a freshly created DB the worker and UI threads can collide on the
-    # switch — only switch if it isn't already WAL, and tolerate a concurrent
-    # setter winning the race.
+    # it once. The WAL switch takes an exclusive lock and ignores busy_timeout, so
+    # on a freshly created DB the worker and UI threads can collide on the switch —
+    # only switch if it isn't already WAL, and tolerate a concurrent setter winning
+    # the race.
     if con.execute("PRAGMA journal_mode").fetchone()[0].lower() != "wal":
         try:
             con.execute("PRAGMA journal_mode=WAL")
@@ -163,8 +169,15 @@ def next_queued(con: sqlite3.Connection) -> sqlite3.Row | None:
     ).fetchone()
 
 
-def mark_analyzing(con: sqlite3.Connection, song_id: str) -> None:
-    con.execute("UPDATE songs SET status='analyzing' WHERE id=?", (song_id,))
+def mark_analyzing(con: sqlite3.Connection, song_id: str) -> bool:
+    """Atomically claim a queued song for analysis. Guarded to ``status='queued'``
+    so it can't resurrect a row a concurrent ``cancel_queued`` already moved out of
+    the queue. Returns True if this call won the claim (a row was updated)."""
+    cur = con.execute(
+        "UPDATE songs SET status='analyzing' WHERE id=? AND status='queued'",
+        (song_id,),
+    )
+    return cur.rowcount > 0
 
 
 def mark_stage(

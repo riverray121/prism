@@ -157,7 +157,13 @@ def main() -> None:
         except json.JSONDecodeError:
             log.warning("invalid JSON: %r", line)
             continue
-        handle(msg)
+        # One malformed/failing command (schema ValidationError, an unguarded DB
+        # OperationalError, a KeyError on a drifted profile) must not terminate the
+        # stdin loop and sever the whole command channel — log it and keep reading.
+        try:
+            handle(msg)
+        except Exception:
+            log.exception("command failed: %r", msg.get("type"))
     log.info("sidecar stdin closed, exiting")
 
 

@@ -161,12 +161,18 @@ def _now() -> str:
 
 
 def _claim_next() -> dict | None:
-    """Claim the oldest queued song, flipping it to 'analyzing'. Sole consumer."""
+    """Claim the oldest queued song, flipping it to 'analyzing'. Sole consumer.
+
+    The flip is guarded to ``status='queued'``; if a concurrent ``cancel_queued``
+    moved the row out of the queue between the SELECT and the UPDATE, the claim is
+    lost and we return None to re-poll rather than resurrecting a cancelled song.
+    """
     with library.connect() as con:
         row = library.next_queued(con)
         if row is None:
             return None
-        library.mark_analyzing(con, row["id"])
+        if not library.mark_analyzing(con, row["id"]):
+            return None  # lost the claim (cancelled between select and update)
     return dict(row)
 
 
@@ -332,15 +338,29 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
         storage.cleanup_partial(song_id)
         with library.connect() as con:
             library.mark_failed(con, song_id, str(exc))
-    on_change()  # reflect 'analyzed' or 'failed'
+    # Terminal snapshot (reflect 'analyzed'/'failed'). Guarded so a failure to emit
+    # — after the DB row is already final — doesn't propagate into the run() loop.
+    try:
+        on_change()
+    except Exception:
+        log.exception("terminal snapshot emit failed: %s", song_id)
 
 
 def run(on_change: Callable[[], None]) -> None:
-    """Loop forever, analyzing queued songs. on_change fires after each status change."""
+    """Loop forever, analyzing queued songs. on_change fires after each status change.
+
+    The loop body is the supervision boundary: a transient DB/IO error while claiming
+    (lock beyond timeout, disk error) must not kill this daemon thread and halt all
+    analysis for the process lifetime. Log it, back off briefly, and keep polling.
+    """
     log.info("worker started")
     while True:
-        song = _claim_next()
-        if song is None:
+        try:
+            song = _claim_next()
+            if song is None:
+                time.sleep(POLL_INTERVAL)
+                continue
+            _process(song, on_change)
+        except Exception:
+            log.exception("worker loop error; continuing")
             time.sleep(POLL_INTERVAL)
-            continue
-        _process(song, on_change)

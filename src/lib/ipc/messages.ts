@@ -81,6 +81,8 @@ export const SegmentFeatureSchema = z.object({
   render: z.literal("segment"),
   category: z.string(),
   source: z.string(),
+  // Present (="wip") on provisional segment features, e.g. motifs.
+  status: z.string().optional(),
   segments: z.array(SegmentSchema),
 });
 export type SegmentFeature = z.infer<typeof SegmentFeatureSchema>;
@@ -124,19 +126,37 @@ export const MixFeatureSchema = z.discriminatedUnion("render", [
 ]);
 export type MixFeature = z.infer<typeof MixFeatureSchema>;
 
+// A keyed map of feature envelopes parsed entry-by-entry: an unmodeled render
+// mode, a new sidecar field, or a single feature missing a required field drops
+// only that feature (logged), not the whole profile. A strict
+// z.record(MixFeatureSchema) would fail the entire record — and so the whole
+// inspection view — on any one bad envelope.
+const FeatureMapSchema = z.record(z.string(), z.unknown()).transform((raw) => {
+  const out: Record<string, MixFeature> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    const parsed = MixFeatureSchema.safeParse(value);
+    if (parsed.success) {
+      out[key] = parsed.data;
+    } else {
+      console.warn(`dropping unparseable feature '${key}'`, parsed.error);
+    }
+  }
+  return out;
+});
+
 // One separated stem: its audio file (relative to profile.json) plus the same
 // keyed feature map as the mix, so per-stem features render through the same
 // components. Keyed by engine, then stem (see docs/profile-schema.md).
 // A drum sub-stem (kick/snare/etc.): same shape as a stem, but never nested further.
 export const SubStemSchema = z.object({
   audio_file: z.string(),
-  features: z.record(z.string(), MixFeatureSchema),
+  features: FeatureMapSchema,
 });
 export type SubStem = z.infer<typeof SubStemSchema>;
 
 export const StemSchema = z.object({
   audio_file: z.string(),
-  features: z.record(z.string(), MixFeatureSchema),
+  features: FeatureMapSchema,
   // Present on a drums stem when drum sub-separation ran.
   substems: z.record(z.string(), SubStemSchema).optional(),
 });
@@ -158,7 +178,7 @@ export const ProfileSchema = z.object({
     frame_rate_hz: z.number(),
     frame_count: z.number(),
   }),
-  mix: z.record(z.string(), MixFeatureSchema),
+  mix: FeatureMapSchema,
   // engine -> stem -> Stem. Absent on pre-M4 profiles, so defaults to empty.
   stems: z.record(z.string(), z.record(z.string(), StemSchema)).default({}),
 });

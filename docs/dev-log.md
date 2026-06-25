@@ -40,6 +40,7 @@
 
 ## Todo
 
+- **M6 slice 0 — code review + high-severity fixes.** Multi-agent review of the full M1–M5 codebase (12 reviewers × subsystems/cross-cutting dimensions, each finding adversarially verified). 55 confirmed findings in `docs/code-review-m6.md`, ordered by severity with location + fix per entry. **Fixed so far:** H-1 (wrap `handle(msg)` so one bad command can't sever the IPC channel), H-2 (guard the queued→analyzing claim to `status='queued'`; `mark_analyzing` returns a won/lost bool, `_claim_next` re-polls on a lost claim), H-3 (`PRAGMA busy_timeout=5000` so contended writes wait instead of raising `database is locked`), H-4 (wrap the worker `run()` loop body as the supervision boundary), M-3 (guard the terminal `on_change()` emit), H-6 (per-feature zod parsing via `FeatureMapSchema` — one unparseable envelope drops only that feature, not the whole profile), L-FE4 (`status` modeled on `SegmentFeatureSchema`). **Still pending:** the remaining Medium/Low items and the H-5 four-graph consolidation (the planned M6 UI work).
 - **M2 COMPLETE.** All cheap, dependency-light mix-level DSP is done (24 features across scalar/continuous/event/heatmap). Every remaining catalog feature is explicitly reassigned in `build-order.md` — clean exit. Highlights of what moved:
   - `chords` (BTC transformer) + `downbeats` → **M3** (with the torch dependency).
   - Demucs + per-stem DSP + multi-stage worker → **M4**.
