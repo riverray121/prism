@@ -75,6 +75,7 @@ export const SegmentSchema = z
     start: z.number(),
     end: z.number(),
     label: z.string(),
+    confidence: z.number().optional(),
   })
   .passthrough();
 export const SegmentFeatureSchema = z.object({

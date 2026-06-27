@@ -6,8 +6,7 @@
 
   // Concrete graph for segment features: labeled time spans drawn as colored
   // bands on the shared time axis. Interaction mechanics mirror EventGraph /
-  // ContinuousGraph so the stacked graphs behave identically (shared-layer
-  // consolidation is deferred to M6).
+  // ContinuousGraph so the stacked graphs behave identically.
   let {
     segments,
     maxTimeSec,
@@ -162,10 +161,9 @@
               }
               ctx.stroke();
               // Label (with ML confidence when present) inside the band when it fits.
-              const conf = (seg as { confidence?: unknown }).confidence;
               const label =
-                typeof conf === "number"
-                  ? `${seg.label} ${Math.round(conf * 100)}%`
+                typeof seg.confidence === "number"
+                  ? `${seg.label} ${Math.round(seg.confidence * 100)}%`
                   : seg.label;
               if (label) {
                 const w = ctx.measureText(label).width;

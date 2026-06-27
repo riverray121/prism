@@ -13,13 +13,18 @@ stderr — e.g. a cancel that appears to do nothing for ~100s.
 
 import sys
 import threading
+from typing import Protocol
 
 _lock = threading.Lock()
 _OUT = sys.stdout
 
 
-def emit(event: object) -> None:
-    line = event.model_dump_json()  # type: ignore[attr-defined]
+class _Emittable(Protocol):
+    def model_dump_json(self) -> str: ...
+
+
+def emit(event: _Emittable) -> None:
+    line = event.model_dump_json()
     with _lock:
         _OUT.write(line + "\n")
         _OUT.flush()

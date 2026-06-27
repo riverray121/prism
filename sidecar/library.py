@@ -12,8 +12,8 @@ from collections.abc import Iterator
 
 from . import separation, storage
 
-# Full column set per docs/design-doc.md. Progress/analysis columns are nullable
-# and unused until later milestones.
+# Identity, import metadata, analysis status, and per-stage progress. Progress
+# columns are nullable — populated only while a song is analyzing.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS songs (
     id                     TEXT PRIMARY KEY,
@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS songs (
     queued_at              TEXT,
     status                 TEXT NOT NULL DEFAULT 'unanalyzed',
     current_stage          TEXT,
-    current_stage_progress REAL,
     current_engine         TEXT,
     current_step           INTEGER,
     total_steps            INTEGER,
@@ -55,8 +54,7 @@ _ADDED_COLUMNS = {
 # Nulls every in-progress column. Shared by the terminal transitions so adding a
 # progress column can't leave a stale value at one site.
 _CLEAR_PROGRESS = (
-    "current_stage=NULL, current_stage_progress=NULL, current_engine=NULL, "
-    "current_step=NULL, total_steps=NULL"
+    "current_stage=NULL, current_engine=NULL, current_step=NULL, total_steps=NULL"
 )
 
 

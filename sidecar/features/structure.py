@@ -1,9 +1,9 @@
 """Structural features from a shared self-similarity matrix (SSM).
 
-Pipeline (hand-rolled; see build-order M5 slice 2):
+Pipeline (hand-rolled):
 
   beat-synchronous chroma + MFCC
-    -> cosine affinity SSM            (shared: sections now, novelty/motifs in slice 3)
+    -> cosine affinity SSM            (shared by sections, novelty, motifs)
     -> Foote checkerboard novelty     -> section boundaries
     -> Laplacian spectral embedding   -> k-means grouping of the spans
     -> heuristic naming               -> intro/verse/chorus/drop/breakdown/outro

@@ -10,10 +10,6 @@ class ImportCommand(BaseModel):
     paths: list[str]
 
 
-class ListCommand(BaseModel):
-    type: Literal["library.list"]
-
-
 class QueueAddCommand(BaseModel):
     type: Literal["queue.add"]
     song_ids: list[str]
@@ -27,10 +23,6 @@ class QueueCancelCommand(BaseModel):
 class GetProfileCommand(BaseModel):
     type: Literal["profile.get"]
     song_id: str
-
-
-class GetSettingsCommand(BaseModel):
-    type: Literal["settings.get"]
 
 
 class UpdateSettingsCommand(BaseModel):

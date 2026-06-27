@@ -4,9 +4,8 @@
 
   import type { ContinuousFeature } from "$lib/ipc/messages";
 
-  // Concrete graph for any continuous feature (one value per timeline frame).
-  // A generic cross-render FeatureGraph waits until event/heatmap graphs also
-  // exist (see development.md); this only parameterizes the single line type.
+  // Concrete graph for any continuous feature (one value per timeline frame),
+  // parameterized over the single line type.
   let {
     feature,
     frameRateHz,
