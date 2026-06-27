@@ -218,17 +218,15 @@
         if (!e.ctrlKey) {
           e.preventDefault();
           const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+          // Normalize wheel deltas to pixels: line (deltaMode 1) and page
+          // (deltaMode 2) modes report coarse units rather than pixels.
+          const k =
+            e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
           if (!horizontal || range >= full - 1e-6) {
-            const k =
-              e.deltaMode === 1
-                ? 16
-                : e.deltaMode === 2
-                  ? window.innerHeight
-                  : 1;
             window.scrollBy(e.deltaX * k, e.deltaY * k);
             return;
           }
-          const dv = (e.deltaX * range) / (over.clientWidth || 1);
+          const dv = (e.deltaX * k * range) / (over.clientWidth || 1);
           let nmin = min + dv;
           let nmax = max + dv;
           if (nmin < 0) {

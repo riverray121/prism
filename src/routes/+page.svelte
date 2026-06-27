@@ -5,34 +5,28 @@
   import InspectionView from "$lib/components/InspectionView.svelte";
   import LibraryPanel from "$lib/components/LibraryPanel.svelte";
   import { getSettings, listLibrary, onSidecarEvent } from "$lib/ipc";
-  import { library } from "$lib/state/library.svelte";
+  import { applySidecarEvent } from "$lib/state/sidecar";
   import { inspection } from "$lib/state/inspection.svelte";
-  import { settings } from "$lib/state/settings.svelte";
 
-  // Subscribe to sidecar events and request the current library + settings on mount.
+  // Attach the sidecar-event listener, then request the current library +
+  // settings. The listener is awaited first so no reply emitted before it is
+  // attached can be dropped.
   onMount(() => {
-    const off = onSidecarEvent((event) => {
-      if (event.type === "library.songs") {
-        library.songs = event.songs;
-      } else if (event.type === "library.import_failed") {
-        console.error("import failed", event.path, event.error);
-      } else if (event.type === "profile") {
-        // Ignore stale responses if the user has since navigated away/elsewhere.
-        if (event.song_id === inspection.songId) {
-          inspection.profile = event.profile;
-          inspection.audioPath = event.audio_path;
-          inspection.songDir = event.song_dir;
-        }
-      } else if (event.type === "settings") {
-        settings.engines = event.engines;
-        settings.availableEngines = event.available_engines;
-        settings.drumSubsep = event.drum_subsep;
-        settings.loaded = true;
+    let off: (() => void) | undefined;
+    let stopped = false;
+    (async () => {
+      off = await onSidecarEvent(applySidecarEvent);
+      if (stopped) {
+        off();
+        return;
       }
-    });
-    listLibrary();
-    getSettings();
-    return off;
+      listLibrary();
+      getSettings();
+    })();
+    return () => {
+      stopped = true;
+      off?.();
+    };
   });
 </script>
 

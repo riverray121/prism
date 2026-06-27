@@ -9,6 +9,11 @@ struct Sidecar {
     stdin: Mutex<ChildStdin>,
 }
 
+// Handle to the running sidecar process, stored in Tauri state for lifecycle control.
+struct SidecarProcess {
+    child: Mutex<Child>,
+}
+
 // Write one JSON-line command to the sidecar's stdin.
 #[tauri::command]
 fn send_to_sidecar(sidecar: State<Sidecar>, message: String) -> Result<(), String> {
@@ -18,8 +23,16 @@ fn send_to_sidecar(sidecar: State<Sidecar>, message: String) -> Result<(), Strin
     Ok(())
 }
 
-// Spawn the Python sidecar and forward its stdout lines to the frontend as events.
-fn spawn_sidecar(app: &AppHandle) -> Child {
+// Strip a trailing CRLF/LF from a read buffer.
+fn trim_newline(buf: &mut Vec<u8>) {
+    while matches!(buf.last(), Some(b'\n') | Some(b'\r')) {
+        buf.pop();
+    }
+}
+
+// Spawn the Python sidecar and forward its stdout/stderr to the frontend as events.
+// Returns the child handle (with stdin still attached) or the spawn error.
+fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
     // Dev-only: run from source at the repo root (parent of src-tauri).
     // Bundling will replace this with a frozen binary (deferred to M3+).
     let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -32,25 +45,63 @@ fn spawn_sidecar(app: &AppHandle) -> Child {
         .current_dir(&repo_root)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .spawn()
-        .expect("failed to spawn sidecar");
+        .stderr(Stdio::piped())
+        .spawn()?;
 
-    let stdout = child.stdout.take().expect("sidecar stdout piped");
-    let app = app.clone();
-    // Read sidecar stdout line-by-line on a background thread; forward each line to the frontend.
-    std::thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            match line {
-                Ok(line) => {
-                    let _ = app.emit("sidecar-message", line);
+    // Forward sidecar stdout line-by-line to the frontend on a background thread.
+    // Reads bytes and decodes lossily so one invalid line does not sever the stream;
+    // a read error emits sidecar-error, and EOF emits sidecar-exited with the exit code.
+    if let Some(stdout) = child.stdout.take() {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            let mut reader = BufReader::new(stdout);
+            let mut buf = Vec::new();
+            loop {
+                buf.clear();
+                match reader.read_until(b'\n', &mut buf) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        trim_newline(&mut buf);
+                        let line = String::from_utf8_lossy(&buf).into_owned();
+                        let _ = app.emit("sidecar-message", line);
+                    }
+                    Err(e) => {
+                        let _ = app.emit("sidecar-error", e.to_string());
+                        break;
+                    }
                 }
-                Err(_) => break,
             }
-        }
-    });
+            // Sidecar stdout closed: reap the process and report its exit code.
+            let code = app
+                .try_state::<SidecarProcess>()
+                .and_then(|s| s.child.lock().ok().and_then(|mut c| c.wait().ok()))
+                .and_then(|status| status.code());
+            let _ = app.emit("sidecar-exited", code);
+        });
+    }
 
-    child
+    // Forward sidecar stderr to the parent log and the frontend for diagnostics.
+    if let Some(stderr) = child.stderr.take() {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            let mut reader = BufReader::new(stderr);
+            let mut buf = Vec::new();
+            loop {
+                buf.clear();
+                match reader.read_until(b'\n', &mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        trim_newline(&mut buf);
+                        let line = String::from_utf8_lossy(&buf).into_owned();
+                        eprintln!("[sidecar] {}", line);
+                        let _ = app.emit("sidecar-stderr", line);
+                    }
+                }
+            }
+        });
+    }
+
+    Ok(child)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -59,13 +110,27 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let mut child = spawn_sidecar(app.handle());
-            let stdin = child.stdin.take().expect("sidecar stdin piped");
-            app.manage(Sidecar {
-                stdin: Mutex::new(stdin),
-            });
-            // Keep the child handle alive for the app's lifetime.
-            app.manage(Mutex::new(child));
+            // Spawn the sidecar; on failure surface an error and keep the app running.
+            match spawn_sidecar(app.handle()) {
+                Ok(mut child) => {
+                    if let Some(stdin) = child.stdin.take() {
+                        app.manage(Sidecar {
+                            stdin: Mutex::new(stdin),
+                        });
+                    } else {
+                        let _ = app.emit("sidecar-error", "sidecar stdin unavailable".to_string());
+                    }
+                    // Store the child so the stdout thread can reap it and report its exit code.
+                    app.manage(SidecarProcess {
+                        child: Mutex::new(child),
+                    });
+                }
+                Err(e) => {
+                    let message = format!("failed to spawn sidecar: {e}");
+                    eprintln!("{message}");
+                    let _ = app.emit("sidecar-error", message);
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![send_to_sidecar])

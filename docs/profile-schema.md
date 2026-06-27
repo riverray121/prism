@@ -133,7 +133,7 @@ Sampled on the implicit 100 Hz timeline. `data` length equals `timeline.frame_co
 }
 ```
 
-ML continuous features may add a parallel `confidence` array of equal length. WIP features add `"status": "wip"`.
+ML continuous features may add a parallel `confidence` array of equal length (planned — no extractor emits one yet; `pitch_confidence` is a separate feature, not a sibling array, and the zod loader does not model it). WIP features add `"status": "wip"`.
 
 `timbral_axes` is realized as three separate continuous features, each a 0–1 per-frame contrast between two groups of PANNs class probabilities (0.5 = balanced / nothing detected): `electronic_organic`, `percussive_tonal`, `instrumental_vocal` (value → 1 favors the second pole). v1 omits the confidence array.
 
@@ -242,12 +242,14 @@ Stem WAVs are referenced from `stems.{engine}.{stem}.audio_file`, same rules app
 - `schema_version` follows semver.
 - **Minor bumps:** backward-compatible additions — new optional fields, new features in the catalog.
 - **Major bumps:** breaking changes — renamed/removed fields, changed semantics, changed sidecar conventions.
-- Loaders check the major version on load and refuse unknown majors.
+- Intended: loaders check the major version on load and refuse unknown majors. **Not yet enforced** — the sidecar `read_profile` and the frontend zod loader currently parse `schema_version` as a plain string without a major-version gate. Add the check at the load boundary when schema migrations become real.
 - Current: `0.1.0`.
 
 ---
 
 ## Confidence
+
+> Status: the per-entry `confidence` on `event`/`segment`/`scalar` features is emitted today; the parallel `confidence` array on `continuous` features is planned but not yet produced by any extractor.
 
 - **DSP features:** omit `confidence` entirely.
 - **ML `continuous` features:** parallel `confidence` array, same length as `data`.
@@ -263,6 +265,8 @@ Features marked `[WIP]` in the catalog carry `"status": "wip"` in the profile. L
 ---
 
 ## Favorites
+
+> **Not yet implemented** (an M6 deliverable). No code emits or models a top-level `favorites` array yet; the example above shows the planned shape.
 
 - Array of dot-path strings referencing canonical feature locations.
 - Examples: `"mix.beats"`, `"stems.htdemucs_ft.bass.features.pitch"`, `"mix.sections"`.

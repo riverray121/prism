@@ -154,11 +154,12 @@ def panns_features(
 
     # sound_tags: every curated class, plus any other class peaking high.
     curated_ix = [name_to_ix[n] for n in _CURATED if n in name_to_ix]
+    curated_set = set(curated_ix)
     peaks = framewise.max(axis=0)
     extra_ix = [
         i
         for i in np.argsort(peaks)[::-1]
-        if peaks[i] >= TOPK_THRESHOLD and i not in set(curated_ix)
+        if peaks[i] >= TOPK_THRESHOLD and i not in curated_set
     ]
     row_ix = curated_ix + extra_ix
     matrix = np.empty((len(row_ix), frame_count), dtype=np.float32)

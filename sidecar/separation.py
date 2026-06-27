@@ -70,12 +70,18 @@ def _run_separator(source: Path, out_dir: Path, model_filename: str) -> dict[str
         outputs = sep.separate(str(source))
 
     # Rename each output to a canonical lowercase stem name so downstream paths
-    # are uniform across engines (stems.{engine}.{stem}).
+    # are uniform across engines (stems.{engine}.{stem}). Whitespace in a label
+    # (e.g. "No Vocals") collapses to '_' so it can't break the {stem}.wav path or
+    # the stem_name == "drums" sub-sep branch.
     stems: dict[str, Path] = {}
     for name in outputs:
         src = out_dir / name
         match = _STEM_RE.search(name)
-        stem = (match.group(1) if match else Path(name).stem).lower()
+        label = match.group(1) if match else Path(name).stem
+        stem = re.sub(r"\s+", "_", label.strip()).lower()
+        # Two outputs canonicalizing to the same key would silently drop a stem.
+        if stem in stems:
+            raise ValueError(f"stem name collision: {stem!r} from {name!r}")
         dest = out_dir / f"{stem}.wav"
         if src.resolve() != dest.resolve():
             src.replace(dest)

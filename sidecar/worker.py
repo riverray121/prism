@@ -12,6 +12,7 @@ Stage + discrete step (engine k of total) are written to the song row
 pure function of snapshots. No cross-song parallelism.
 """
 
+import gc
 import logging
 import time
 from collections.abc import Callable
@@ -20,7 +21,7 @@ from datetime import datetime, timezone
 import librosa
 import numpy as np
 
-from . import library, separation, storage
+from . import library, models, separation, storage
 from .features import (
     amplitude,
     chords,
@@ -38,6 +39,11 @@ log = logging.getLogger("sidecar.worker")
 
 # Seconds to wait between queue polls when idle.
 POLL_INTERVAL = 1.0
+
+# Models every analysis needs (chords + PANNs tags/axes). Ensured up front so a
+# missing/unreachable checkpoint fails the song before the expensive mix pass
+# rather than partway through. Separation engines fetch their own weights.
+_REQUIRED_MODELS = ["btc_large_voca", "panns_cnn14_sed"]
 
 # Target frame rate for continuous features; the actual rate is sr/hop. n_fft is
 # the STFT window shared across frequency features.
@@ -245,11 +251,13 @@ def _separate_and_analyze_stems(
         )
         stem_paths = separation.separate(audio_path, stems_root / engine, engine)
 
+        # One dsp-stem transition per engine; the per-stem loop carries no new
+        # stage info, so don't re-emit it for every stem.
+        _set_stage(
+            song_id, "dsp-stem", on_change, engine=engine, step=i + 1, total=total
+        )
         engine_stems: dict[str, dict] = {}
         for stem_name, path in stem_paths.items():
-            _set_stage(
-                song_id, "dsp-stem", on_change, engine=engine, step=i + 1, total=total
-            )
             entry = _stem_entry(
                 song_id,
                 path,
@@ -260,7 +268,8 @@ def _separate_and_analyze_stems(
                 engine,
                 f"stems/{engine}/{stem_name}.wav",
             )
-            # Second stage: split the drums stem into kick/snare/etc.
+            # Second stage: split the drums stem into kick/snare/etc. Shown as a
+            # distinct transient, then dsp-stem is restored for the remaining stems.
             if drum_subsep and stem_name == "drums":
                 _set_stage(
                     song_id,
@@ -295,6 +304,10 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
     song_id = song["id"]
     on_change()  # reflect 'analyzing'
     try:
+        # Fail fast if a required model is missing/unreachable, before any work.
+        for model_name in _REQUIRED_MODELS:
+            models.ensure(model_name)
+
         audio_path = storage.LIBRARY_ROOT / song["source_path"]
         # Load once, keeping channels for spatial features; derive mono for the rest.
         y_stereo, sr = librosa.load(audio_path, mono=False)
@@ -307,6 +320,11 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
         frame_rate_hz, frame_count, mix, heatmaps = _analyze(y, y_stereo, sr)
         for name, matrix in heatmaps.items():
             storage.write_heatmap(song_id, name, matrix)
+
+        # Release the large mix-stage arrays (~150–200 MB) before separation — the
+        # most memory-hungry phase; the stem stage reloads stems from disk.
+        del y, y_stereo, heatmaps
+        gc.collect()
 
         # Stages: separation + per-stem DSP across the configured engine set.
         stems = _separate_and_analyze_stems(

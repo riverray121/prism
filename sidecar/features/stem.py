@@ -7,8 +7,9 @@ worker writes those to .npy sidecars). Continuous features and heatmaps are
 truncated to the song's shared ``frame_count`` so every stem overlays on the
 100 Hz timeline.
 
-Slice 1 set: energy (RMS), spectral_centroid, mfcc (heatmap). Onsets, transient
-sharpness, pitch, and vibrato arrive in a later slice.
+Feature set: energy (RMS), spectral_centroid, onsets, transient sharpness, and an
+MFCC heatmap for every stem; a pitch contour (pYIN) for non-percussion stems; and
+vibrato for vocals.
 """
 
 import librosa

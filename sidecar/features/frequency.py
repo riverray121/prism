@@ -49,6 +49,8 @@ def spectral_rolloff(S: np.ndarray, sr: int) -> dict:
 def spectral_flatness(S: np.ndarray) -> dict:
     """Tonal (0) vs. noisy (1): geometric-to-arithmetic mean ratio of the spectrum."""
     f = librosa.feature.spectral_flatness(S=S)[0]
+    # Silent frames can return slightly above 1.0; clamp to the declared range.
+    f = np.clip(f, 0.0, 1.0)
     return _continuous("librosa", "normalized", f, [0, 1])
 
 

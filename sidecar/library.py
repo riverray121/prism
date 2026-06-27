@@ -52,6 +52,13 @@ _ADDED_COLUMNS = {
     "total_steps": "INTEGER",
 }
 
+# Nulls every in-progress column. Shared by the terminal transitions so adding a
+# progress column can't leave a stale value at one site.
+_CLEAR_PROGRESS = (
+    "current_stage=NULL, current_stage_progress=NULL, current_engine=NULL, "
+    "current_step=NULL, total_steps=NULL"
+)
+
 
 @contextmanager
 def connect() -> Iterator[sqlite3.Connection]:
@@ -208,11 +215,9 @@ def mark_stage(
 
 def mark_analyzed(con: sqlite3.Connection, song_id: str, analyzed_at: str) -> None:
     con.execute(
-        """
+        f"""
         UPDATE songs
-        SET status='analyzed', analyzed_at=?,
-            current_stage=NULL, current_engine=NULL,
-            current_step=NULL, total_steps=NULL
+        SET status='analyzed', analyzed_at=?, {_CLEAR_PROGRESS}
         WHERE id=?
         """,
         (analyzed_at, song_id),
@@ -220,12 +225,14 @@ def mark_analyzed(con: sqlite3.Connection, song_id: str, analyzed_at: str) -> No
 
 
 def mark_failed(con: sqlite3.Connection, song_id: str, error_message: str) -> None:
+    # Clear analyzed_at: a failed run leaves no complete profile, so a later
+    # cancel-after-requeue must not restore this row to 'analyzed' (cleanup_partial
+    # has dropped its stems/heatmaps). analyzed_at is the authoritative "complete
+    # profile exists" flag.
     con.execute(
-        """
+        f"""
         UPDATE songs
-        SET status='failed', error_message=?,
-            current_stage=NULL, current_engine=NULL,
-            current_step=NULL, total_steps=NULL
+        SET status='failed', error_message=?, analyzed_at=NULL, {_CLEAR_PROGRESS}
         WHERE id=?
         """,
         (error_message, song_id),
@@ -245,11 +252,9 @@ def fail_interrupted(con: sqlite3.Connection, error_message: str) -> list[str]:
     ]
     if ids:
         con.execute(
-            """
+            f"""
             UPDATE songs
-            SET status='failed', error_message=?,
-                current_stage=NULL, current_engine=NULL,
-                current_step=NULL, total_steps=NULL
+            SET status='failed', error_message=?, analyzed_at=NULL, {_CLEAR_PROGRESS}
             WHERE status='analyzing'
             """,
             (error_message,),
@@ -261,9 +266,18 @@ def fail_interrupted(con: sqlite3.Connection, error_message: str) -> list[str]:
 
 
 def get_setting(con: sqlite3.Connection, key: str, default=None):
-    """Return a JSON-decoded setting value, or ``default`` if unset."""
+    """Return a JSON-decoded setting value, or ``default`` if unset.
+
+    Falls back to ``default`` on a malformed/empty stored value so external
+    corruption can't break engine/drum-subsep resolution.
+    """
     row = con.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
-    return json.loads(row["value"]) if row is not None else default
+    if row is None:
+        return default
+    try:
+        return json.loads(row["value"])
+    except (json.JSONDecodeError, TypeError):
+        return default
 
 
 def set_setting(con: sqlite3.Connection, key: str, value) -> None:

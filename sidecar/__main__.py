@@ -8,11 +8,9 @@ from pathlib import Path
 from . import ipc, library, metadata, separation, storage, worker
 from .schema import (
     GetProfileCommand,
-    GetSettingsCommand,
     ImportCommand,
     ImportFailedEvent,
     LibrarySongsEvent,
-    ListCommand,
     ProfileEvent,
     QueueAddCommand,
     QueueCancelCommand,
@@ -88,7 +86,6 @@ def handle(msg: dict) -> None:
                 ipc.emit(ImportFailedEvent(path=path_str, error=str(exc)))
         emit_snapshot()
     elif msg_type == "library.list":
-        ListCommand.model_validate(msg)
         emit_snapshot()
     elif msg_type == "queue.add":
         cmd = QueueAddCommand.model_validate(msg)
@@ -118,8 +115,11 @@ def handle(msg: dict) -> None:
             )
         except FileNotFoundError:
             log.warning("no profile for %s", cmd.song_id)
+        except (KeyError, TypeError, json.JSONDecodeError):
+            # A schema-drifted or partially-written profile (missing keys, bad
+            # JSON) shouldn't take down the command channel — log and skip.
+            log.warning("malformed profile for %s", cmd.song_id)
     elif msg_type == "settings.get":
-        GetSettingsCommand.model_validate(msg)
         emit_settings()
     elif msg_type == "settings.update":
         cmd = UpdateSettingsCommand.model_validate(msg)

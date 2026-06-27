@@ -121,6 +121,16 @@ def compute_chords(y: np.ndarray, sr: int) -> dict:
     if sr != SONG_HZ:
         y = librosa.resample(y, orig_sr=sr, target_sr=SONG_HZ)
 
+    # A signal shorter than one CQT block yields no feature frames; the blocked
+    # CQT would then concatenate an empty list. Report no chords instead.
+    if len(y) < HOP_LENGTH:
+        return {
+            "render": "event",
+            "category": "tonal",
+            "source": "btc",
+            "events": [],
+        }
+
     model, mean, std = _load_model()
 
     feature = (_cqt_features(y) - mean) / std

@@ -271,17 +271,15 @@
         if (!e.ctrlKey) {
           e.preventDefault();
           const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+          // Normalize wheel deltas to pixels: line (deltaMode 1) and page
+          // (deltaMode 2) modes report coarse units rather than pixels.
+          const k =
+            e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
           if (!horizontal || range >= full - 1e-6) {
-            const k =
-              e.deltaMode === 1
-                ? 16
-                : e.deltaMode === 2
-                  ? window.innerHeight
-                  : 1;
             window.scrollBy(e.deltaX * k, e.deltaY * k);
             return;
           }
-          const dv = (e.deltaX * range) / (over.clientWidth || 1);
+          const dv = (e.deltaX * k * range) / (over.clientWidth || 1);
           let nmin = min + dv;
           let nmax = max + dv;
           if (nmin < 0) {
@@ -328,12 +326,16 @@
     offscreen = null;
     let cancelled = false;
     (async () => {
-      const resp = await fetch(convertFileSrc(p));
-      const buf = await resp.arrayBuffer();
-      const m = parseNpy(buf);
-      if (cancelled) return;
-      offscreen = buildOffscreen(m);
-      matrix = m;
+      try {
+        const resp = await fetch(convertFileSrc(p));
+        const buf = await resp.arrayBuffer();
+        const m = parseNpy(buf);
+        if (cancelled) return;
+        offscreen = buildOffscreen(m);
+        matrix = m;
+      } catch (e) {
+        if (!cancelled) console.error("heatmap load failed", p, e);
+      }
     })();
     return () => {
       cancelled = true;

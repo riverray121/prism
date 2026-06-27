@@ -76,6 +76,12 @@ def ssm(
     grid = librosa.frames_to_time(frames, sr=sr, hop_length=HOP)
     grid[0], grid[-1] = 0.0, duration
 
+    # Ultra-short clips collapse to a single cell, leaving no inner boundaries to
+    # sync on (a 0-column feature array). Report one full-song segment with a
+    # trivially self-similar 1x1 SSM and let novelty be zero.
+    if len(grid) - 1 <= 1:
+        return np.ones((1, 1)), np.array([0.0, duration])
+
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=HOP)
     # Drop MFCC 0 (overall energy, which would dominate the cosine) and z-score
     # each coefficient across time so all contribute comparably. The absolute
@@ -87,8 +93,8 @@ def ssm(
         mfcc.std(axis=1, keepdims=True) + 1.0
     )
     # Aggregate over cells (median is robust to transients). sync splits around
-    # the given indices, so passing only the inner boundaries yields exactly one
-    # column per cell.
+    # the given indices, so passing only the inner boundaries yields one column
+    # per cell (the ultra-short single-cell case is handled above).
     inner = frames[1:-1]
     chroma_sync = librosa.util.sync(chroma, inner, aggregate=np.median)
     mfcc_sync = librosa.util.sync(mfcc, inner, aggregate=np.median)
@@ -334,7 +340,8 @@ def _motifs(s: np.ndarray, grid: np.ndarray) -> dict:
     if n > MIN_MOTIF_CELLS:
         rec = _recurrence(s)
         rec = np.where(rec >= float(np.median(s)) + MOTIF_CONTRAST, rec, 0.0)
-        found: list[tuple[float, int, int, int]] = []  # (score, i0, length, lag)
+        # (score, i0, length, lag, strength)
+        found: list[tuple[float, int, int, int, float]] = []
         for lag in range(MIN_MOTIF_CELLS, n - MIN_MOTIF_CELLS + 1):
             diag = np.diag(rec, k=lag)
             for r0, r1 in _runs(diag > 0):
@@ -342,11 +349,10 @@ def _motifs(s: np.ndarray, grid: np.ndarray) -> dict:
                 if length < MIN_MOTIF_CELLS:
                     continue
                 strength = float(diag[r0 : r0 + length].mean())
-                found.append((strength * length, r0, length, lag))
+                found.append((strength * length, r0, length, lag, strength))
         # Strongest pairs only; bounds the O(m^2) overlap clustering below.
         found.sort(reverse=True)
-        for _, i0, length, lag in found[:MOTIF_PAIR_CAP]:
-            strength = float(np.diag(rec, k=lag)[i0 : i0 + length].mean())
+        for _, i0, length, lag, strength in found[:MOTIF_PAIR_CAP]:
             a = len(occs)
             occs.append((i0, i0 + length, strength))
             b = len(occs)

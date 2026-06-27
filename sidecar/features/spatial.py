@@ -18,8 +18,13 @@ def stereo_width(y_stereo: np.ndarray, sr: int, hop: int) -> dict:
     side = (left - right) / 2.0
 
     def frame_rms(x: np.ndarray) -> np.ndarray:
-        frames = librosa.util.frame(x, frame_length=hop, hop_length=hop)
-        return np.sqrt(np.mean(frames**2, axis=0)) if frames.size else np.array([])
+        if len(x) < hop:  # sub-hop signal: no frame to measure
+            return np.array([])
+        # Center each frame on its timeline position (frame i centered at i*hop)
+        # by padding half a hop on both sides, matching the centered features.
+        padded = np.pad(x, hop // 2, mode="constant")
+        frames = librosa.util.frame(padded, frame_length=hop, hop_length=hop)
+        return np.sqrt(np.mean(frames**2, axis=0))
 
     mid_rms = frame_rms(mid)
     side_rms = frame_rms(side)

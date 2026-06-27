@@ -42,6 +42,16 @@ _REGISTRY = {
 }
 
 
+# Timeout (seconds) for each socket operation during a model download, so a
+# stalled connection fails instead of wedging the worker thread indefinitely.
+_DOWNLOAD_TIMEOUT = 60
+
+# Paths verified this process. Hashing a multi-hundred-MB checkpoint (~0.5–1.5s)
+# on every call just to confirm an unchanged file is wasteful; verify once, then
+# trust the path for the process lifetime.
+_verified: set[Path] = set()
+
+
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -54,7 +64,10 @@ def ensure(name: str) -> Path:
     """Return the local path to model ``name``, downloading + verifying if needed."""
     entry = _REGISTRY[name]
     dest = MODELS_DIR / entry["filename"]
+    if dest in _verified and dest.exists():
+        return dest
     if dest.exists() and _sha256(dest) == entry["sha256"]:
+        _verified.add(dest)
         return dest
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -63,7 +76,8 @@ def ensure(name: str) -> Path:
     fd, tmp_name = tempfile.mkstemp(dir=MODELS_DIR, suffix=".part")
     tmp = Path(tmp_name)
     try:
-        with os.fdopen(fd, "wb") as out, urllib.request.urlopen(entry["url"]) as resp:
+        resp_ctx = urllib.request.urlopen(entry["url"], timeout=_DOWNLOAD_TIMEOUT)
+        with os.fdopen(fd, "wb") as out, resp_ctx as resp:
             while chunk := resp.read(1 << 20):
                 out.write(chunk)
         actual = _sha256(tmp)
@@ -74,5 +88,6 @@ def ensure(name: str) -> Path:
         tmp.replace(dest)
     finally:
         tmp.unlink(missing_ok=True)
+    _verified.add(dest)
     log.info("model %s ready at %s", name, dest)
     return dest

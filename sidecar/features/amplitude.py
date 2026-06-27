@@ -26,8 +26,15 @@ def rms(y: np.ndarray, sr: int, hop: int) -> dict:
 
 def peak(y: np.ndarray, sr: int, hop: int) -> dict:
     """Sample-peak envelope: max absolute sample per frame, normalized to 0-1."""
-    frames = librosa.util.frame(y, frame_length=hop, hop_length=hop)
-    p = np.abs(frames).max(axis=0) if frames.size else np.array([])
+    if len(y) < hop:  # sub-hop signal: no frame to measure
+        p = np.array([])
+    else:
+        # Center each frame on its timeline position (frame i centered at i*hop)
+        # by padding half a hop on both sides, so the count and alignment match
+        # the centered continuous features.
+        padded = np.pad(y, hop // 2, mode="constant")
+        frames = librosa.util.frame(padded, frame_length=hop, hop_length=hop)
+        p = np.abs(frames).max(axis=0)
     top = float(p.max()) if p.size else 0.0
     normalized = (p / top) if top > 0 else p
     return {

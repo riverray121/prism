@@ -40,7 +40,18 @@ export function parseNpy(buffer: ArrayBuffer): Npy {
     .filter((s) => s.length > 0)
     .map(Number);
 
+  // A scalar (empty shape) is not a valid heatmap/tags matrix.
+  if (shape.length === 0) throw new Error("truncated .npy: empty shape ()");
+
+  // Validate the declared shape fits the buffer before constructing the view,
+  // so a truncated sidecar fails with context instead of a bare RangeError.
   const count = shape.reduce((a, b) => a * b, 1);
-  const data = new Float32Array(buffer, headerStart + headerLen, count);
+  const off = headerStart + headerLen;
+  if (off + count * 4 > buffer.byteLength)
+    throw new Error(
+      `truncated .npy: shape (${shape.join(", ")}) needs ${count * 4} bytes ` +
+        `at offset ${off}, buffer has ${buffer.byteLength}`,
+    );
+  const data = new Float32Array(buffer, off, count);
   return { shape, data };
 }

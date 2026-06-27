@@ -23,10 +23,9 @@ def _first_tag(audio: mutagen.FileType, key: str) -> str | None:
     """Return the first value of an easy tag, or None if absent."""
     if audio.tags is None or key not in audio.tags:
         return None
+    # easy=True normalizes every tag value to a list.
     value = audio.tags[key]
-    if isinstance(value, list):
-        return str(value[0]) if value else None
-    return str(value)
+    return str(value[0]) if value else None
 
 
 def _from_filename(path: Path) -> tuple[str, str]:

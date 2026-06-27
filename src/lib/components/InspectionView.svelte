@@ -60,6 +60,12 @@
     return audioFile ? `${inspection.songDir}/${audioFile}` : null;
   }
 
+  // Resolve a relative sidecar path (heatmap/tags .npy) to its absolute URL.
+  // Call sites gate on inspection.songDir being set.
+  function sidecarUrl(sidecar: string): string {
+    return `${inspection.songDir}/${sidecar}`;
+  }
+
   // Decode a file to an AudioBuffer, caching by path.
   async function loadBuffer(path: string): Promise<AudioBuffer> {
     const cached = buffers.get(path);
@@ -211,7 +217,9 @@
     const token = loadToken;
     (async () => {
       const buf = await loadBuffer(path);
-      if (token === loadToken) activeBuffer = buf;
+      // Only adopt the pre-decoded mix if it is still the active source; a stem
+      // soloed before this resolves must keep its own buffer.
+      if (token === loadToken && activeKey === "mix") activeBuffer = buf;
     })();
   });
 
@@ -483,7 +491,7 @@
             >
           </p>
           <HeatmapGraph
-            path={`${inspection.songDir}/${feature.sidecar}`}
+            path={sidecarUrl(feature.sidecar)}
             frameRateHz={inspection.profile.timeline.frame_rate_hz}
             normalize={name === "spectrogram" ? "global" : "per-row"}
             playheadSec={currentTime}
@@ -539,7 +547,7 @@
             >
           </p>
           <TagsGraph
-            path={`${inspection.songDir}/${feature.sidecar}`}
+            path={sidecarUrl(feature.sidecar)}
             labels={feature.labels}
             frameRateHz={inspection.profile.timeline.frame_rate_hz}
             playheadSec={currentTime}
@@ -677,7 +685,7 @@
           >
         </p>
         <HeatmapGraph
-          path={`${inspection.songDir}/${feature.sidecar}`}
+          path={sidecarUrl(feature.sidecar)}
           {frameRateHz}
           normalize="per-row"
           playheadSec={currentTime}

@@ -42,12 +42,12 @@ export function updateSettings(update: {
 
 // Subscribe to validated sidecar events. Each stdout line is parsed and checked
 // against the schema; malformed or unknown lines are logged and dropped.
-// Returns an unsubscribe function.
-export function onSidecarEvent(
+// Resolves once the listener is attached, with an unsubscribe function — await
+// it before issuing commands so no events emitted before attachment are dropped.
+export async function onSidecarEvent(
   handler: (event: SidecarEvent) => void,
-): () => void {
-  let active = true;
-  const unlisten = listen<string>("sidecar-message", (event) => {
+): Promise<() => void> {
+  const unlisten = await listen<string>("sidecar-message", (event) => {
     let json: unknown;
     try {
       json = JSON.parse(event.payload);
@@ -62,11 +62,5 @@ export function onSidecarEvent(
     }
     handler(result.data);
   });
-  unlisten.then((fn) => {
-    if (!active) fn();
-  });
-  return () => {
-    active = false;
-    unlisten.then((fn) => fn());
-  };
+  return unlisten;
 }

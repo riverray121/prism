@@ -26,7 +26,9 @@ def _best_key(mean_chroma: np.ndarray) -> tuple[str, float]:
         for profile, quality in ((_MAJOR, "major"), (_MINOR, "minor")):
             rotated = np.roll(profile, tonic)
             corr = float(np.corrcoef(mean_chroma, rotated)[0, 1])
-            if corr > best_corr:
+            # A silent/constant chroma yields a NaN correlation; skip it so a
+            # non-finite value can never become the best match.
+            if np.isfinite(corr) and corr > best_corr:
                 best_corr = corr
                 best_name = f"{_PITCH_CLASSES[tonic]} {quality}"
     return best_name, best_corr

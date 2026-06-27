@@ -6,7 +6,9 @@ dir (deferred). See ``docs/profile-schema.md`` for the full on-disk layout.
 """
 
 import json
+import os
 import shutil
+import tempfile
 from pathlib import Path
 from uuid import uuid4
 
@@ -74,7 +76,19 @@ def write_profile(
         "stems": stems or {},
     }
     path = SONGS_DIR / song["id"] / "profile.json"
-    path.write_text(json.dumps(profile, indent=2))
+    # Write to a sibling temp file then atomically rename, so a kill/full disk
+    # mid-write can't leave a truncated profile.json that read_profile chokes on.
+    # allow_nan=False makes any non-finite leak fail loudly here rather than emit
+    # non-standard JSON tokens.
+    text = json.dumps(profile, indent=2, allow_nan=False)
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w") as out:
+            out.write(text)
+        tmp.replace(path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:
@@ -95,18 +109,15 @@ def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:
 
 
 def cleanup_partial(song_id: str) -> None:
-    """Remove partial separation output for a failed song so a retry starts clean.
+    """Remove partial analysis output for a failed song so a retry starts clean.
 
-    Drops the whole ``stems/`` tree and per-engine heatmap subdirs; mix-level
-    .npy sidecars are left (they're overwritten on retry and harmless if stale).
+    Drops the whole ``stems/`` and ``heatmaps/`` trees. The mix pass rewrites the
+    top-level heatmaps before separation on retry, so removing them costs nothing
+    and avoids leaking sidecars for a never-retried failed song.
     """
     song_dir = SONGS_DIR / song_id
     shutil.rmtree(song_dir / "stems", ignore_errors=True)
-    heatmaps_dir = song_dir / "heatmaps"
-    if heatmaps_dir.is_dir():
-        for child in heatmaps_dir.iterdir():
-            if child.is_dir():  # per-engine stem-heatmap subdir
-                shutil.rmtree(child, ignore_errors=True)
+    shutil.rmtree(song_dir / "heatmaps", ignore_errors=True)
 
 
 def read_profile(song_id: str) -> dict:
