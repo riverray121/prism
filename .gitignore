@@ -19,6 +19,3 @@ __pycache__/
 
 # Local scratch audio for development/testing
 /test-audio
-
-# Per-milestone dev logs are local working context, not tracked
-docs/**/log.md
