@@ -1,6 +1,6 @@
 # Feature Catalog
 
-Canonical enumeration of every feature extracted by the analysis pipeline. The design doc (`design-doc.md`) references this file. For architecture and rationale, start there.
+Canonical enumeration of every feature extracted by the analysis pipeline. The design doc (`milestone-1-analysis-pipeline/design.md`) references this file. For architecture and rationale, start there.
 
 ## Conventions
 
@@ -96,7 +96,7 @@ ML features carry a per-frame `confidence`. DSP features omit it.
 
 ## Per-stem features
 
-Stems come from the multi-engine separation stage (see `design-doc.md` and `build-order.md`): a configured set of engines via `audio-separator`, each producing its native stem set. Every stem, for every engine, is written as a WAV and referenced from the JSON profile by path, and gets the full feature pass below — so the same features can be compared across engines for the same stem.
+Stems come from the multi-engine separation stage (see `milestone-1-analysis-pipeline/design.md` and `milestone-1-analysis-pipeline/implementation.md`): a configured set of engines via `audio-separator`, each producing its native stem set. Every stem, for every engine, is written as a WAV and referenced from the JSON profile by path, and gets the full feature pass below — so the same features can be compared across engines for the same stem.
 
 ### Common — every stem
 

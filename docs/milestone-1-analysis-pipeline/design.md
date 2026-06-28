@@ -241,7 +241,7 @@ A per-feature **Y-axis dropdown** switches between that feature's dimensions (e.
 
 - [`feature-catalog.md`](./feature-catalog.md) — canonical list of every feature extracted, with render mode, source, units, scope
 - [`profile-schema.md`](./profile-schema.md) — JSON profile spec, disk layout, sidecar conventions, versioning
-- [`build-order.md`](./build-order.md) — milestones from scaffolding to v1
+- [`implementation.md`](./implementation.md) — the build as thin vertical slices
 
 ## Open Decisions
 

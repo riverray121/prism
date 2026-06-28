@@ -1,6 +1,6 @@
 """Download-on-first-run registry for pretrained model weights.
 
-Weights are large opaque binaries and never live in git (see docs/dev-log.md).
+Weights are large opaque binaries and never live in git.
 Each model is fetched on first use into a gitignored cache in the app-data dir
 and checksum-verified, so a truncated or tampered download fails loudly instead
 of corrupting analysis downstream. ``ensure(name)`` returns the local path,

@@ -5,9 +5,8 @@
   import type { EventFeature } from "$lib/ipc/messages";
 
   // Concrete graph for event features: vertical ticks on the shared time axis.
-  // Second concrete graph type; a generic FeatureGraph waits for the third
-  // (heatmap) before abstracting (see development.md). Interaction mechanics
-  // mirror ContinuousGraph so the stacked graphs behave identically.
+  // Interaction mechanics mirror ContinuousGraph so the stacked graphs behave
+  // identically.
   let {
     events,
     maxTimeSec,

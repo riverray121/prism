@@ -1,64 +1,35 @@
-# Claude Instructions
+# Prism
 
-Guidance for Claude when working on this project.
+Desktop audio-analysis dashboard: import a track, analyze it (mix-level DSP + multi-engine stem separation + ML), and explore the features against synced playback. Tauri shell, Svelte 5 frontend, Python analysis sidecar.
+
+Design and process live in `docs/`. Read them before starting work.
 
 ## Session start
 
-All design and process documentation lives in `docs/`. At the start of each session, read in this order before starting new work:
+Read `docs/index.md`, then the ACTIVE milestone's `log.md` → `implementation.md`, then `design.md` / `architecture.md` as the task needs. Only the ACTIVE milestone is current — ignore shipped ones unless asked. Cross-milestone references: `docs/feature-catalog.md` (every analyzed feature), `docs/profile-schema.md` (profile.json spec).
 
-1. `docs/dev-log.md` — current state: what's done, what's next, any notes
-2. `docs/build-order.md` — the active milestone and what it contains
-3. Whichever design docs are relevant to the active task (`docs/design-doc.md`, `docs/feature-catalog.md`, `docs/profile-schema.md`, `docs/development.md`)
+Workflow skills: `/spec` plans a milestone's docs through conversation, `/slice` builds one vertical slice end to end, `/clean` runs the end-of-milestone repo pass.
 
-This grounds you in where the project actually is before proposing or doing anything.
+## Stack
 
-## Development log
+- Tauri 2 (Rust shell) — spawns the sidecar, owns the window.
+- Svelte 5 + SvelteKit (static SPA) + Tailwind v4 — frontend; uPlot for graphs.
+- Python 3.12 sidecar (uv) — librosa / torch / PANNs / audio-separator; JSON-line IPC over stdin/stdout.
 
-Maintain `docs/dev-log.md`. Update it as work progresses. Three sections:
+## Commands
 
-- **Completed** — what's been built, brief context
-- **Todo** — what's next (drawn from `build-order.md` or new work)
-- **Notes** — decisions made during development, gotchas, future considerations
-
-Keep it simple and concise. One line per entry where possible. Move entries from Todo → Completed as work finishes. Append to Notes when something is worth remembering but isn't actionable.
-
-The dev log is for _development context_ that doesn't belong in the design docs. Design changes go into the design docs themselves.
-
-## Code comments
-
-Comment frequently but not excessively. Comments must be concise, precise, accurate, and complete.
-
-- Precede each modular block of code with a comment describing what that block does.
-- State facts: the purpose of the code. Nothing more.
-- Never reference conversations, history, or decisions external to the code.
-- Only when something about a decision is non-obvious from the code itself, note it.
+- Test: `uv run pytest` · `pnpm test`
+- Lint: `uvx ruff check sidecar/` · `pnpm format:check`
+- Typecheck: `pnpm check`
+- Run: `pnpm tauri dev`
 
 ## Git
 
-- Commit frequently — small, focused commits over large ones.
-- When working **autonomously**, commit on your own as work completes.
-- When working **interactively** with the user, ask permission before committing.
-- **Never** include Claude as a `Co-Authored-By:` in commit messages. Commits are authored by the user only.
-- Commit messages are a single line — a concise subject only. No body, no bulleted lists.
-- Do not push on every commit. Commit locally as work progresses; push only after the user has tested and confirmed a feature works.
+- Remote: `origin` (github.com/riverray121/prism)
+- Push: only after the user has tested and confirmed a feature works.
 
-## Verifying features — the user tests, not Claude
+## Standing rules
 
-Do **not** manually run the analysis pipeline on library songs, regenerate `profile.json`, manipulate `library.db`, or otherwise alter library data to demonstrate or verify a feature. The user tests each feature themselves through the running app. Verify your own code only with isolated, unit-level checks (pure extractor calls on a signal, type checks, lint) that never touch the library. Only modify the database or library data when **explicitly** asked.
-
-Note: the Python sidecar is **not** hot-reloaded. Tauri spawns it once at app launch and only restarts it on Rust changes — so after editing any sidecar code, the running app must be relaunched before its analysis reflects the change.
-
-Always launch (or relaunch) the app yourself after making changes the user needs to test, so a fresh sidecar with the current code is running and the user never has to start it manually. Just launch it — do not import or analyze anything.
-
-## Source of truth
-
-Design and process are documented in `docs/`:
-
-- `docs/design-doc.md` — overall design
-- `docs/feature-catalog.md` — every analyzed feature
-- `docs/profile-schema.md` — JSON profile spec
-- `docs/build-order.md` — milestones
-- `docs/development.md` — tooling and engineering practices
-- `docs/ideas.md` — unscoped ideas backlog (not yet committed to a milestone)
-
-Update these docs when decisions change. Don't let them drift.
+- **The user tests features, not Claude.** Do not run the analysis pipeline on library songs, regenerate `profile.json`, or modify `library.db` to demonstrate or verify a feature. Verify your own code only with isolated, unit-level checks (pure extractor calls on a signal, type checks, lint) that never touch the library. Only modify library data when **explicitly** asked.
+- **The sidecar is not hot-reloaded.** Tauri spawns it once at launch and restarts it only on Rust changes — after editing any sidecar code, the app must be relaunched before its analysis reflects the change.
+- **Launch the app yourself** after changes the user needs to test, so a fresh sidecar with the current code is running. Just launch it — do not import or analyze anything.

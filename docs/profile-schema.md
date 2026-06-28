@@ -2,7 +2,7 @@
 
 JSON serialization of a single song's analysis. Consumed by the dashboard and by Stage 2 (the mapping tool). Versioned; major-version bumps are breaking.
 
-The design doc (`design-doc.md`) and feature catalog (`feature-catalog.md`) are companions to this file.
+The design doc (`milestone-1-analysis-pipeline/design.md`) and feature catalog (`feature-catalog.md`) are companions to this file.
 
 ---
 
@@ -46,7 +46,7 @@ library/
 
 `{uuid}` is UUIDv4, assigned at import.
 
-Stems are nested one level by **separation engine**. M4 runs a set of engines per song (see `build-order.md`); each engine writes the stem set its model produces — the stem names vary by model (e.g. Demucs `htdemucs` → drums/bass/other/vocals; a 6-stem model adds guitar/piano). Every engine's output is kept on disk; there is no v1 cleanup pass.
+Stems are nested one level by **separation engine**. The pipeline runs a set of engines per song (see `milestone-1-analysis-pipeline/implementation.md`); each engine writes the stem set its model produces — the stem names vary by model (e.g. Demucs `htdemucs` → drums/bass/other/vocals; a 6-stem model adds guitar/piano). Every engine's output is kept on disk; there is no v1 cleanup pass.
 
 ---
 

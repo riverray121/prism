@@ -8,8 +8,7 @@ from scipy.ndimage import uniform_filter1d
 DENSITY_WINDOW_SEC = 2.0
 
 # Assumed time signature for downbeat inference. The heuristic picks one of
-# METER beat phases as the bar start; non-4/4 meters will be wrong (see
-# docs/dev-log.md for upgrade paths).
+# METER beat phases as the bar start; non-4/4 meters will be wrong.
 METER = 4
 
 

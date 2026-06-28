@@ -14,10 +14,10 @@ pnpm tauri dev      # run the app
 
 ## Documentation
 
-Design and process live in [`docs/`](./docs/):
+Design and process live in [`docs/`](./docs/), organized by milestone:
 
-- [`design-doc.md`](./docs/design-doc.md) — overall design
-- [`feature-catalog.md`](./docs/feature-catalog.md) — every analyzed feature
-- [`profile-schema.md`](./docs/profile-schema.md) — JSON profile spec
-- [`build-order.md`](./docs/build-order.md) — milestones
-- [`development.md`](./docs/development.md) — tooling and engineering practices
+- [`index.md`](./docs/index.md) — milestone list and status; start here
+- [`milestone-1-analysis-pipeline/`](./docs/milestone-1-analysis-pipeline/) — the shipped analysis pipeline (`design.md`, `architecture.md`, `implementation.md`, `log.md`)
+- [`feature-catalog.md`](./docs/feature-catalog.md) — every analyzed feature (cross-milestone reference)
+- [`profile-schema.md`](./docs/profile-schema.md) — JSON profile spec (cross-milestone reference)
+- [`ideas.md`](./docs/ideas.md) — unscoped backlog

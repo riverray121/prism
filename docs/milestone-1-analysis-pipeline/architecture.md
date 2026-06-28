@@ -1,6 +1,6 @@
 # Development Practices
 
-How we build and maintain this project. Companion to `design-doc.md`.
+How we build and maintain this project. Companion to `design.md`.
 
 ## Testing
 
@@ -132,10 +132,10 @@ src/
 
 Don't build a generic `FeatureGraph` abstraction until three concrete graph types are working. Design from the concrete, not the abstract.
 
-**Frontend layering contract (keep the UI replaceable).** The UI through M1–M5 is intentionally minimal; a UI/UX design doc and reskin land in M6 (see `build-order.md`). To make that rework clean, keep a hard split between durable and disposable layers:
+**Frontend layering contract (keep the UI replaceable).** The milestone-1 UI is intentionally minimal; a UI/UX design doc and reskin land in milestone 2 (see `../milestone-2-ui-rework/ideas.md`). To make that rework clean, keep a hard split between durable and disposable layers:
 
 - **Durable, presentation-free** — survives a reskin untouched: `lib/ipc` (commands + event stream), `lib/ipc/messages.ts` (zod schemas + types), `lib/state` (reactive stores and the actions that mutate them, e.g. `open`/`close`/queueing).
-- **Disposable presentation** — what the M6 rework replaces: `lib/components` (the `.svelte` views) and all Tailwind/styling.
+- **Disposable presentation** — what the milestone-2 rework replaces: `lib/components` (the `.svelte` views) and all Tailwind/styling.
 
 Rules that preserve the split:
 
@@ -147,7 +147,7 @@ When shadcn-svelte is adopted (lazily; see the design doc) it formalizes the com
 
 ## Documentation
 
-- Design decisions live in the design docs (`design-doc.md` + companions). Update when decisions change.
+- Design decisions live in the design docs (`design.md` + companions). Update when decisions change.
 - Don't write docstrings explaining _what_ code does — well-named functions handle that. Comment only for non-obvious _why_.
 - `README.md` at repo root: one paragraph + pointers to the design doc.
-- Development log: `dev-log.md` — protocol in `CLAUDE.md`.
+- Development log: `log.md`.
