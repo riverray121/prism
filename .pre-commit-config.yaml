@@ -1,4 +1,7 @@
-# Linters and formatters only — no tests (slow, and local test runs cover safety).
+# Commit stage: linters and formatters only (fast). The test suite runs on
+# pre-push — slow once librosa/torch import, but gates code before it leaves the
+# machine, matching the "push only after tested" rule in CLAUDE.md.
+default_install_hook_types: [pre-commit, pre-push]
 repos:
   # Python: lint + format the sidecar.
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -17,3 +20,22 @@ repos:
         language: system
         files: \.(svelte|ts|js|css|json|md|html)$
         exclude: ^(pnpm-lock\.yaml|src-tauri/|build/|\.svelte-kit/)
+
+  # Test suites, gated to pre-push. always_run so a push is always tested,
+  # regardless of which files changed.
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (sidecar)
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: vitest
+        name: vitest (frontend)
+        entry: pnpm test
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
