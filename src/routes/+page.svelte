@@ -1,47 +1,37 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  import AnalysisSettings from "$lib/components/AnalysisSettings.svelte";
   import InspectionView from "$lib/components/InspectionView.svelte";
-  import LibraryPanel from "$lib/components/LibraryPanel.svelte";
-  import { getSettings, listLibrary, onSidecarEvent } from "$lib/ipc";
-  import { applySidecarEvent } from "$lib/state/sidecar";
+  import Sidebar from "$lib/components/shell/Sidebar.svelte";
+  import TabStub from "$lib/components/shell/TabStub.svelte";
+  import TopBar from "$lib/components/shell/TopBar.svelte";
   import { inspection } from "$lib/state/inspection.svelte";
+  import { startSidecarSession, stopSidecarSession } from "$lib/state/sidecar";
+  import { TABS, workspace } from "$lib/state/workspace.svelte";
 
-  // Attach the sidecar-event listener, then request the current library +
-  // settings. The listener is awaited first so no reply emitted before it is
-  // attached can be dropped.
   onMount(() => {
-    let off: (() => void) | undefined;
-    let stopped = false;
-    (async () => {
-      off = await onSidecarEvent(applySidecarEvent);
-      if (stopped) {
-        off();
-        return;
-      }
-      listLibrary();
-      getSettings();
-    })();
-    return () => {
-      stopped = true;
-      off?.();
-    };
+    startSidecarSession();
+    return stopSidecarSession;
   });
+
+  // Chrome copy for the showing tab; stubs and the analysis empty state render it.
+  const activeTab = $derived(
+    TABS.find((t) => t.id === workspace.tab) ?? TABS[0],
+  );
 </script>
 
-<main class="flex min-h-screen flex-col items-center gap-8 px-6 py-10">
-  <header class="text-center">
-    <h1 class="text-3xl font-semibold tracking-tight">Prism</h1>
-    <p class="text-sm text-neutral-500 dark:text-neutral-400">
-      Audio analysis dashboard
-    </p>
-  </header>
-
-  {#if inspection.songId === null}
-    <LibraryPanel />
-    <AnalysisSettings />
-  {:else}
-    <InspectionView />
-  {/if}
-</main>
+<div class="flex h-screen">
+  <Sidebar />
+  <div class="flex min-w-0 flex-1 flex-col">
+    <TopBar />
+    <main class="min-h-0 flex-1 overflow-y-auto">
+      {#if workspace.tab === "analysis" && inspection.songId !== null}
+        <div class="flex justify-center px-6 py-6">
+          <InspectionView />
+        </div>
+      {:else}
+        <TabStub title={activeTab.label} blurb={activeTab.blurb} />
+      {/if}
+    </main>
+  </div>
+</div>

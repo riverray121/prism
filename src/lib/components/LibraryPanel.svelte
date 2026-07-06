@@ -71,9 +71,8 @@
   }
 </script>
 
-<section class="flex w-full max-w-2xl flex-col gap-4">
-  <div class="flex items-center justify-between">
-    <h2 class="text-lg font-semibold">Library</h2>
+<section class="flex w-full flex-col gap-4">
+  <div class="flex items-center justify-end">
     <button
       onclick={pickAndImport}
       class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
@@ -83,7 +82,7 @@
   </div>
 
   <div
-    class="overflow-hidden rounded-md border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+    class="overflow-x-auto rounded-md border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
   >
     {#if library.songs.length === 0}
       <p class="p-4 text-sm text-neutral-500">No songs imported yet.</p>

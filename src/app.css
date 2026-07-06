@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* Design tokens, defined dark-first: the dark value is the designed surface,
+   the light value derives from it. light-dark() resolves per the OS scheme
+   (color-scheme below), so every token is theme-aware at the point of use. */
+@theme {
+  --color-app: light-dark(#f4f4f5, #131316); /* window background */
+  --color-surface: light-dark(#ffffff, #19191d); /* panels, bars */
+  --color-raised: light-dark(#ececee, #232329); /* hover / active fills */
+  --color-edge: light-dark(#d9d9de, #2a2a31); /* 1px borders */
+  --color-ink: light-dark(#232326, #d7d7dc); /* primary text */
+  --color-ink-muted: light-dark(#6e6e76, #94949c); /* secondary text */
+  --color-ink-faint: light-dark(#a3a3ab, #62626b); /* tertiary text */
+  --color-accent: light-dark(#4f46e5, #818cf8); /* selection, primary actions */
+  --color-danger: light-dark(#dc2626, #f87171);
+
+  --spacing-bar: 2.5rem; /* shared chrome height: top bar + sidebar header */
+}
+
 /* Root surface follows the OS light/dark theme. color-scheme enables light-dark()
    and themes native scrollbars; overscroll-behavior kills the rubber-band gap
    that otherwise exposes the page background at the top and bottom. */
@@ -11,10 +28,7 @@
   body {
     height: 100%;
     overscroll-behavior: none;
-    background-color: light-dark(
-      var(--color-neutral-50),
-      var(--color-neutral-950)
-    );
-    color: light-dark(var(--color-neutral-900), var(--color-neutral-100));
+    background-color: var(--color-app);
+    color: var(--color-ink);
   }
 }

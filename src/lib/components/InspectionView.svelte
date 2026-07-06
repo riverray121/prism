@@ -16,7 +16,7 @@
     SegmentFeature,
     TagsFeature,
   } from "$lib/ipc/messages";
-  import { close, inspection } from "$lib/state/inspection.svelte";
+  import { inspection } from "$lib/state/inspection.svelte";
 
   // Playback uses the Web Audio API: the file is decoded into an AudioBuffer and
   // played through an AudioBufferSourceNode. The playhead is derived from
@@ -285,7 +285,7 @@
     inspection.profile ? Object.entries(inspection.profile.stems) : [],
   );
 
-  // Shared timeline frame rate; safe fallback when no profile is loaded.
+  // Shared timeline frame rate; consumers render only once a profile exists.
   const frameRateHz = $derived(
     inspection.profile?.timeline.frame_rate_hz ?? 100,
   );
@@ -372,24 +372,9 @@
 </script>
 
 <section class="flex w-full max-w-4xl flex-col gap-6">
-  <button
-    onclick={close}
-    class="self-start text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
-  >
-    ← Library
-  </button>
-
   {#if inspection.profile === null}
     <p class="text-sm text-neutral-500">Loading…</p>
   {:else}
-    {@const song = inspection.profile.song}
-    <header>
-      <h2 class="text-2xl font-semibold tracking-tight">{song.title}</h2>
-      <p class="text-sm text-neutral-500 dark:text-neutral-400">
-        {song.artist}
-      </p>
-    </header>
-
     <!-- Playback transport. The top button plays the original mix; each stem has
          its own play button below. Only one source is audible at a time, and the
          playhead is shared across every graph. -->
@@ -492,7 +477,7 @@
           </p>
           <HeatmapGraph
             path={sidecarUrl(feature.sidecar)}
-            frameRateHz={inspection.profile.timeline.frame_rate_hz}
+            {frameRateHz}
             normalize={name === "spectrogram" ? "global" : "per-row"}
             playheadSec={currentTime}
             follow={playing}
@@ -518,7 +503,7 @@
           </p>
           <ContinuousGraph
             {feature}
-            frameRateHz={inspection.profile.timeline.frame_rate_hz}
+            {frameRateHz}
             label={name}
             color={PALETTE[i % PALETTE.length]}
             playheadSec={currentTime}
@@ -549,7 +534,7 @@
           <TagsGraph
             path={sidecarUrl(feature.sidecar)}
             labels={feature.labels}
-            frameRateHz={inspection.profile.timeline.frame_rate_hz}
+            {frameRateHz}
             playheadSec={currentTime}
             follow={playing}
             onSeek={scrub}

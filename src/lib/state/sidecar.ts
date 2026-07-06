@@ -1,3 +1,4 @@
+import { getSettings, listLibrary, onSidecarEvent } from "$lib/ipc";
 import type { SidecarEvent } from "$lib/ipc/messages";
 import { library } from "$lib/state/library.svelte";
 import { inspection } from "$lib/state/inspection.svelte";
@@ -6,7 +7,7 @@ import { settings } from "$lib/state/settings.svelte";
 // Reducer mapping inbound sidecar events onto the durable $state stores. The
 // inbound counterpart to the command senders in lib/ipc; kept out of the route
 // component so the dispatch (and its correctness guards) survives UI changes.
-export function applySidecarEvent(event: SidecarEvent): void {
+function applySidecarEvent(event: SidecarEvent): void {
   if (event.type === "library.songs") {
     library.songs = event.songs;
   } else if (event.type === "library.import_failed") {
@@ -24,4 +25,33 @@ export function applySidecarEvent(event: SidecarEvent): void {
     settings.drumSubsep = event.drum_subsep;
     settings.loaded = true;
   }
+}
+
+// Session lifecycle: attach the sidecar-event listener, then request the
+// current library + settings. The listener is awaited first so no reply
+// emitted before it is attached can be dropped. The generation token makes
+// start/stop re-entrant: a start superseded (by stop or a newer start) while
+// still awaiting detaches itself instead of leaking into the live session.
+let off: (() => void) | undefined;
+let generation = 0;
+
+export function startSidecarSession(): void {
+  const gen = ++generation;
+  void (async () => {
+    const detach = await onSidecarEvent(applySidecarEvent);
+    if (gen !== generation) {
+      detach();
+      return;
+    }
+    off?.();
+    off = detach;
+    listLibrary();
+    getSettings();
+  })();
+}
+
+export function stopSidecarSession(): void {
+  generation++;
+  off?.();
+  off = undefined;
 }
