@@ -19,6 +19,8 @@ export const SongSchema = z.object({
   // Discrete progress: engine current_step of total_steps (no percentage).
   current_step: z.number().nullable().default(null),
   total_steps: z.number().nullable().default(null),
+  // Populated when status is 'failed'; shown in the library with retry.
+  error_message: z.string().nullable().default(null),
 });
 export type Song = z.infer<typeof SongSchema>;
 

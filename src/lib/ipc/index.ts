@@ -33,6 +33,20 @@ export function getSettings(): Promise<void> {
   return sendCommand({ type: "settings.get" });
 }
 
+// Edit a song's user-facing metadata (DB row + profile.json when analyzed).
+export function updateMetadata(
+  songId: string,
+  title: string,
+  artist: string,
+): Promise<void> {
+  return sendCommand({
+    type: "library.update_metadata",
+    song_id: songId,
+    title,
+    artist,
+  });
+}
+
 // Replace a song's full favorites list (dot-paths into its profile).
 export function updateFavorites(
   songId: string,

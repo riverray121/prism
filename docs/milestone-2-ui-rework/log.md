@@ -20,9 +20,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 8 — Analyze popup + engine capabilities: `sidecar/settings.py` owns engine/drum-subsep resolution (single validation site; `library.py` stores raw JSON only — A3); `separation.ENGINE_INFO` (label + drums capability) rides the settings event (A7); bits-ui `AnalyzeDialog` opened per song from Analyze/Re-analyze/Retry buttons, confirms into the queue; standalone AnalysisSettings panel deleted; engine tests migrated to test_settings.py.
 
+- Slice 9 — Library management: LibraryPanel rebuilt as compact two-line sidebar rows (status color, error message on failed, ✎ metadata edit, contextual Analyze/Retry/Cancel); search + status filter + missing-metadata filter; `MetadataDialog` + `library.update_metadata` IPC (DB row + profile.json mirror); `Song.error_message` in snapshot/zod; collapsed rail shows a `ProgressRing` per queued/analyzing song (engine-step fraction; static arc while queued) with title tooltips.
+
 ## Todo
 
-- [ ] Slice 9 — Library management
 - [ ] Slice 10 — YouTube import
 - [ ] Slice 11 — Split view
 

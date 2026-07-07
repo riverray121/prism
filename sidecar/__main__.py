@@ -17,6 +17,7 @@ from .schema import (
     SettingsEvent,
     Song,
     UpdateFavoritesCommand,
+    UpdateMetadataCommand,
     UpdateSettingsCommand,
 )
 
@@ -121,6 +122,12 @@ def handle(msg: dict) -> None:
             # A schema-drifted or partially-written profile (missing keys, bad
             # JSON) shouldn't take down the command channel — log and skip.
             log.warning("malformed profile for %s", cmd.song_id)
+    elif msg_type == "library.update_metadata":
+        cmd = UpdateMetadataCommand.model_validate(msg)
+        with library.connect() as con:
+            library.update_metadata(con, cmd.song_id, cmd.title, cmd.artist)
+        storage.update_profile_metadata(cmd.song_id, cmd.title, cmd.artist)
+        emit_snapshot()
     elif msg_type == "favorites.update":
         cmd = UpdateFavoritesCommand.model_validate(msg)
         try:

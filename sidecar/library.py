@@ -120,7 +120,7 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
         """
         SELECT id, title, artist, duration_sec, sample_rate, source_path,
                status, imported_at, current_stage, current_engine,
-               current_step, total_steps
+               current_step, total_steps, error_message
         FROM songs
         ORDER BY imported_at
         """
@@ -286,4 +286,14 @@ def set_setting(con: sqlite3.Connection, key: str, value) -> None:
         ON CONFLICT(key) DO UPDATE SET value=excluded.value
         """,
         (key, json.dumps(value)),
+    )
+
+
+def update_metadata(
+    con: sqlite3.Connection, song_id: str, title: str, artist: str
+) -> None:
+    """Edit a song's user-facing metadata."""
+    con.execute(
+        "UPDATE songs SET title=?, artist=? WHERE id=?",
+        (title, artist, song_id),
     )

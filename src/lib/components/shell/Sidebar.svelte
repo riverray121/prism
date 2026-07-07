@@ -2,7 +2,25 @@
   import { Tooltip } from "bits-ui";
 
   import LibraryPanel from "$lib/components/LibraryPanel.svelte";
+  import ProgressRing from "$lib/components/shell/ProgressRing.svelte";
+  import { library } from "$lib/state/library.svelte";
   import { toggleSidebar, workspace } from "$lib/state/workspace.svelte";
+
+  // Songs with analysis in flight — the collapsed rail keeps them glanceable.
+  const inFlight = $derived(
+    library.songs.filter(
+      (s) => s.status === "queued" || s.status === "analyzing",
+    ),
+  );
+
+  // Coarse fraction from the engine step counter; null (static arc) until the
+  // worker reports steps, and always null while merely queued.
+  function fractionOf(song: (typeof library.songs)[number]): number | null {
+    if (song.status !== "analyzing") return null;
+    return song.current_step && song.total_steps
+      ? song.current_step / song.total_steps
+      : null;
+  }
 </script>
 
 <aside
@@ -45,6 +63,28 @@
             </Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
+
+        <!-- One ring per queued/analyzing song; queued shows a static arc. -->
+        <div class="mt-3 flex flex-col items-center gap-2">
+          {#each inFlight as song (song.id)}
+            <Tooltip.Root>
+              <Tooltip.Trigger
+                class={song.status === "queued" ? "opacity-40" : ""}
+              >
+                <ProgressRing fraction={fractionOf(song)} />
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content
+                  side="right"
+                  sideOffset={6}
+                  class="rounded border border-edge bg-raised px-2 py-1 text-xs text-ink"
+                >
+                  {song.title} — {song.status}
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          {/each}
+        </div>
       </Tooltip.Provider>
     </div>
   {/if}

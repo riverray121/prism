@@ -148,3 +148,14 @@ def cleanup_partial(song_id: str) -> None:
 def read_profile(song_id: str) -> dict:
     """Read an analyzed song's profile.json. Raises FileNotFoundError if absent."""
     return json.loads((SONGS_DIR / song_id / "profile.json").read_text())
+
+
+def update_profile_metadata(song_id: str, title: str, artist: str) -> None:
+    """Mirror a metadata edit into profile.json, when the song is analyzed."""
+    try:
+        profile = read_profile(song_id)
+    except FileNotFoundError:
+        return
+    profile["song"]["title"] = title
+    profile["song"]["artist"] = artist
+    _write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)

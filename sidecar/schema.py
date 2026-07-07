@@ -25,6 +25,13 @@ class GetProfileCommand(BaseModel):
     song_id: str
 
 
+class UpdateMetadataCommand(BaseModel):
+    type: Literal["library.update_metadata"]
+    song_id: str
+    title: str
+    artist: str
+
+
 class UpdateFavoritesCommand(BaseModel):
     type: Literal["favorites.update"]
     song_id: str
@@ -61,6 +68,8 @@ class Song(BaseModel):
     # the separation backends expose no intra-step progress).
     current_step: int | None = None
     total_steps: int | None = None
+    # Populated when status='failed'; shown in the library with a retry action.
+    error_message: str | None = None
 
 
 class LibrarySongsEvent(BaseModel):
