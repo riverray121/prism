@@ -15,7 +15,8 @@ from uuid import uuid4
 import numpy as np
 
 # Profile JSON schema version (see docs/profile-schema.md).
-SCHEMA_VERSION = "0.1.0"
+# 0.2.0: optional `onsets` on continuous feature envelopes.
+SCHEMA_VERSION = "0.2.0"
 
 # Repo root is the parent of the ``sidecar`` package directory. Resolved from the
 # module location so the path holds regardless of the process working directory.

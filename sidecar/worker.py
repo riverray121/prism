@@ -25,6 +25,7 @@ from . import library, models, separation, storage
 from .features import (
     amplitude,
     chords,
+    derive,
     frequency,
     rhythm,
     semantic,
@@ -125,6 +126,9 @@ def _analyze(
     mix.update(axes)
     heatmaps["sound_tags"] = tags_matrix
 
+    # Default onset track on every continuous feature (renders as a dots lane).
+    derive.attach_onsets(mix, frame_rate_hz)
+
     return frame_rate_hz, frame_count, mix, heatmaps
 
 
@@ -218,6 +222,8 @@ def _stem_entry(
         rel = f"{heatmap_prefix}/{stem_name}_{hname}"
         storage.write_heatmap(song_id, rel, matrix)
         features[hname] = _heatmap_envelope(hname, matrix, f"heatmaps/{rel}.npy")
+    # Default onset track on every continuous stem feature.
+    derive.attach_onsets(features, sr / hop)
     return {"audio_file": audio_file, "features": features}
 
 

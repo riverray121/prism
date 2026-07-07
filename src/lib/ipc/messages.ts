@@ -54,6 +54,9 @@ export const ContinuousFeatureSchema = z.object({
   // Present (="wip") on provisional ML features, e.g. the timbral axes.
   status: z.string().optional(),
   data: z.array(z.number()),
+  // Default onset track derived at analysis time (schema 0.2.0); absent on
+  // profiles analyzed before then.
+  onsets: z.array(z.object({ t: z.number(), strength: z.number() })).optional(),
 });
 export type ContinuousFeature = z.infer<typeof ContinuousFeatureSchema>;
 

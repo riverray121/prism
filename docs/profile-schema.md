@@ -135,6 +135,15 @@ Sampled on the implicit 100 Hz timeline. `data` length equals `timeline.frame_co
 
 ML continuous features may add a parallel `confidence` array of equal length (planned — no extractor emits one yet; `pitch_confidence` is a separate feature, not a sibling array, and the zod loader does not model it). WIP features add `"status": "wip"`.
 
+Since 0.2.0, every continuous feature also carries a default onset track, derived at analysis time by fixed-parameter peak-picking over the min-max-normalized data (see `sidecar/features/derive.py`). `strength` is the normalized peak height. Absent on older profiles; loaders render the onsets lane only when present.
+
+```json
+"onsets": [
+  {"t": 0.42, "strength": 0.91},
+  {"t": 0.87, "strength": 0.55}
+]
+```
+
 `timbral_axes` is realized as three separate continuous features, each a 0–1 per-frame contrast between two groups of PANNs class probabilities (0.5 = balanced / nothing detected): `electronic_organic`, `percussive_tonal`, `instrumental_vocal` (value → 1 favors the second pole). v1 omits the confidence array.
 
 ```json
@@ -243,7 +252,7 @@ Stem WAVs are referenced from `stems.{engine}.{stem}.audio_file`, same rules app
 - **Minor bumps:** backward-compatible additions — new optional fields, new features in the catalog.
 - **Major bumps:** breaking changes — renamed/removed fields, changed semantics, changed sidecar conventions.
 - Intended: loaders check the major version on load and refuse unknown majors. **Not yet enforced** — the sidecar `read_profile` and the frontend zod loader currently parse `schema_version` as a plain string without a major-version gate. Add the check at the load boundary when schema migrations become real.
-- Current: `0.1.0`.
+- Current: `0.2.0` (adds the optional `onsets` field on continuous features).
 
 ---
 

@@ -16,9 +16,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 6 — Favorites: star on every feature row + scalar card (dot-paths per profile-schema); optimistic toggle in inspection state + `favorites.update` IPC; sidecar `write_favorites` (atomic rewrite) and `write_profile` now carries favorites through re-analysis; profile zod gains `favorites` (default []); stale paths warn on load, never fail; pytest coverage in test_storage.py.
 
+- Slice 7 — Onset lanes: `sidecar/features/derive.py` (min-max normalize → scipy find_peaks, 0.3 cutoff, 100 ms separation; 6 pytest cases) attached to every continuous envelope in mix + stem passes; `schema_version` 0.2.0; zod `onsets` optional on continuous; `OnsetDots` kit sub-lane (dots on a baseline, strength → opacity; TimeAxis gained showXAxis/showControls); profile-schema.md updated. Old profiles render without lanes until re-analyzed. A4 deferred (heatmap-metadata relocation — pure cleanup, no functional pull).
+
 ## Todo
 
-- [ ] Slice 7 — Onset lanes
 - [ ] Slice 8 — Analyze popup + engine capabilities
 - [ ] Slice 9 — Library management
 - [ ] Slice 10 — YouTube import

@@ -4,6 +4,7 @@
   import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
   import EventLane from "$lib/graphs/EventLane.svelte";
   import HeatmapLane from "$lib/graphs/HeatmapLane.svelte";
+  import OnsetDots from "$lib/graphs/OnsetDots.svelte";
   import SegmentLane from "$lib/graphs/SegmentLane.svelte";
   import TagsLanes from "$lib/graphs/TagsLanes.svelte";
   import type { MixFeature, ScalarFeature } from "$lib/ipc/messages";
@@ -194,6 +195,18 @@
         onScrubStart={scrubStart}
         onScrubEnd={scrubEnd}
       />
+      {#if feature.onsets?.length}
+        <OnsetDots
+          onsets={feature.onsets}
+          maxTimeSec={durationSec}
+          color={PALETTE[i % PALETTE.length]}
+          playheadSec={transport.currentTime}
+          follow={transport.playing}
+          onSeek={scrub}
+          onScrubStart={scrubStart}
+          onScrubEnd={scrubEnd}
+        />
+      {/if}
     {:else if feature.render === "event"}
       <EventLane
         events={feature.events}

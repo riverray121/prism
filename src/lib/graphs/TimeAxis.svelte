@@ -22,6 +22,8 @@
     height = 120,
     yRange = null,
     showYAxis = true,
+    showXAxis = true,
+    showControls = true,
     draw = null,
     playheadSec = null,
     follow = false,
@@ -35,6 +37,8 @@
     height?: number;
     yRange?: [number, number] | null; // fixed y scale (renderers that self-draw)
     showYAxis?: boolean;
+    showXAxis?: boolean; // off for sub-lanes that ride under a parent lane
+    showControls?: boolean; // Follow/Reset footer; off for minimal sub-lanes
     draw?: ((u: uPlot) => void) | null; // renderer pass, drawn under the playhead
     playheadSec?: number | null;
     follow?: boolean; // smooth-center the view on the playhead (while playing)
@@ -107,7 +111,7 @@
       // Drag is repurposed for scrubbing the playhead; zoom is on the wheel.
       cursor: { drag: { x: false, y: false } },
       axes: [
-        { stroke: "#888", grid },
+        showXAxis ? { stroke: "#888", grid } : { show: false },
         showYAxis ? { stroke: "#888", grid } : { show: false },
       ],
       series,
@@ -210,15 +214,18 @@
 </script>
 
 <div class="flex flex-col gap-2">
-  <div class="flex items-center justify-end gap-4 text-xs text-ink-muted">
-    <button
-      onclick={() => (followMode = followMode === "center" ? "page" : "center")}
-      title="How the view tracks the playhead when zoomed and playing"
-      class="hover:text-ink"
-    >
-      Follow: {followMode === "center" ? "Center" : "Page"}
-    </button>
-    <button onclick={resetZoom} class="hover:text-ink"> Reset zoom </button>
-  </div>
+  {#if showControls}
+    <div class="flex items-center justify-end gap-4 text-xs text-ink-muted">
+      <button
+        onclick={() =>
+          (followMode = followMode === "center" ? "page" : "center")}
+        title="How the view tracks the playhead when zoomed and playing"
+        class="hover:text-ink"
+      >
+        Follow: {followMode === "center" ? "Center" : "Page"}
+      </button>
+      <button onclick={resetZoom} class="hover:text-ink"> Reset zoom </button>
+    </div>
+  {/if}
   <div bind:this={container} class="w-full"></div>
 </div>
