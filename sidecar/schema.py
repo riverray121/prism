@@ -86,11 +86,20 @@ class ProfileEvent(BaseModel):
     song_dir: str
 
 
+class EngineInfo(BaseModel):
+    # Human-readable engine label for the UI.
+    label: str
+    # Whether the engine emits a `drums` stem (drum sub-separation capability).
+    drums: bool
+
+
 class SettingsEvent(BaseModel):
     type: Literal["settings"] = "settings"
     # Engine ids currently selected for analysis.
     engines: list[str]
     # All engine ids the sidecar can run, so the UI can render the full toggle set.
     available_engines: list[str]
+    # Per-engine labels/capabilities, so the frontend hard-codes nothing.
+    engine_info: dict[str, EngineInfo]
     # Whether drums stems are sub-separated into kick/snare/etc.
     drum_subsep: bool

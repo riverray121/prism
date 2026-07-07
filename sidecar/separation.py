@@ -33,6 +33,28 @@ ENGINES = {
     "mel_band_roformer": "model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt",
 }
 
+# UI-facing metadata per engine: display label + whether it emits a `drums`
+# stem (the capability drum sub-separation needs). Sent to the frontend so
+# nothing about engines is hard-coded there.
+ENGINE_INFO = {
+    "htdemucs_ft": {
+        "label": "Demucs (htdemucs_ft) — vocals/drums/bass/other",
+        "drums": True,
+    },
+    "htdemucs_6s": {
+        "label": "Demucs 6-stem (htdemucs_6s) — + guitar/piano",
+        "drums": True,
+    },
+    "bs_roformer": {
+        "label": "BS-RoFormer — vocals/instrumental",
+        "drums": False,
+    },
+    "mel_band_roformer": {
+        "label": "Mel-Band RoFormer — vocals/instrumental",
+        "drums": False,
+    },
+}
+
 # Engines selected by default (when the user hasn't chosen a set). Just the
 # fine-tuned 4-stem Demucs — the others are opt-in via Analysis settings, since
 # they add cost and the RoFormers/6-stem overlap its stems.

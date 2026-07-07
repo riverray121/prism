@@ -1,7 +1,6 @@
 <script lang="ts">
   import { Tooltip } from "bits-ui";
 
-  import AnalysisSettings from "$lib/components/AnalysisSettings.svelte";
   import LibraryPanel from "$lib/components/LibraryPanel.svelte";
   import { toggleSidebar, workspace } from "$lib/state/workspace.svelte";
 </script>
@@ -24,7 +23,6 @@
       </div>
       <div class="flex flex-col gap-6 px-3 pb-6">
         <LibraryPanel />
-        <AnalysisSettings />
       </div>
     </div>
   {:else}

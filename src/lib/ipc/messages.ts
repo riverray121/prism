@@ -205,8 +205,17 @@ export const SettingsEventSchema = z.object({
   type: z.literal("settings"),
   engines: z.array(z.string()),
   available_engines: z.array(z.string()),
+  // Per-engine label + drums-stem capability, declared by the sidecar so the
+  // frontend hard-codes nothing about engines.
+  engine_info: z.record(
+    z.string(),
+    z.object({ label: z.string(), drums: z.boolean() }),
+  ),
   drum_subsep: z.boolean(),
 });
+export type EngineInfo = z.infer<
+  typeof SettingsEventSchema
+>["engine_info"][string];
 
 // All events the sidecar can send on stdout.
 export const SidecarEventSchema = z.discriminatedUnion("type", [

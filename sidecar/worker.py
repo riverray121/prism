@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 import librosa
 import numpy as np
 
-from . import library, models, separation, storage
+from . import library, models, separation, settings, storage
 from .features import (
     amplitude,
     chords,
@@ -246,8 +246,8 @@ def _separate_and_analyze_stems(
     stems_root = storage.SONGS_DIR / song_id / "stems"
     # Engine set + drum sub-separation are user settings (Analysis settings panel).
     with library.connect() as con:
-        engines = library.get_engines(con)
-        drum_subsep = library.get_drum_subsep(con)
+        engines = settings.get_engines(con)
+        drum_subsep = settings.get_drum_subsep(con)
     total = len(engines)
     result: dict[str, dict] = {}
 

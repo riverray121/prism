@@ -10,7 +10,7 @@ import sqlite3
 from contextlib import contextmanager
 from collections.abc import Iterator
 
-from . import separation, storage
+from . import storage
 
 # Identity, import metadata, analysis status, and per-stage progress. Progress
 # columns are nullable — populated only while a song is analyzing.
@@ -287,23 +287,3 @@ def set_setting(con: sqlite3.Connection, key: str, value) -> None:
         """,
         (key, json.dumps(value)),
     )
-
-
-def get_engines(con: sqlite3.Connection) -> list[str]:
-    """Separation engines selected for analysis, in canonical order.
-
-    Defaults to ``separation.DEFAULT_ENGINES`` when unset. Invalid/removed engine
-    ids in the saved selection are dropped; an empty selection means mix-only.
-    """
-    available = list(separation.ENGINES)
-    selected = get_setting(con, "engines", None)
-    if selected is None:
-        return [e for e in separation.DEFAULT_ENGINES if e in available]
-    chosen = set(selected)
-    return [e for e in available if e in chosen]
-
-
-def get_drum_subsep(con: sqlite3.Connection) -> bool:
-    """Whether to sub-separate drums stems into kick/snare/etc. Default off (extra
-    model + time per drums stem)."""
-    return bool(get_setting(con, "drum_subsep", False))

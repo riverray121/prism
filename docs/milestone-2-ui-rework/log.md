@@ -18,9 +18,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 7 — Onset lanes: `sidecar/features/derive.py` (min-max normalize → scipy find_peaks, 0.3 cutoff, 100 ms separation; 6 pytest cases) attached to every continuous envelope in mix + stem passes; `schema_version` 0.2.0; zod `onsets` optional on continuous; `OnsetDots` kit sub-lane (dots on a baseline, strength → opacity; TimeAxis gained showXAxis/showControls); profile-schema.md updated. Old profiles render without lanes until re-analyzed. A4 deferred (heatmap-metadata relocation — pure cleanup, no functional pull).
 
+- Slice 8 — Analyze popup + engine capabilities: `sidecar/settings.py` owns engine/drum-subsep resolution (single validation site; `library.py` stores raw JSON only — A3); `separation.ENGINE_INFO` (label + drums capability) rides the settings event (A7); bits-ui `AnalyzeDialog` opened per song from Analyze/Re-analyze/Retry buttons, confirms into the queue; standalone AnalysisSettings panel deleted; engine tests migrated to test_settings.py.
+
 ## Todo
 
-- [ ] Slice 8 — Analyze popup + engine capabilities
 - [ ] Slice 9 — Library management
 - [ ] Slice 10 — YouTube import
 - [ ] Slice 11 — Split view

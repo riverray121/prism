@@ -2,7 +2,8 @@
   import { open } from "@tauri-apps/plugin-dialog";
 
   import { formatTime } from "$lib/format";
-  import { cancelAnalysis, importFiles, queueAnalysis } from "$lib/ipc";
+  import AnalyzeDialog from "$lib/components/library/AnalyzeDialog.svelte";
+  import { cancelAnalysis, importFiles } from "$lib/ipc";
   import { library } from "$lib/state/library.svelte";
   import { open as openInspection } from "$lib/state/inspection.svelte";
 
@@ -19,10 +20,8 @@
     await importFiles(paths);
   }
 
-  // Queue a song for analysis.
-  function analyze(songId: string) {
-    return queueAnalysis([songId]);
-  }
+  // Song whose analysis-configuration dialog is open (null = none).
+  let analyzeFor = $state<{ id: string; title: string } | null>(null);
 
   // Remove a queued song from the analysis queue.
   function cancel(songId: string) {
@@ -127,7 +126,8 @@
               <td class="px-3 py-2 text-right">
                 {#if song.status === "unanalyzed" || song.status === "failed"}
                   <button
-                    onclick={() => analyze(song.id)}
+                    onclick={() =>
+                      (analyzeFor = { id: song.id, title: song.title })}
                     class="rounded bg-neutral-200 px-2 py-1 text-xs font-medium hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700"
                   >
                     {song.status === "failed" ? "Retry" : "Analyze"}
@@ -137,7 +137,7 @@
                   <button
                     onclick={(e) => {
                       e.stopPropagation();
-                      analyze(song.id);
+                      analyzeFor = { id: song.id, title: song.title };
                     }}
                     title="Run analysis again (overwrites the existing profile)"
                     class="rounded bg-neutral-200 px-2 py-1 text-xs font-medium hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700"
@@ -160,3 +160,11 @@
     {/if}
   </div>
 </section>
+
+{#if analyzeFor}
+  <AnalyzeDialog
+    songId={analyzeFor.id}
+    songTitle={analyzeFor.title}
+    onclose={() => (analyzeFor = null)}
+  />
+{/if}

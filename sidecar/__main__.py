@@ -5,7 +5,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import ipc, library, metadata, separation, storage, worker
+from . import ipc, library, metadata, separation, settings, storage, worker
 from .schema import (
     GetProfileCommand,
     ImportCommand,
@@ -44,12 +44,13 @@ def emit_snapshot() -> None:
 def emit_settings() -> None:
     """Emit the current analysis settings (engines + drum sub-separation)."""
     with library.connect() as con:
-        engines = library.get_engines(con)
-        drum_subsep = library.get_drum_subsep(con)
+        engines = settings.get_engines(con)
+        drum_subsep = settings.get_drum_subsep(con)
     ipc.emit(
         SettingsEvent(
             engines=engines,
             available_engines=list(separation.ENGINES),
+            engine_info=separation.ENGINE_INFO,
             drum_subsep=drum_subsep,
         )
     )
@@ -132,11 +133,9 @@ def handle(msg: dict) -> None:
         cmd = UpdateSettingsCommand.model_validate(msg)
         with library.connect() as con:
             if cmd.engines is not None:
-                # Keep only known engine ids; the frontend may lag the available set.
-                valid = [e for e in cmd.engines if e in separation.ENGINES]
-                library.set_setting(con, "engines", valid)
+                settings.set_engines(con, cmd.engines)
             if cmd.drum_subsep is not None:
-                library.set_setting(con, "drum_subsep", bool(cmd.drum_subsep))
+                settings.set_drum_subsep(con, cmd.drum_subsep)
         emit_settings()
     else:
         log.warning("unknown command: %r", msg)
