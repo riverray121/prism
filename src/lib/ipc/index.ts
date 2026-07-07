@@ -18,6 +18,11 @@ export function importYoutube(url: string): Promise<void> {
   return sendCommand({ type: "library.import_youtube", url });
 }
 
+// Remove a song: its library row and its whole on-disk folder.
+export function deleteSong(songId: string): Promise<void> {
+  return sendCommand({ type: "library.delete", song_id: songId });
+}
+
 export function listLibrary(): Promise<void> {
   return sendCommand({ type: "library.list" });
 }

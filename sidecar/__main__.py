@@ -8,9 +8,12 @@ from pathlib import Path
 
 from . import ipc, library, metadata, separation, settings, storage, worker, youtube
 from .schema import (
+    DeleteSongCommand,
     GetProfileCommand,
     ImportCommand,
     ImportFailedEvent,
+    ImportFinishedEvent,
+    ImportStartedEvent,
     ImportYoutubeCommand,
     LibrarySongsEvent,
     ProfileEvent,
@@ -86,6 +89,7 @@ def import_youtube(url: str) -> None:
     so emitting from here is safe.
     """
     tmp: Path | None = None
+    ipc.emit(ImportStartedEvent(path=url))
     try:
         audio = youtube.download(url)
         tmp = audio.parent
@@ -96,6 +100,7 @@ def import_youtube(url: str) -> None:
     finally:
         if tmp is not None:
             shutil.rmtree(tmp, ignore_errors=True)
+        ipc.emit(ImportFinishedEvent(path=url))
     emit_snapshot()
 
 
@@ -148,6 +153,15 @@ def handle(msg: dict) -> None:
             # A schema-drifted or partially-written profile (missing keys, bad
             # JSON) shouldn't take down the command channel — log and skip.
             log.warning("malformed profile for %s", cmd.song_id)
+    elif msg_type == "library.delete":
+        cmd = DeleteSongCommand.model_validate(msg)
+        with library.connect() as con:
+            deleted = library.delete_song(con, cmd.song_id)
+        if deleted:
+            storage.delete_song_dir(cmd.song_id)
+        else:
+            log.warning("delete refused (analyzing?): %s", cmd.song_id)
+        emit_snapshot()
     elif msg_type == "library.update_metadata":
         cmd = UpdateMetadataCommand.model_validate(msg)
         with library.connect() as con:

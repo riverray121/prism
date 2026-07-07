@@ -52,8 +52,15 @@ TARGET_FRAME_RATE_HZ = 100
 N_FFT = 2048
 
 
+# Number of dsp-mix progress checkpoints (see _analyze's on_step calls).
+MIX_STEPS = 8
+
+
 def _analyze(
-    y: np.ndarray, y_stereo: np.ndarray, sr: int
+    y: np.ndarray,
+    y_stereo: np.ndarray,
+    sr: int,
+    on_step: Callable[[int], None] | None = None,
 ) -> tuple[float, int, dict[str, dict], dict[str, np.ndarray]]:
     """Run every mix-level feature off one loaded signal.
 
@@ -61,22 +68,33 @@ def _analyze(
     for spatial features. Returns (frame_rate_hz, frame_count, mix, heatmaps).
     Continuous features and heatmap matrices are truncated to a shared frame_count
     so they line up on the timeline; heatmaps are written to .npy by the caller.
+    ``on_step`` fires after each checkpoint (1..MIX_STEPS) for stage progress.
     """
+
+    def step(k: int) -> None:
+        if on_step:
+            on_step(k)
+
     hop = max(1, round(sr / TARGET_FRAME_RATE_HZ))
     frame_rate_hz = sr / hop
     # Magnitude spectrogram, computed once and shared by the frequency features.
     spectrum = np.abs(librosa.stft(y, n_fft=N_FFT, hop_length=hop))
+    step(1)
 
     key_env, key_conf = tonal.key(y, sr)
+    step(2)
     # bpm (scalar) + beats, downbeats (event); the structure pass (sections,
     # novelty, motifs — one shared SSM) reuses the beat grid.
     rhythm_feats = rhythm.rhythm_features(y, sr)
     beat_times = [ev["t"] for ev in rhythm_feats["beats"]["events"]]
+    step(3)
+    structure_feats = structure.structure_features(
+        y, sr, beat_times, len(y) // hop + 1, frame_rate_hz
+    )
+    step(4)
     mix: dict[str, dict] = {
         **rhythm_feats,
-        **structure.structure_features(
-            y, sr, beat_times, len(y) // hop + 1, frame_rate_hz
-        ),
+        **structure_feats,
         "rms": amplitude.rms(y, sr, hop),
         "silence": amplitude.silence(y, sr, hop),
         "rhythmic_density": rhythm.rhythmic_density(y, sr, hop),
@@ -93,8 +111,10 @@ def _analyze(
         "key": key_env,
         "key_confidence": key_conf,
         "tuning_deviation": tonal.tuning_deviation(y, sr),
-        "chords": chords.compute_chords(y, sr),
     }
+    step(5)
+    mix["chords"] = chords.compute_chords(y, sr)
+    step(6)
     # Heatmap matrices (raw, shape [bins, frames]); aligned and registered below.
     heatmaps: dict[str, np.ndarray] = {
         "spectrogram": frequency.spectrogram(y, sr, hop),
@@ -125,9 +145,11 @@ def _analyze(
     mix["sound_tags"] = tags_env
     mix.update(axes)
     heatmaps["sound_tags"] = tags_matrix
+    step(7)
 
-    # Default onset track on every continuous feature (renders as a dots lane).
+    # Default onset tracks on every continuous feature (rendered as dots lanes).
     derive.attach_onsets(mix, frame_rate_hz)
+    step(8)
 
     return frame_rate_hz, frame_count, mix, heatmaps
 
@@ -257,13 +279,18 @@ def _separate_and_analyze_stems(
         )
         stem_paths = separation.separate(audio_path, stems_root / engine, engine)
 
-        # One dsp-stem transition per engine; the per-stem loop carries no new
-        # stage info, so don't re-emit it for every stem.
-        _set_stage(
-            song_id, "dsp-stem", on_change, engine=engine, step=i + 1, total=total
-        )
         engine_stems: dict[str, dict] = {}
-        for stem_name, path in stem_paths.items():
+        # Per-stem progress: the engine label carries the stem being analyzed and
+        # step counts stems within this engine.
+        for j, (stem_name, path) in enumerate(stem_paths.items()):
+            _set_stage(
+                song_id,
+                "dsp-stem",
+                on_change,
+                engine=f"{engine} · {stem_name}",
+                step=j + 1,
+                total=len(stem_paths),
+            )
             entry = _stem_entry(
                 song_id,
                 path,
@@ -322,8 +349,15 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
 
         # Stage: mix-level DSP. Heatmap payloads go to .npy sidecars; only their
         # envelopes sit in the profile.
-        _set_stage(song_id, "dsp-mix", on_change)
-        frame_rate_hz, frame_count, mix, heatmaps = _analyze(y, y_stereo, sr)
+        _set_stage(song_id, "dsp-mix", on_change, step=0, total=MIX_STEPS)
+        frame_rate_hz, frame_count, mix, heatmaps = _analyze(
+            y,
+            y_stereo,
+            sr,
+            on_step=lambda k: _set_stage(
+                song_id, "dsp-mix", on_change, step=k, total=MIX_STEPS
+            ),
+        )
         for name, matrix in heatmaps.items():
             storage.write_heatmap(song_id, name, matrix)
 

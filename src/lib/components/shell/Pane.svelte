@@ -23,14 +23,15 @@
   }
 </script>
 
-<div class="flex min-w-0 flex-col">
+<div class="flex h-full min-h-0 min-w-0 flex-col">
   <div
-    class="flex h-8 shrink-0 items-center gap-1 border-b border-edge bg-surface px-2"
+    class="flex h-10 shrink-0 items-center gap-1 border-b border-edge bg-surface px-2"
   >
     {#each TABS as { id, label } (id)}
       <button
         onclick={() => pick(id)}
-        class="rounded px-2 py-0.5 text-xs {tab === id
+        title={`Show the ${label} stage in this pane`}
+        class="rounded px-3 py-1 text-sm {tab === id
           ? 'bg-raised text-ink'
           : 'text-ink-muted hover:text-ink'}"
       >
@@ -39,8 +40,8 @@
     {/each}
     <button
       onclick={() => fullscreenPane(side)}
-      title="Fullscreen this pane"
-      class="ml-auto px-1 text-xs text-ink-faint hover:text-ink"
+      title="Fullscreen this pane (closes the split)"
+      class="ml-auto rounded px-3 py-1 text-base leading-none text-ink-faint hover:bg-raised hover:text-ink"
     >
       ⤢
     </button>

@@ -1,12 +1,14 @@
 <script lang="ts">
   import { formatTime } from "$lib/format";
   import AnalyzeDialog from "$lib/components/library/AnalyzeDialog.svelte";
+  import ConfirmDialog from "$lib/components/library/ConfirmDialog.svelte";
   import ImportDialog from "$lib/components/library/ImportDialog.svelte";
   import MetadataDialog from "$lib/components/library/MetadataDialog.svelte";
-  import { cancelAnalysis } from "$lib/ipc";
+  import { cancelAnalysis, deleteSong } from "$lib/ipc";
   import type { Song } from "$lib/ipc/messages";
   import { library } from "$lib/state/library.svelte";
   import {
+    close as closeInspection,
     inspection,
     open as openInspection,
   } from "$lib/state/inspection.svelte";
@@ -18,6 +20,21 @@
   let analyzeFor = $state<{ id: string; title: string } | null>(null);
   // Song whose metadata dialog is open (null = none).
   let editFor = $state<Song | null>(null);
+  // Song pending delete confirmation (null = none).
+  let deleteFor = $state<Song | null>(null);
+
+  function confirmDelete(song: Song) {
+    if (inspection.songId === song.id) closeInspection();
+    void deleteSong(song.id);
+  }
+
+  // "Jul 7" style short date from an ISO timestamp.
+  function shortDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  }
 
   // ── Search + filters ─────────────────────────────────────────────────────
 
@@ -170,18 +187,32 @@
             <span class="min-w-0 flex-1 truncate">
               {song.artist} · {formatType(song.source_path)} · {formatDuration(
                 song.duration_sec,
-              )}
+              )}{song.analyzed_at
+                ? ` · analyzed ${shortDate(song.analyzed_at)}`
+                : ""}
             </span>
             <button
               onclick={(e) => {
                 e.stopPropagation();
                 editFor = song;
               }}
-              title="Edit metadata"
-              class="shrink-0 text-ink-faint hover:text-ink"
+              title="Edit title and artist"
+              class="shrink-0 rounded px-2 py-1 text-sm leading-none text-ink-faint hover:bg-raised hover:text-ink"
             >
               ✎
             </button>
+            {#if song.status !== "analyzing"}
+              <button
+                onclick={(e) => {
+                  e.stopPropagation();
+                  deleteFor = song;
+                }}
+                title="Delete this song and all its analysis data"
+                class="shrink-0 rounded px-2 py-1 text-sm leading-none text-ink-faint hover:bg-raised hover:text-danger"
+              >
+                🗑
+              </button>
+            {/if}
             {#if song.status === "unanalyzed" || song.status === "failed" || song.status === "analyzed"}
               <button
                 onclick={(e) => {
@@ -191,7 +222,7 @@
                 title={song.status === "analyzed"
                   ? "Run analysis again (overwrites the existing profile)"
                   : ""}
-                class="shrink-0 rounded bg-raised px-2 py-0.5 text-xs font-medium hover:text-ink"
+                class="shrink-0 rounded bg-raised px-2.5 py-1 text-sm font-medium hover:text-ink"
               >
                 {song.status === "failed"
                   ? "Retry"
@@ -205,7 +236,7 @@
                   e.stopPropagation();
                   void cancelAnalysis(song.id);
                 }}
-                class="shrink-0 rounded bg-raised px-2 py-0.5 text-xs font-medium hover:text-ink"
+                class="shrink-0 rounded bg-raised px-2.5 py-1 text-sm font-medium hover:text-ink"
               >
                 Cancel
               </button>
@@ -234,4 +265,13 @@
 {/if}
 {#if editFor}
   <MetadataDialog song={editFor} onclose={() => (editFor = null)} />
+{/if}
+{#if deleteFor}
+  {@const target = deleteFor}
+  <ConfirmDialog
+    title={`Delete "${target.title}"?`}
+    body="Removes the song, its analysis, stems, and favorites from the library. This cannot be undone."
+    onconfirm={() => confirmDelete(target)}
+    onclose={() => (deleteFor = null)}
+  />
 {/if}

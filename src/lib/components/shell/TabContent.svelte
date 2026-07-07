@@ -11,8 +11,13 @@
   const meta = $derived(TABS.find((t) => t.id === tab) ?? TABS[0]);
 </script>
 
-{#if tab === "analysis" && inspection.songId !== null}
-  <InspectionView />
-{:else}
+<!-- The analysis view stays mounted (hidden) while other tabs show, so its
+     scroll position, collapse state, and loaded lanes survive tab switches. -->
+{#if inspection.songId !== null}
+  <div class={tab === "analysis" ? "h-full" : "hidden"}>
+    <InspectionView />
+  </div>
+{/if}
+{#if tab !== "analysis" || inspection.songId === null}
   <TabStub title={meta.label} blurb={meta.blurb} />
 {/if}

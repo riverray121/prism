@@ -16,6 +16,9 @@ export const transport = $state<{
   // Duration of the audible buffer (fallback: song metadata) — drives the
   // time display and scrub clamping.
   durationSec: number;
+  // Playback speed multiplier (1 = normal). Rate changes pitch too — this is
+  // resampling, not time-stretching.
+  rate: number;
   // Surfaced when playback fails, so errors are visible instead of silent
   // (e.g. a missing stem file or a decode failure).
   error: string | null;
@@ -24,6 +27,7 @@ export const transport = $state<{
   playing: false,
   activeKey: "mix",
   durationSec: 0,
+  rate: 1,
   error: null,
 });
 
@@ -31,6 +35,7 @@ let ctx: AudioContext | undefined;
 let source: AudioBufferSourceNode | undefined;
 let startCtxTime = 0; // ctx.currentTime when the current source started
 let startOffset = 0; // buffer offset the current source started from
+let startRate = 1; // playback rate the current source started with
 let raf: number | null = null;
 let activeBuffer: AudioBuffer | null = null;
 // Decoded buffers cached by file path, so switching sources doesn't re-decode.
@@ -72,20 +77,26 @@ function setActiveBuffer(buf: AudioBuffer | null) {
   transport.durationSec = duration();
 }
 
-// Current playback position from the audio clock while playing, else the held position.
+// Current playback position from the audio clock while playing, else the held
+// position. Elapsed wall time maps to buffer time through the playback rate.
 function positionNow(): number {
   if (!ctx || !transport.playing) return transport.currentTime;
-  return Math.min(startOffset + (ctx.currentTime - startCtxTime), duration());
+  return Math.min(
+    startOffset + (ctx.currentTime - startCtxTime) * startRate,
+    duration(),
+  );
 }
 
 function startSource(offset: number) {
   const context = ensureCtx();
   const node = context.createBufferSource();
   node.buffer = activeBuffer;
+  node.playbackRate.value = transport.rate;
   node.connect(context.destination);
   node.onended = onSourceEnded;
   startOffset = offset;
   startCtxTime = context.currentTime;
+  startRate = transport.rate;
   node.start(0, offset);
   source = node;
 }
@@ -197,6 +208,40 @@ export function scrub(sec: number): void {
 export function scrubEnd(): void {
   if (resumeAfterScrub) void playKey(transport.activeKey, activePath);
   resumeAfterScrub = false;
+}
+
+// Change playback speed; a playing source restarts at the current position so
+// the new rate (and the playhead math) take effect immediately.
+export function setRate(rate: number): void {
+  transport.rate = rate;
+  if (!transport.playing) return;
+  transport.currentTime = positionNow();
+  stopSource();
+  startSource(transport.currentTime);
+  startRate = rate;
+}
+
+// Switch the audible source without disturbing the playhead: seamless swap
+// while playing, or just re-target while paused (buffer resolves lazily).
+export function switchSource(key: string, path: string | null): void {
+  if (transport.playing) {
+    void playKey(key, path);
+    return;
+  }
+  const seq = ++playSeq;
+  const token = loadToken;
+  transport.activeKey = key;
+  activePath = path;
+  if (!path) return;
+  void (async () => {
+    try {
+      const buf = await loadBuffer(path);
+      if (token !== loadToken || seq !== playSeq) return;
+      setActiveBuffer(buf);
+    } catch {
+      // Lazy retarget is best-effort; a real play attempt surfaces the error.
+    }
+  })();
 }
 
 // Reset for a song change: stop audio, drop caches, abandon in-flight decodes,

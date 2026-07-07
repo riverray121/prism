@@ -4,15 +4,16 @@
    the light value derives from it. light-dark() resolves per the OS scheme
    (color-scheme below), so every token is theme-aware at the point of use. */
 @theme {
-  --color-app: light-dark(#f4f4f5, #131316); /* window background */
-  --color-surface: light-dark(#ffffff, #19191d); /* panels, bars */
-  --color-raised: light-dark(#ececee, #232329); /* hover / active fills */
-  --color-edge: light-dark(#d9d9de, #2a2a31); /* 1px borders */
-  --color-ink: light-dark(#232326, #d7d7dc); /* primary text */
-  --color-ink-muted: light-dark(#6e6e76, #94949c); /* secondary text */
-  --color-ink-faint: light-dark(#a3a3ab, #62626b); /* tertiary text */
-  --color-accent: light-dark(#4f46e5, #818cf8); /* selection, primary actions */
-  --color-danger: light-dark(#dc2626, #f87171);
+  /* Zed-like neutral-cool grays: dark sits around #22-#33, not near-black. */
+  --color-app: light-dark(#f2f2f3, #22252a); /* window background */
+  --color-surface: light-dark(#fafafa, #282c33); /* panels, bars */
+  --color-raised: light-dark(#e8e8ea, #333842); /* hover / active fills */
+  --color-edge: light-dark(#d4d4d8, #3c424c); /* 1px borders */
+  --color-ink: light-dark(#232326, #dce0e5); /* primary text */
+  --color-ink-muted: light-dark(#66666e, #9aa1ab); /* secondary text */
+  --color-ink-faint: light-dark(#9b9ba3, #6b727d); /* tertiary text */
+  --color-accent: light-dark(#3b82c4, #74ade8); /* selection, primary actions */
+  --color-danger: light-dark(#ca4a4a, #e06c75);
 
   --spacing-bar: 2.5rem; /* shared chrome height: top bar + sidebar header */
 }
@@ -31,4 +32,17 @@
     background-color: var(--color-app);
     color: var(--color-ink);
   }
+}
+
+/* Indeterminate progress sweep (YouTube download has no byte progress). */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+.animate-indeterminate {
+  animation: indeterminate 1.2s linear infinite;
 }

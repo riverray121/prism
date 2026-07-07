@@ -6,7 +6,9 @@ import type { Song } from "$lib/ipc/messages";
 export const library = $state<{
   songs: Song[];
   lastImportError: { path: string; error: string } | null;
-}>({ songs: [], lastImportError: null });
+  // URLs with a download in flight (sidecar import_started → import_finished).
+  pendingImports: string[];
+}>({ songs: [], lastImportError: null, pendingImports: [] });
 
 // Snapshot lookup by id; null for null/unknown ids. Lives here so components
 // never join stores themselves.

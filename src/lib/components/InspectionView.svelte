@@ -65,15 +65,6 @@
       : 0,
   );
 
-  // Song-level lane for the pinned strip: RMS if present, else the first
-  // continuous mix feature.
-  const overview = $derived.by(() => {
-    const rms = inspection.profile?.mix["rms"];
-    if (rms?.render === "continuous") return rms.data;
-    const first = features.find((e) => e[1].render === "continuous");
-    return first && first[1].render === "continuous" ? first[1].data : null;
-  });
-
   // ── Collapse + search state ───────────────────────────────────────────────
 
   // Sparse overrides over per-group defaults (mix categories open, engines
@@ -85,6 +76,9 @@
   function toggle(key: string, dflt: boolean): void {
     openOverrides[key] = !isOpen(key, dflt);
   }
+
+  // Per-lane onset display mode: true = strict maxima; keyed by favorites path.
+  const strictOnsets = $state<Record<string, boolean>>({});
 
   let query = $state("");
   const q = $derived(query.trim().toLowerCase());
@@ -178,10 +172,10 @@
   favPath: string,
 )}
   <div>
-    <p class="mb-1 flex items-center gap-1 text-xs text-ink-muted">
+    <p class="mb-1 flex items-center gap-1.5 text-sm text-ink-muted">
       {@render star(favPath)}
       {humanize(name)}
-      <span class="text-ink-faint">· {detailOf(feature)}</span>
+      <span class="text-xs text-ink-faint">· {detailOf(feature)}</span>
     </p>
     {#if feature.render === "continuous"}
       <ContinuousLane
@@ -189,6 +183,7 @@
         {frameRateHz}
         label={name}
         color={PALETTE[i % PALETTE.length]}
+        height={150}
         playheadSec={transport.currentTime}
         follow={transport.playing}
         onSeek={scrub}
@@ -196,16 +191,35 @@
         onScrubEnd={scrubEnd}
       />
       {#if feature.onsets?.length}
-        <OnsetDots
-          onsets={feature.onsets}
-          maxTimeSec={durationSec}
-          color={PALETTE[i % PALETTE.length]}
-          playheadSec={transport.currentTime}
-          follow={transport.playing}
-          onSeek={scrub}
-          onScrubStart={scrubStart}
-          onScrubEnd={scrubEnd}
-        />
+        {@const strict =
+          (strictOnsets[favPath] ?? false) && !!feature.onsets_strict}
+        <div class="flex items-center gap-2">
+          <div class="min-w-0 flex-1">
+            <OnsetDots
+              onsets={strict ? (feature.onsets_strict ?? []) : feature.onsets}
+              maxTimeSec={durationSec}
+              color={PALETTE[i % PALETTE.length]}
+              playheadSec={transport.currentTime}
+              follow={transport.playing}
+              onSeek={scrub}
+              onScrubStart={scrubStart}
+              onScrubEnd={scrubEnd}
+            />
+          </div>
+          {#if feature.onsets_strict}
+            <button
+              onclick={() => (strictOnsets[favPath] = !strict)}
+              title={strict
+                ? "Dense onsets: every qualifying peak — runs of dots trace sustained sounds"
+                : "Strict onsets: prominent maxima only — one dot per distinct hit"}
+              class="shrink-0 rounded border border-edge px-2 py-0.5 text-xs {strict
+                ? 'text-accent'
+                : 'text-ink-faint hover:text-ink'}"
+            >
+              {strict ? "maxima" : "dense"}
+            </button>
+          {/if}
+        </div>
       {/if}
     {:else if feature.render === "event"}
       <EventLane
@@ -214,7 +228,7 @@
         playheadSec={transport.currentTime}
         follow={transport.playing}
         labelFor={name === "chords" ? chordLabel : undefined}
-        height={name === "chords" ? 88 : 64}
+        height={name === "chords" ? 100 : 76}
         onSeek={scrub}
         onScrubStart={scrubStart}
         onScrubEnd={scrubEnd}
@@ -223,6 +237,7 @@
       <SegmentLane
         segments={feature.segments}
         maxTimeSec={durationSec}
+        height={76}
         playheadSec={transport.currentTime}
         follow={transport.playing}
         onSeek={scrub}
@@ -233,6 +248,7 @@
       <HeatmapLane
         path={sidecarPath(feature.sidecar)}
         {frameRateHz}
+        height={190}
         normalize={name === "spectrogram" ? "global" : "per-row"}
         playheadSec={transport.currentTime}
         follow={transport.playing}
@@ -274,34 +290,14 @@
       <p class="text-sm text-ink-faint">Loading…</p>
     </div>
   {:else}
-    <!-- Pinned strip: song-level overview locked to the global playhead, plus
-         the feature search. Stays put while the list scrolls. -->
-    <div
-      class="flex shrink-0 flex-col gap-2 border-b border-edge bg-surface px-4 pb-2 pt-1"
-    >
-      {#if overview}
-        <ContinuousLane
-          data={overview}
-          {frameRateHz}
-          label="overview"
-          color="#818cf8"
-          height={48}
-          playheadSec={transport.currentTime}
-          follow={transport.playing}
-          onSeek={scrub}
-          onScrubStart={scrubStart}
-          onScrubEnd={scrubEnd}
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-32 pt-3">
+      <div class="flex w-full flex-col gap-1">
+        <input
+          bind:value={query}
+          placeholder="Search features…"
+          title="Filter features by name, category, engine, or stem"
+          class="mb-2 w-72 rounded border border-edge bg-app px-2 py-1.5 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
         />
-      {/if}
-      <input
-        bind:value={query}
-        placeholder="Search features…"
-        class="w-64 rounded border border-edge bg-app px-2 py-1 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
-      />
-    </div>
-
-    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-      <div class="mx-auto flex max-w-4xl flex-col gap-1">
         <!-- Scalars: one value each, a labeled grid. -->
         {#if scalars.length > 0 && (q === "" || scalars.some( ([n]) => matches(n), ))}
           <Group
@@ -363,8 +359,8 @@
             <Group
               label={engine}
               detail={`${Object.keys(engineStems).length} stems`}
-              open={groupOpen(`stems.${engine}`, false, engineHasHits)}
-              ontoggle={() => toggle(`stems.${engine}`, false)}
+              open={groupOpen(`stems.${engine}`, true, engineHasHits)}
+              ontoggle={() => toggle(`stems.${engine}`, true)}
             >
               {#each Object.entries(engineStems) as [stemName, stemData] (stemName)}
                 {@const stemKey = `${engine}::${stemName}`}

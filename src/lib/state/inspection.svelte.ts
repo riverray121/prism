@@ -1,6 +1,10 @@
 import { getProfile, updateFavorites } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
-import { resetForSong, toggleSource } from "$lib/state/transport.svelte";
+import {
+  resetForSong,
+  switchSource,
+  toggleSource,
+} from "$lib/state/transport.svelte";
 
 // The song currently open in the inspection view. profile/audioPath are null
 // while the sidecar is fetching them. songId null means no song is open.
@@ -49,6 +53,12 @@ export function pathForKey(key: string): string | null {
 // meets the transport, so components never join the two.
 export function playToggle(key: string): void {
   toggleSource(key, pathForKey(key));
+}
+
+// Return the audible source to the original mix (e.g. after soloing a stem),
+// keeping the playhead where it is.
+export function backToMix(): void {
+  switchSource("mix", pathForKey("mix"));
 }
 
 // Resolve a relative sidecar path (heatmap/tags .npy) to its absolute path.

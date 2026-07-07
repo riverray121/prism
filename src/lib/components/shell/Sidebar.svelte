@@ -34,7 +34,8 @@
         <span class="text-sm font-semibold">Library</span>
         <button
           onclick={toggleSidebar}
-          class="px-1 text-sm text-ink-muted hover:text-ink"
+          title="Collapse the library sidebar"
+          class="rounded px-3 py-1.5 text-base leading-none text-ink-muted hover:bg-raised hover:text-ink"
         >
           «
         </button>
@@ -49,7 +50,8 @@
         <Tooltip.Root>
           <Tooltip.Trigger
             onclick={toggleSidebar}
-            class="rounded px-1.5 py-0.5 text-sm text-ink-muted hover:bg-raised hover:text-ink"
+            title="Expand the library sidebar"
+            class="rounded px-2.5 py-1.5 text-base text-ink-muted hover:bg-raised hover:text-ink"
           >
             »
           </Tooltip.Trigger>

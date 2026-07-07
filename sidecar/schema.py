@@ -15,6 +15,11 @@ class ImportYoutubeCommand(BaseModel):
     url: str
 
 
+class DeleteSongCommand(BaseModel):
+    type: Literal["library.delete"]
+    song_id: str
+
+
 class QueueAddCommand(BaseModel):
     type: Literal["queue.add"]
     song_ids: list[str]
@@ -65,6 +70,8 @@ class Song(BaseModel):
     source_path: str
     status: str
     imported_at: str
+    # Set once analysis completes; shown as the analyzed date in the library.
+    analyzed_at: str | None = None
     # Multi-stage analysis progress (null unless status='analyzing').
     current_stage: str | None = None
     # Separation engine currently running, during the separate/dsp-stem stages.
@@ -86,6 +93,18 @@ class ImportFailedEvent(BaseModel):
     type: Literal["library.import_failed"] = "library.import_failed"
     path: str
     error: str
+
+
+# Long-running import (a download) began; lets the UI show progress.
+class ImportStartedEvent(BaseModel):
+    type: Literal["library.import_started"] = "library.import_started"
+    path: str
+
+
+# A started import ended (either way; failures also emit import_failed).
+class ImportFinishedEvent(BaseModel):
+    type: Literal["library.import_finished"] = "library.import_finished"
+    path: str
 
 
 class ProfileEvent(BaseModel):

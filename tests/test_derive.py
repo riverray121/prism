@@ -53,3 +53,31 @@ def test_attach_onsets_hits_only_continuous_envelopes():
     derive.attach_onsets(feature_map, 100.0)
     assert len(feature_map["rms"]["onsets"]) == 3
     assert "onsets" not in feature_map["beats"]
+
+
+def test_strict_mode_collapses_a_noisy_hump_to_one_onset():
+    # A wide hump with small noise on top: dense mode sees several qualifying
+    # peaks; strict mode's prominence filter keeps the hump as one onset.
+    x = np.linspace(-1, 1, 200)
+    hump = np.exp(-((x / 0.4) ** 2))
+    hump[80:120] += 0.02 * np.array([1, -1] * 20)  # ripple across the crest
+    dense = derive.onsets_from(hump, frame_rate_hz=100.0)
+    strict = derive.onsets_from(hump, frame_rate_hz=100.0, mode="strict")
+    assert len(dense) >= len(strict)
+    assert len(strict) == 1
+
+
+def test_strict_mode_keeps_distinct_prominent_peaks():
+    y = np.zeros(300)
+    y[50] = 1.0
+    y[150] = 0.8
+    y[250] = 0.9
+    strict = derive.onsets_from(y, frame_rate_hz=100.0, mode="strict")
+    assert [o["t"] for o in strict] == [0.5, 1.5, 2.5]
+
+
+def test_attach_onsets_adds_both_tracks():
+    feature_map = {"rms": {"render": "continuous", "data": list(_spiky())}}
+    derive.attach_onsets(feature_map, 100.0)
+    assert len(feature_map["rms"]["onsets"]) == 3
+    assert len(feature_map["rms"]["onsets_strict"]) == 3

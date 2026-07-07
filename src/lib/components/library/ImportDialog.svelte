@@ -10,6 +10,26 @@
   let { onclose }: { onclose: () => void } = $props();
 
   let url = $state("");
+  // URL whose download we're waiting on; keeps the dialog open with progress.
+  let submitted = $state<string | null>(null);
+
+  const downloading = $derived(
+    submitted !== null && library.pendingImports.includes(submitted),
+  );
+  const failed = $derived(
+    submitted !== null && library.lastImportError?.path === submitted
+      ? library.lastImportError
+      : null,
+  );
+
+  // Close once the download finished cleanly (song row arrives via snapshot).
+  // The latch waits for import_started to round-trip first — without it the
+  // effect would close the dialog before the sidecar even acknowledged.
+  let sawStart = $state(false);
+  $effect(() => {
+    if (downloading) sawStart = true;
+    else if (submitted !== null && sawStart && !failed) onclose();
+  });
 
   async function pickFiles() {
     const selected = await open({
@@ -28,10 +48,9 @@
     const trimmed = url.trim();
     if (trimmed === "") return;
     library.lastImportError = null;
+    submitted = trimmed;
     void importYoutube(trimmed);
-    // The download runs sidecar-side; the row appears via the next snapshot,
-    // or lastImportError carries the failure (e.g. missing ffmpeg).
-    onclose();
+    // The dialog stays open showing progress until import_finished arrives.
   }
 </script>
 
@@ -65,7 +84,8 @@
             />
             <button
               onclick={submitUrl}
-              disabled={url.trim() === ""}
+              disabled={url.trim() === "" || downloading}
+              title="Download this URL's audio as FLAC and import it"
               class="rounded bg-accent px-3 py-1 text-sm font-medium text-surface hover:opacity-90 disabled:opacity-50"
             >
               Import
@@ -74,6 +94,20 @@
           <p class="text-xs text-ink-faint">
             Downloads as FLAC. Requires ffmpeg on the system.
           </p>
+
+          {#if downloading}
+            <!-- Indeterminate: yt-dlp exposes no byte progress through this path. -->
+            <div class="flex flex-col gap-1">
+              <p class="text-xs text-ink-muted">Downloading…</p>
+              <div class="h-1.5 overflow-hidden rounded bg-raised">
+                <div class="h-full w-1/3 animate-indeterminate bg-accent"></div>
+              </div>
+            </div>
+          {:else if failed}
+            <p class="text-xs text-danger" title={failed.error}>
+              Import failed: {failed.error}
+            </p>
+          {/if}
         </div>
       </div>
     </Dialog.Content>

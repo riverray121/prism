@@ -101,6 +101,8 @@
 
   function options(): uPlot.Options {
     const grid = { stroke: "rgba(128,128,128,0.15)", width: 1 };
+    // Larger than uPlot's default so tick labels stay readable on dense lanes.
+    const font = "13px ui-sans-serif, system-ui, sans-serif";
     return {
       width: container.clientWidth,
       height,
@@ -111,8 +113,8 @@
       // Drag is repurposed for scrubbing the playhead; zoom is on the wheel.
       cursor: { drag: { x: false, y: false } },
       axes: [
-        showXAxis ? { stroke: "#888", grid } : { show: false },
-        showYAxis ? { stroke: "#888", grid } : { show: false },
+        showXAxis ? { stroke: "#888", grid, font } : { show: false },
+        showYAxis ? { stroke: "#888", grid, font } : { show: false },
       ],
       series,
       legend: { show: false },
@@ -125,6 +127,17 @@
         ],
       },
     };
+  }
+
+  // Nearest ancestor that can actually scroll vertically; the tab panes own
+  // their scrolling, so window-level scrollBy would be a no-op.
+  function scrollParentOf(el: Element): Element | null {
+    for (let n = el.parentElement; n; n = n.parentElement) {
+      if (n.scrollHeight <= n.clientHeight) continue;
+      const overflowY = getComputedStyle(n).overflowY;
+      if (overflowY === "auto" || overflowY === "scroll") return n;
+    }
+    return null;
   }
 
   // Drag-to-scrub and wheel-to-zoom, bound to the plot overlay.
@@ -167,15 +180,16 @@
         // Gesture routing:
         //  - pinch / ctrl+wheel (ctrlKey) -> zoom (below)
         //  - horizontal two-finger swipe on a zoomed view -> pan
-        //  - anything else -> page scroll, forwarded to the viewport explicitly
-        //    because the absolutely-positioned uPlot overlay swallows the wheel
-        //    in this webview (the page would otherwise not scroll over a graph)
+        //  - anything else -> scroll, forwarded to the nearest scrollable
+        //    ancestor explicitly because the absolutely-positioned uPlot
+        //    overlay swallows the wheel in this webview (scrolling would
+        //    otherwise go dead while the cursor is over a graph)
         if (!e.ctrlKey) {
           e.preventDefault();
           const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
           const k = wheelDeltaScale(e.deltaMode, window.innerHeight);
           if (!horizontal || range >= full - 1e-6) {
-            window.scrollBy(e.deltaX * k, e.deltaY * k);
+            scrollParentOf(over)?.scrollBy(e.deltaX * k, e.deltaY * k);
             return;
           }
           const dv = (e.deltaX * k * range) / (over.clientWidth || 1);

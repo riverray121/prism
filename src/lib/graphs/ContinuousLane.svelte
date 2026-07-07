@@ -10,6 +10,9 @@
     label = "value",
     color = "#6366f1",
     height = 120,
+    showYAxis = true,
+    showXAxis = true,
+    showControls = true,
     playheadSec = null,
     follow = false,
     onSeek,
@@ -21,6 +24,9 @@
     label?: string;
     color?: string;
     height?: number;
+    showYAxis?: boolean;
+    showXAxis?: boolean;
+    showControls?: boolean;
     playheadSec?: number | null;
     follow?: boolean;
     onSeek?: (sec: number) => void;
@@ -43,6 +49,9 @@
   series={[{}, { label, stroke: color, width: 1, points: { show: false } }]}
   {maxTimeSec}
   {height}
+  {showYAxis}
+  {showXAxis}
+  {showControls}
   {playheadSec}
   {follow}
   {onSeek}

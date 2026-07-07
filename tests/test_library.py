@@ -118,3 +118,17 @@ def test_get_setting_falls_back_on_malformed_json(con):
 def test_setting_round_trip(con):
     library.set_setting(con, "engines", ["htdemucs_ft"])
     assert library.get_setting(con, "engines", None) == ["htdemucs_ft"]
+
+
+def test_delete_song_removes_row(con):
+    _insert(con, "s1")
+    assert library.delete_song(con, "s1") is True
+    assert library.list_songs(con) == []
+
+
+def test_delete_song_refuses_while_analyzing(con):
+    _insert(con, "s1")
+    library.mark_queued(con, ["s1"], "2026-01-01T00:00:00Z")
+    library.mark_analyzing(con, "s1")
+    assert library.delete_song(con, "s1") is False
+    assert len(library.list_songs(con)) == 1

@@ -16,7 +16,8 @@ import numpy as np
 
 # Profile JSON schema version (see docs/profile-schema.md).
 # 0.2.0: optional `onsets` on continuous feature envelopes.
-SCHEMA_VERSION = "0.2.0"
+# 0.3.0: optional `onsets_strict` sibling (prominence-filtered maxima).
+SCHEMA_VERSION = "0.3.0"
 
 # Repo root is the parent of the ``sidecar`` package directory. Resolved from the
 # module location so the path holds regardless of the process working directory.
@@ -159,3 +160,8 @@ def update_profile_metadata(song_id: str, title: str, artist: str) -> None:
     profile["song"]["title"] = title
     profile["song"]["artist"] = artist
     _write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
+
+
+def delete_song_dir(song_id: str) -> None:
+    # Remove a song's whole folder (source, stems, heatmaps, profile).
+    shutil.rmtree(SONGS_DIR / song_id, ignore_errors=True)

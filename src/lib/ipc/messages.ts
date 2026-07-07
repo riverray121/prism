@@ -12,6 +12,8 @@ export const SongSchema = z.object({
   source_path: z.string(),
   status: z.string(),
   imported_at: z.string(),
+  // Set once analysis completes; shown as the analyzed date in the library.
+  analyzed_at: z.string().nullable().default(null),
   // Multi-stage analysis progress; null unless status is 'analyzing'.
   current_stage: z.string().nullable().default(null),
   // Separation engine currently running, during the separate/dsp-stem stages.
@@ -35,6 +37,16 @@ export const ImportFailedEventSchema = z.object({
   error: z.string(),
 });
 
+// Long-running import (a download) lifecycle, so the UI can show progress.
+export const ImportStartedEventSchema = z.object({
+  type: z.literal("library.import_started"),
+  path: z.string(),
+});
+export const ImportFinishedEventSchema = z.object({
+  type: z.literal("library.import_finished"),
+  path: z.string(),
+});
+
 // Profile JSON (subset we consume). The mix is a keyed map of feature
 // envelopes, discriminated by render mode; see docs/profile-schema.md.
 export const ScalarFeatureSchema = z.object({
@@ -56,9 +68,13 @@ export const ContinuousFeatureSchema = z.object({
   // Present (="wip") on provisional ML features, e.g. the timbral axes.
   status: z.string().optional(),
   data: z.array(z.number()),
-  // Default onset track derived at analysis time (schema 0.2.0); absent on
-  // profiles analyzed before then.
+  // Default onset tracks derived at analysis time; absent on older profiles.
+  // `onsets` (0.2.0) is dense — runs of dots trace sustained peaks;
+  // `onsets_strict` (0.3.0) keeps prominent maxima only.
   onsets: z.array(z.object({ t: z.number(), strength: z.number() })).optional(),
+  onsets_strict: z
+    .array(z.object({ t: z.number(), strength: z.number() }))
+    .optional(),
 });
 export type ContinuousFeature = z.infer<typeof ContinuousFeatureSchema>;
 
@@ -223,6 +239,8 @@ export type EngineInfo = z.infer<
 export const SidecarEventSchema = z.discriminatedUnion("type", [
   LibrarySongsEventSchema,
   ImportFailedEventSchema,
+  ImportStartedEventSchema,
+  ImportFinishedEventSchema,
   ProfileEventSchema,
   SettingsEventSchema,
 ]);

@@ -121,3 +121,12 @@ def test_reanalysis_preserves_favorites(library_root):
     storage.write_favorites("s1", ["mix.rms"])
     _write_minimal_profile(analyzed_at="2026-01-03T00:00:00Z")  # re-analysis rewrite
     assert storage.read_profile("s1")["favorites"] == ["mix.rms"]
+
+
+def test_delete_song_dir_removes_everything(library_root):
+    song_dir = library_root / "songs" / "s1"
+    (song_dir / "stems").mkdir(parents=True)
+    (song_dir / "profile.json").write_text("{}")
+    storage.delete_song_dir("s1")
+    assert not song_dir.exists()
+    storage.delete_song_dir("s1")  # idempotent

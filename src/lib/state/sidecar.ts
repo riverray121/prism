@@ -14,6 +14,12 @@ function applySidecarEvent(event: SidecarEvent): void {
   } else if (event.type === "library.import_failed") {
     console.error("import failed", event.path, event.error);
     library.lastImportError = { path: event.path, error: event.error };
+  } else if (event.type === "library.import_started") {
+    library.pendingImports = [...library.pendingImports, event.path];
+  } else if (event.type === "library.import_finished") {
+    library.pendingImports = library.pendingImports.filter(
+      (p) => p !== event.path,
+    );
   } else if (event.type === "profile") {
     // Ignore stale responses if the user has since navigated away/elsewhere.
     if (event.song_id === inspection.songId) {

@@ -45,14 +45,15 @@
     ctx.moveTo(u.bbox.left, mid);
     ctx.lineTo(u.bbox.left + u.bbox.width, mid);
     ctx.stroke();
-    // One dot per onset; opacity tracks strength so hard hits read darker.
+    // One dot per onset; opacity and radius both track strength so hard hits
+    // read clearly darker and bigger than weak ones.
     ctx.fillStyle = color;
     for (const onset of onsets) {
       if (onset.t < min || onset.t > max) continue;
       const x = u.valToPos(onset.t, "x", true);
-      ctx.globalAlpha = 0.35 + 0.65 * onset.strength;
+      ctx.globalAlpha = 0.12 + 0.88 * onset.strength;
       ctx.beginPath();
-      ctx.arc(x, mid, 2.5 * dpr, 0, Math.PI * 2);
+      ctx.arc(x, mid, (1.5 + 2 * onset.strength) * dpr, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();

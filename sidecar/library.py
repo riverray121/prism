@@ -119,7 +119,7 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
     return con.execute(
         """
         SELECT id, title, artist, duration_sec, sample_rate, source_path,
-               status, imported_at, current_stage, current_engine,
+               status, imported_at, analyzed_at, current_stage, current_engine,
                current_step, total_steps, error_message
         FROM songs
         ORDER BY imported_at
@@ -297,3 +297,12 @@ def update_metadata(
         "UPDATE songs SET title=?, artist=? WHERE id=?",
         (title, artist, song_id),
     )
+
+
+def delete_song(con: sqlite3.Connection, song_id: str) -> bool:
+    # Refused while the worker is analyzing it (the row is the worker's
+    # progress surface); returns whether the row was deleted.
+    cur = con.execute(
+        "DELETE FROM songs WHERE id=? AND status != 'analyzing'", (song_id,)
+    )
+    return cur.rowcount > 0
