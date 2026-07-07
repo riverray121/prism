@@ -23,7 +23,7 @@
 <div class="flex flex-col">
   <button
     onclick={ontoggle}
-    class="flex items-center gap-2 py-1 text-left text-sm text-ink-muted hover:text-ink"
+    class="flex items-center gap-2 py-1.5 text-left text-base text-ink-muted hover:text-ink"
     style:padding-left={`${depth * 0.75}rem`}
   >
     <span class="w-3 text-xs text-ink-faint">{open ? "▾" : "▸"}</span>

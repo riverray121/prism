@@ -172,10 +172,10 @@
   favPath: string,
 )}
   <div>
-    <p class="mb-1 flex items-center gap-1.5 text-sm text-ink-muted">
+    <p class="mb-1.5 flex items-center gap-1.5 text-base text-ink-muted">
       {@render star(favPath)}
       {humanize(name)}
-      <span class="text-xs text-ink-faint">· {detailOf(feature)}</span>
+      <span class="text-sm text-ink-faint">· {detailOf(feature)}</span>
     </p>
     {#if feature.render === "continuous"}
       <ContinuousLane

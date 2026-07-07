@@ -175,7 +175,7 @@
             : ''} {inspection.songId === song.id ? 'bg-raised' : ''}"
         >
           <div class="flex items-center gap-1">
-            <span class="min-w-0 truncate text-sm">{song.title}</span>
+            <span class="min-w-0 truncate text-base">{song.title}</span>
             <button
               onclick={(e) => {
                 e.stopPropagation();

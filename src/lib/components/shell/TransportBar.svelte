@@ -85,7 +85,7 @@
           {frameRateHz}
           label="overview"
           color="#74ade8"
-          height={64}
+          height={88}
           showYAxis={false}
           showControls={false}
           playheadSec={transport.currentTime}

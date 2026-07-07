@@ -51,10 +51,8 @@
   <div class="flex items-center px-2">
     <button
       onclick={toggleSplit}
-      title={workspace.splitTab === null
-        ? "Split view: two stages side by side"
-        : "Close split view"}
-      class="rounded px-3 py-1.5 text-base leading-none {workspace.splitTab !==
+      title={workspace.splitTab === null ? "Split view" : "Close split view"}
+      class="rounded px-3 py-1.5 text-xl leading-none {workspace.splitTab !==
       null
         ? 'bg-raised text-accent'
         : 'text-ink-muted hover:bg-raised hover:text-ink'}"

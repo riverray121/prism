@@ -31,11 +31,11 @@
   {#if workspace.sidebarExpanded}
     <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div class="flex h-bar shrink-0 items-center justify-between px-3">
-        <span class="text-sm font-semibold">Library</span>
+        <span class="text-base font-semibold">Library</span>
         <button
           onclick={toggleSidebar}
           title="Collapse the library sidebar"
-          class="rounded px-3 py-1.5 text-base leading-none text-ink-muted hover:bg-raised hover:text-ink"
+          class="rounded px-3 py-1.5 text-xl leading-none text-ink-muted hover:bg-raised hover:text-ink"
         >
           «
         </button>
@@ -51,7 +51,7 @@
           <Tooltip.Trigger
             onclick={toggleSidebar}
             title="Expand the library sidebar"
-            class="rounded px-2.5 py-1.5 text-base text-ink-muted hover:bg-raised hover:text-ink"
+            class="rounded px-2.5 py-1.5 text-xl text-ink-muted hover:bg-raised hover:text-ink"
           >
             »
           </Tooltip.Trigger>
