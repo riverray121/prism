@@ -6,7 +6,17 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import ipc, library, metadata, separation, settings, storage, worker, youtube
+from . import (
+    ipc,
+    library,
+    logs,
+    metadata,
+    separation,
+    settings,
+    storage,
+    worker,
+    youtube,
+)
 from .schema import (
     DeleteSongCommand,
     GetProfileCommand,
@@ -26,12 +36,9 @@ from .schema import (
     UpdateSettingsCommand,
 )
 
-# Log to stderr so the stdout JSON-lines channel stays clean.
-logging.basicConfig(
-    level=logging.INFO,
-    stream=sys.stderr,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
+# stderr keeps the stdout JSON-lines channel clean; logs.configure also mirrors
+# every record to a rotated file and installs the crash hooks.
+logs.configure()
 log = logging.getLogger("sidecar")
 
 
