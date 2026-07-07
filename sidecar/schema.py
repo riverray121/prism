@@ -10,6 +10,11 @@ class ImportCommand(BaseModel):
     paths: list[str]
 
 
+class ImportYoutubeCommand(BaseModel):
+    type: Literal["library.import_youtube"]
+    url: str
+
+
 class QueueAddCommand(BaseModel):
     type: Literal["queue.add"]
     song_ids: list[str]

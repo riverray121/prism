@@ -13,6 +13,11 @@ export function importFiles(paths: string[]): Promise<void> {
   return sendCommand({ type: "library.import", paths });
 }
 
+// Download a YouTube URL's audio (sidecar-side) and import it.
+export function importYoutube(url: string): Promise<void> {
+  return sendCommand({ type: "library.import_youtube", url });
+}
+
 export function listLibrary(): Promise<void> {
   return sendCommand({ type: "library.list" });
 }

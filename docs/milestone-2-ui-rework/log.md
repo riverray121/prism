@@ -22,9 +22,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 9 — Library management: LibraryPanel rebuilt as compact two-line sidebar rows (status color, error message on failed, ✎ metadata edit, contextual Analyze/Retry/Cancel); search + status filter + missing-metadata filter; `MetadataDialog` + `library.update_metadata` IPC (DB row + profile.json mirror); `Song.error_message` in snapshot/zod; collapsed rail shows a `ProgressRing` per queued/analyzing song (engine-step fraction; static arc while queued) with title tooltips.
 
+- Slice 10 — YouTube import: `sidecar/youtube.py` (yt-dlp → FLAC, `{uploader} - {title}` filename feeds the existing metadata heuristic; explicit ffmpeg-missing error); `library.import_youtube` command runs on a worker thread (downloads must not block the stdin loop); `ImportDialog` behind the sidebar + button (file picker or URL); `library.lastImportError` surfaces failures in the panel; README documents the ffmpeg prerequisite.
+
 ## Todo
 
-- [ ] Slice 10 — YouTube import
 - [ ] Slice 11 — Split view
 
 ## Notes

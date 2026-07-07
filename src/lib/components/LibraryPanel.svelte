@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { open } from "@tauri-apps/plugin-dialog";
-
   import { formatTime } from "$lib/format";
   import AnalyzeDialog from "$lib/components/library/AnalyzeDialog.svelte";
+  import ImportDialog from "$lib/components/library/ImportDialog.svelte";
   import MetadataDialog from "$lib/components/library/MetadataDialog.svelte";
-  import { cancelAnalysis, importFiles } from "$lib/ipc";
+  import { cancelAnalysis } from "$lib/ipc";
   import type { Song } from "$lib/ipc/messages";
   import { library } from "$lib/state/library.svelte";
   import {
@@ -12,18 +11,8 @@
     open as openInspection,
   } from "$lib/state/inspection.svelte";
 
-  // Open a native file picker and import the selected audio files.
-  async function pickAndImport() {
-    const selected = await open({
-      multiple: true,
-      filters: [
-        { name: "Audio", extensions: ["flac", "wav", "mp3", "m4a", "aac"] },
-      ],
-    });
-    if (selected === null) return;
-    const paths = Array.isArray(selected) ? selected : [selected];
-    await importFiles(paths);
-  }
+  // Whether the import (files / YouTube URL) dialog is open.
+  let importOpen = $state(false);
 
   // Song whose analysis-configuration dialog is open (null = none).
   let analyzeFor = $state<{ id: string; title: string } | null>(null);
@@ -112,8 +101,8 @@
       class="min-w-0 flex-1 rounded border border-edge bg-app px-2 py-1 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
     />
     <button
-      onclick={pickAndImport}
-      title="Import audio files"
+      onclick={() => (importOpen = true)}
+      title="Add songs (files or YouTube URL)"
       class="shrink-0 rounded bg-accent px-2.5 py-1 text-sm font-medium text-surface hover:opacity-90"
     >
       +
@@ -137,6 +126,15 @@
       {visibleSongs.length}/{library.songs.length}
     </span>
   </div>
+
+  {#if library.lastImportError}
+    <p
+      class="truncate text-xs text-danger"
+      title={`${library.lastImportError.path}: ${library.lastImportError.error}`}
+    >
+      Import failed: {library.lastImportError.error}
+    </p>
+  {/if}
 
   <div class="flex flex-col overflow-hidden rounded-md border border-edge">
     {#if visibleSongs.length === 0}
@@ -224,6 +222,9 @@
   </div>
 </section>
 
+{#if importOpen}
+  <ImportDialog onclose={() => (importOpen = false)} />
+{/if}
 {#if analyzeFor}
   <AnalyzeDialog
     songId={analyzeFor.id}

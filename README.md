@@ -4,7 +4,7 @@ A Mac-first desktop dashboard that imports audio files, runs a multi-layer DSP a
 
 ## Getting started
 
-Prerequisites: Rust, Node + pnpm, and uv.
+Prerequisites: Rust, Node + pnpm, uv, and ffmpeg (`brew install ffmpeg` — required for YouTube import).
 
 ```sh
 pnpm install        # frontend deps

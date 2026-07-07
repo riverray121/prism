@@ -14,10 +14,19 @@ dependencies = [
     "pyloudnorm>=0.2.0",
     "scipy>=1.17.1",
     "torch>=2.12.0",
+    "yt-dlp>=2026.7.4",
 ]
 
 [tool.uv]
 package = false
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+# Repo root on sys.path so tests can `import sidecar`; suite lives in tests/.
+pythonpath = ["."]
+testpaths = ["tests"]
 
 [tool.ruff]
 # Vendored third-party code is kept close to upstream; don't lint or reformat it.

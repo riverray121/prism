@@ -1,7 +1,12 @@
 import type { Song } from "$lib/ipc/messages";
 
 // Reactive library state, replaced wholesale from each library.songs snapshot.
-export const library = $state<{ songs: Song[] }>({ songs: [] });
+// lastImportError surfaces the most recent failed import (file or URL) in the
+// library UI; cleared when a new import starts.
+export const library = $state<{
+  songs: Song[];
+  lastImportError: { path: string; error: string } | null;
+}>({ songs: [], lastImportError: null });
 
 // Snapshot lookup by id; null for null/unknown ids. Lives here so components
 // never join stores themselves.

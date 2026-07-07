@@ -1,15 +1,17 @@
 import json
 import logging
+import shutil
 import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import ipc, library, metadata, separation, settings, storage, worker
+from . import ipc, library, metadata, separation, settings, storage, worker, youtube
 from .schema import (
     GetProfileCommand,
     ImportCommand,
     ImportFailedEvent,
+    ImportYoutubeCommand,
     LibrarySongsEvent,
     ProfileEvent,
     QueueAddCommand,
@@ -76,6 +78,27 @@ def import_one(path_str: str) -> None:
     log.info("imported %s as %s", source.name, song_id)
 
 
+def import_youtube(url: str) -> None:
+    """Download a URL's audio then run the normal import; emits its own events.
+
+    Runs on a worker thread: downloads take long enough that holding the stdin
+    command loop would freeze every other interaction. ipc.emit is lock-guarded,
+    so emitting from here is safe.
+    """
+    tmp: Path | None = None
+    try:
+        audio = youtube.download(url)
+        tmp = audio.parent
+        import_one(str(audio))
+    except Exception as exc:
+        log.exception("youtube import failed: %s", url)
+        ipc.emit(ImportFailedEvent(path=url, error=str(exc)))
+    finally:
+        if tmp is not None:
+            shutil.rmtree(tmp, ignore_errors=True)
+    emit_snapshot()
+
+
 def handle(msg: dict) -> None:
     msg_type = msg.get("type")
     log.info("command: %s", msg_type)
@@ -88,6 +111,9 @@ def handle(msg: dict) -> None:
                 log.exception("import failed: %s", path_str)
                 ipc.emit(ImportFailedEvent(path=path_str, error=str(exc)))
         emit_snapshot()
+    elif msg_type == "library.import_youtube":
+        cmd = ImportYoutubeCommand.model_validate(msg)
+        threading.Thread(target=import_youtube, args=(cmd.url,), daemon=True).start()
     elif msg_type == "library.list":
         emit_snapshot()
     elif msg_type == "queue.add":
