@@ -26,13 +26,24 @@ Thin slices in build order. Each leaves the suite green.
 - Touches: `src/lib/npy.test.ts`, `src/lib/ipc/messages.test.ts`.
 - Acceptance: `parseNpy` covers every parse branch and edge error; the zod schemas cover discriminated-union routing, defaults, passthrough, and the drop-and-warn feature map.
 
-## Slice 5 — Frontend runes reducers (deferred)
+## Slice 5 — Frontend runes reducers
 
-- Goal: `applySidecarEvent` (profile stale-guard) and `inspection.open/close` under test.
-- Touches: Svelte–vitest plugin setup so `.svelte.ts` runes modules import; `src/lib/state/*.test.ts` with `$lib/ipc` mocked.
-- Blocked on: deciding the vitest Svelte-plugin config; not required for the milestone's green bar.
+- Goal: `applySidecarEvent` (snapshot/profile stale-guard/import lifecycle), `inspection.open/close/toggleFavorite`, and `transport` reset/race guards under test.
+- Touches: vitest config gains `@sveltejs/vite-plugin-svelte` so `.svelte.ts` runes modules compile; `src/lib/state/*.test.ts` with `$lib/ipc` (and Web Audio, for transport) mocked.
+- Acceptance: reducer routes every event type onto the right store; stale profile events are dropped; favorites toggle round-trips; `pnpm test` green.
+- Out of scope: `.svelte` component rendering tests.
 
-## Slice 6 — Extract-then-test graph math (deferred)
+## Slice 6 — Extract-then-test graph math (RESOLVED by M2)
 
-- Goal: graph interaction math (`trackPlayhead`, wheel zoom/pan, colormap) and component formatters (`chordLabel`, `formatScalar`, `statusLabel`) lifted out of `.svelte` files into tested shared `.ts` modules.
-- Note: overlaps the M2 graph-kit slices, which already plan to centralize interaction logic; land the tests with that extraction rather than duplicating it here.
+- The M2 graph kit extracted the interaction math into `src/lib/graphs/axis.ts` (tested: `axis.test.ts`) and the formatters into `lib/format.ts` / `lib/chords.ts` / `graphs/tags.ts` / `graphs/heatmap.ts` (tested in M2 slice 12). Nothing remains here.
+
+## Slice 7 — Observability: sidecar logs (IMPLEMENTED)
+
+- Landed ahead of this spec (commit `c47126e`): `sidecar/logs.py` — rotated `sidecar.log` (5 MB × 3) beside stderr, `sys`/`threading` excepthooks logging CRITICAL tracebacks, `faulthandler` → `crash.log`, `PRISM_LOG_DIR`/`PRISM_LOG=debug` overrides; wired in `__main__`; covered by `tests/test_logs.py`.
+
+## Slice 8 — Observability: shell crash detection + health surface (IMPLEMENTED — runtime verification pending)
+
+- Goal: the app-shell half of `observability/design.md` — a dead app or sidecar always leaves an artifact and the UI says so.
+- Touches: `src-tauri/src/applog.rs` (rotated `app.log`, panic hook + backtrace, `chrono` timestamps; no tracing dep — the shell logs a handful of event kinds, not spans), `lib.rs` (log sidecar stderr/exit codes, `session.lock` written at startup + removed on `RunEvent::Exit`, `startup_report` + `log_frontend_error` commands), `capabilities` (`opener:allow-open-path`), `src/lib/state/health.svelte.ts` (window error forwarding, `sidecar-exited` listener, startup report), shell banners in `+page.svelte` (sidecar-death with exit code + Open logs; dismissible unclean-exit notice).
+- Acceptance: kill the sidecar process → red banner with exit code appears and `app.log` records it; force-quit the app → next launch shows the unclean-exit notice; a thrown frontend error lands in `app.log`; "Open logs" opens the log folder; `cargo check` + `pnpm check` clean.
+- Out of scope: sidecar auto-restart, telemetry, in-app log viewer.

@@ -13,6 +13,15 @@ Slices 5–6 (runes reducers, extract-then-test graph math) remain deferred per 
 
 Coverage review (M2 slice 12) added: `test_rhythm`, `test_stem` (wiring over faked extractors), `test_models`, and frontend `format`/`chords`/`graphs/tags`/`graphs/heatmap` tests; M2 slices had already added `test_derive`, `test_settings`, `test_youtube`, and favorites coverage in `test_storage`. 99 pytest + 52 vitest green.
 
+- **Observability subfeature (moved in from its own milestone; design in `observability/design.md`).** O1 — `sidecar/logs.py`: rotated `sidecar.log` (5 MB × 3) beside stderr, `sys/threading.excepthook` CRITICAL tracebacks, `faulthandler` → `crash.log`, `PRISM_LOG_DIR`/`PRISM_LOG` overrides; covered in `tests/test_logs.py`. O2 — Rust `applog` module (rotated `app.log`, panic hook with backtrace, captured sidecar stderr, sidecar exit codes), `session.lock` unclean-exit marker + `startup_report`/`log_frontend_error` commands, frontend `health` state (window error forwarding, sidecar-death banner with exit code, dismissible unclean-exit notice, Open-logs via opener plugin).
+
+## Todo
+
+- [ ] Slice 5 — Frontend runes reducers
+- [x] Slice 6 — resolved by M2 (axis.ts + helper tests)
+- [x] Slice 7 — Observability: sidecar logs (commit c47126e)
+- [x] Slice 8 — Observability: shell crash detection + health surface (built + checks green; kill-the-sidecar / force-quit runtime verification pending)
+
 ## Notes
 
 - Correction to the M1 practice doc: the pydantic models live in `sidecar/schema.py`, not `models.py`. `sidecar/models.py` is the weights download-on-first-run registry.

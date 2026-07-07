@@ -1,4 +1,4 @@
-# Crash Detection & Logging — Design
+# Crash Detection & Logging — Design (implemented)
 
 Persistent logs for all three processes, crash detection with next-launch reporting, and in-app surfacing of failures. Motivated by an unattributable app death: the process tree vanished with no artifact to consult — no log files exist outside the dev terminal, and a sidecar/WebView/shell failure cannot currently be told apart after the fact.
 
@@ -19,7 +19,7 @@ One log root: `~/Library/Application Support/Prism/logs/` (the app-data dir; ove
 | `crash.log`   | Python     | `faulthandler` output — native-level faults (torch/librosa segfaults) dump all thread stacks |
 
 - **Python:** add a `RotatingFileHandler` (5 MB × 3) beside the existing stderr handler; `sys.excepthook` + `threading.excepthook` log CRITICAL with traceback before the process dies; `faulthandler.enable()` pointed at `crash.log`.
-- **Rust:** `tracing` + `tracing-appender` (rotating); `std::panic::set_hook` writes the panic + backtrace before unwinding. The shell also **captures the sidecar's stderr** and appends it to `app.log` with a `[sidecar]` prefix — today that stream is visible only in a dev terminal and lost entirely in a normal launch.
+- **Rust:** a small `applog` module (append + size-based rotation; no tracing dependency — the shell logs a handful of event kinds, not spans); `std::panic::set_hook` writes the panic + backtrace before unwinding. The shell also **captures the sidecar's stderr** and appends it to `app.log` with a `[sidecar]` prefix — previously visible only in a dev terminal and lost entirely in a normal launch.
 - **Frontend:** `window.onerror` + `unhandledrejection` handlers in the shell forward to Rust (`log_frontend_error` command) into `app.log`. WebView errors currently vanish.
 - Levels: INFO default, `PRISM_LOG=debug` override. One event per line. No audio/feature payloads in logs.
 - Dev mode keeps mirroring everything to the terminal; the files are written in both modes.
@@ -27,7 +27,7 @@ One log root: `~/Library/Application Support/Prism/logs/` (the app-data dir; ove
 ## Crash detection
 
 - **Sidecar death (runtime).** The Rust shell already owns the child; add a wait-watcher: if the sidecar exits while the app runs, log the exit code + last stderr lines, and emit a `sidecar-died` event. The frontend shows a persistent banner ("Analysis engine stopped — restart the app · Open logs"). Auto-restart with backoff is a later iteration; detection + banner is v1.
-- **Unclean app exit (next launch).** A `logs/session.lock` marker (pid + timestamp) is written at startup and removed on clean exit. A stale marker from a non-running pid at launch means the previous session died uncleanly: log it and show a dismissible notice ("Prism didn't shut down cleanly · Open logs"). Complements the existing worker sweep that fails interrupted `analyzing` rows.
+- **Unclean app exit (next launch).** A `logs/session.lock` marker (pid) is written at startup and removed on clean exit; the frontend fetches the verdict via a `startup_report` command (no event race). A stale marker from a non-running pid at launch means the previous session died uncleanly: log it and show a dismissible notice ("Prism didn't shut down cleanly · Open logs"). Complements the existing worker sweep that fails interrupted `analyzing` rows.
 - **Analysis failures** stay as they are (status `failed` + `error_message` on the row) — already detected and surfaced.
 
 ## Surfacing
