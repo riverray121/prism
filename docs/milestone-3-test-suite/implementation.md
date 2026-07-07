@@ -26,7 +26,7 @@ Thin slices in build order. Each leaves the suite green.
 - Touches: `src/lib/npy.test.ts`, `src/lib/ipc/messages.test.ts`.
 - Acceptance: `parseNpy` covers every parse branch and edge error; the zod schemas cover discriminated-union routing, defaults, passthrough, and the drop-and-warn feature map.
 
-## Slice 5 — Frontend runes reducers
+## Slice 5 — Frontend runes reducers (IMPLEMENTED)
 
 - Goal: `applySidecarEvent` (snapshot/profile stale-guard/import lifecycle), `inspection.open/close/toggleFavorite`, and `transport` reset/race guards under test.
 - Touches: vitest config gains `@sveltejs/vite-plugin-svelte` so `.svelte.ts` runes modules compile; `src/lib/state/*.test.ts` with `$lib/ipc` (and Web Audio, for transport) mocked.
