@@ -30,9 +30,13 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 13 — Feedback pass: window launches maximized with 1100×700 min (no horizontal scrollbar state); lighter Zed-informed palette + blue accent; graphs full-width with bigger lanes (continuous 150, heatmap 190) and 13px axis text; scroll-over-graph fixed (wheel forwards to the nearest scrollable ancestor, not window); global `TransportBar` on every tab (overview lane + play + clock + speed 0.25–1× + "stem → mix" switch; playhead no longer clipped); top bar de-branded with centered stage tabs, hidden while split (stages shown in ≤2 places); split panes scroll (grid-rows minmax fix); Analysis stays mounted across tab switches (state preserved); stems default expanded; pb-32 scroll tail; delete song (confirm dialog, sidecar removes row + folder, refused mid-analysis); analyzed date on rows; import dialog shows an indeterminate download bar via `import_started/finished` events; dsp-mix emits 8 substeps and dsp-stem per-stem steps (rings actually move); `onsets_strict` (prominence-filtered maxima, schema 0.3.0) with a per-lane dense/maxima toggle; onset dot contrast raised (opacity+radius by strength); tooltips on all chrome buttons; bigger click targets. Observability design moved to milestone-4.
 
+- A4 closed post-slice-13: heatmap display metadata moved to its producing feature modules (`frequency.SPECTROGRAM_HEATMAP` / `timbre.MFCC_HEATMAP` / `tonal.CHROMA_HEATMAP`), envelope + `heatmaps/{name}.npy` path convention centralized in `storage.heatmap_envelope`/`heatmap_rel`; the worker only wires producers. Every M1 structural-debt item (A1–A7, L4, L-FE1) is now resolved.
+
+- SHIPPED: user tested the full milestone and approved. The repo-wide `/clean` pass was deliberately deferred to the start of the next milestone.
+
 ## Todo
 
-(none — all slices built; user test pass pending)
+(none — milestone shipped)
 
 ## Notes
 

@@ -1,6 +1,6 @@
-# Deferred Structural Debt — Ideas
+# Deferred Structural Debt — RESOLVED
 
-Carry-over from the milestone-1 code review / deslop. Not a feature — a checklist of cleanups, each applied when its area is touched.
+Carry-over from the milestone-1 code review / deslop. Every item below landed during M2 (A2/A5/L4 with the graph kit, A6 with the shell, A3/A7 with the analyze popup, A4 post-slice-13). Kept as a record; nothing remains.
 
 Frontend layering (land with the [`../ui/`](../ui/overview.md) rework, since those components are rewritten anyway):
 

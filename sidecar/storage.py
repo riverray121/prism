@@ -117,6 +117,25 @@ def write_favorites(song_id: str, favorites: list[str]) -> None:
     _write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
 
 
+def heatmap_rel(name: str) -> str:
+    """Sidecar path for a heatmap, relative to profile.json — the single home
+    of the ``heatmaps/{name}.npy`` convention."""
+    return f"heatmaps/{name}.npy"
+
+
+def heatmap_envelope(meta: dict, matrix: np.ndarray, sidecar: str) -> dict:
+    """Build a heatmap feature envelope from its module's display metadata."""
+    return {
+        "render": "heatmap",
+        "category": meta["category"],
+        "source": "librosa",
+        "unit": meta["unit"],
+        "sidecar": sidecar,
+        "shape": [int(matrix.shape[0]), int(matrix.shape[1])],
+        "axes": meta["axes"],
+    }
+
+
 def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:
     """Write a heatmap matrix as an uncompressed float32 .npy sidecar.
 
@@ -125,7 +144,7 @@ def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:
     relative to profile.json (e.g. ``heatmaps/mfcc.npy``), which is what the
     feature's ``sidecar`` field stores.
     """
-    rel = f"heatmaps/{name}.npy"
+    rel = heatmap_rel(name)
     path = SONGS_DIR / song_id / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     # Force C-order: some librosa features (e.g. chroma_cqt) return Fortran-order

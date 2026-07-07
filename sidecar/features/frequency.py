@@ -89,3 +89,12 @@ def band_energies(S: np.ndarray, sr: int, n_fft: int) -> dict[str, dict]:
         frac = power[mask].sum(axis=0) / total
         out[name] = _continuous("librosa", "normalized", frac, [0, 1])
     return out
+
+
+# Display metadata for this module's heatmap feature; the profile writer builds
+# the envelope from it so no other layer hard-codes it.
+SPECTROGRAM_HEATMAP = {
+    "category": "frequency",
+    "unit": "dB",
+    "axes": ["freq_hz", "time_frame"],
+}

@@ -43,3 +43,12 @@ def mfcc(y: np.ndarray, sr: int, hop: int, n_mfcc: int = 13) -> np.ndarray:
     sidecar by the worker, not stored inline in the profile.
     """
     return librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc, hop_length=hop)
+
+
+# Display metadata for this module's heatmap feature; the profile writer builds
+# the envelope from it so no other layer hard-codes it.
+MFCC_HEATMAP = {
+    "category": "timbre",
+    "unit": "coefficient",
+    "axes": ["mfcc", "time_frame"],
+}

@@ -134,7 +134,9 @@ def _analyze(
     for name, matrix in heatmaps.items():
         matrix = matrix[:, :frame_count]
         heatmaps[name] = matrix
-        mix[name] = _heatmap_envelope(name, matrix, f"heatmaps/{name}.npy")
+        mix[name] = storage.heatmap_envelope(
+            _HEATMAP_META[name], matrix, storage.heatmap_rel(name)
+        )
 
     # PANNs (one inference): sound_tags + the timbral axes. sound_tags builds its
     # own envelope (dynamic class labels) and arrives frame_count-aligned, so it
@@ -154,38 +156,13 @@ def _analyze(
     return frame_rate_hz, frame_count, mix, heatmaps
 
 
-# Per-heatmap display metadata; the payload itself lives in the .npy sidecar.
+# Heatmap display metadata, owned by the producing feature modules; this map
+# only wires name -> owner.
 _HEATMAP_META = {
-    "spectrogram": {
-        "category": "frequency",
-        "unit": "dB",
-        "axes": ["freq_hz", "time_frame"],
-    },
-    "mfcc": {
-        "category": "timbre",
-        "unit": "coefficient",
-        "axes": ["mfcc", "time_frame"],
-    },
-    "chroma": {
-        "category": "tonal",
-        "unit": "energy",
-        "axes": ["pitch_class", "time_frame"],
-    },
+    "spectrogram": frequency.SPECTROGRAM_HEATMAP,
+    "mfcc": timbre.MFCC_HEATMAP,
+    "chroma": tonal.CHROMA_HEATMAP,
 }
-
-
-def _heatmap_envelope(name: str, matrix: np.ndarray, sidecar: str) -> dict:
-    """Build a heatmap feature envelope referencing its .npy sidecar by path."""
-    meta = _HEATMAP_META[name]
-    return {
-        "render": "heatmap",
-        "category": meta["category"],
-        "source": "librosa",
-        "unit": meta["unit"],
-        "sidecar": sidecar,
-        "shape": [int(matrix.shape[0]), int(matrix.shape[1])],
-        "axes": meta["axes"],
-    }
 
 
 def _now() -> str:
@@ -243,7 +220,9 @@ def _stem_entry(
     for hname, matrix in heatmaps.items():
         rel = f"{heatmap_prefix}/{stem_name}_{hname}"
         storage.write_heatmap(song_id, rel, matrix)
-        features[hname] = _heatmap_envelope(hname, matrix, f"heatmaps/{rel}.npy")
+        features[hname] = storage.heatmap_envelope(
+            _HEATMAP_META[hname], matrix, storage.heatmap_rel(rel)
+        )
     # Default onset track on every continuous stem feature.
     derive.attach_onsets(features, sr / hop)
     return {"audio_file": audio_file, "features": features}

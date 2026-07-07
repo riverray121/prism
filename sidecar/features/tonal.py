@@ -76,3 +76,12 @@ def chroma(y: np.ndarray, sr: int, hop: int) -> np.ndarray:
     worker, like other heatmaps.
     """
     return librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop)
+
+
+# Display metadata for this module's heatmap feature; the profile writer builds
+# the envelope from it so no other layer hard-codes it.
+CHROMA_HEATMAP = {
+    "category": "tonal",
+    "unit": "energy",
+    "axes": ["pitch_class", "time_frame"],
+}
