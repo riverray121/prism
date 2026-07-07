@@ -26,6 +26,8 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 11 — Split view: workspace state gains `splitTab` (primary + optional second pane); `TabContent` extracted as the host-agnostic tab renderer; `Pane` (slim per-pane tab picker + fullscreen ⤢) rendered in a two-column grid; ◫ toggle in the top bar (opens with the canonical companion tab); both panes read the one global transport. All 11 slices complete — awaiting user testing of the whole milestone.
 
+- Slice 12 — Test suite landed + coverage review: the parallel milestone-3 suite (pytest harness, 16 sidecar modules, npy/messages vitest, pre-push wiring) committed together with gap-fills from review — `test_rhythm` (click-train onsets/density/beat grid), `test_stem` (stem-type routing + alignment over faked extractors), `test_models` (registry + download/verify/cache), and frontend `format`/`chords`/`graphs/tags`/`graphs/heatmap` tests. 99 pytest + 52 vitest green. Excluded by design: `__main__` IPC plumbing, model-loading E2E, runes/component tests (need a Svelte-plugin vitest config), `buildHeatmapCanvas` (DOM canvas).
+
 ## Todo
 
 (none — all slices built; user test pass pending)
