@@ -1,19 +1,12 @@
 <script lang="ts">
   import { chordLabel } from "$lib/chords";
+  import Group from "$lib/components/analysis/Group.svelte";
   import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
   import EventLane from "$lib/graphs/EventLane.svelte";
   import HeatmapLane from "$lib/graphs/HeatmapLane.svelte";
   import SegmentLane from "$lib/graphs/SegmentLane.svelte";
   import TagsLanes from "$lib/graphs/TagsLanes.svelte";
-  import type {
-    ContinuousFeature,
-    EventFeature,
-    HeatmapFeature,
-    MixFeature,
-    ScalarFeature,
-    SegmentFeature,
-    TagsFeature,
-  } from "$lib/ipc/messages";
+  import type { MixFeature, ScalarFeature } from "$lib/ipc/messages";
   import {
     inspection,
     playToggle,
@@ -26,8 +19,8 @@
     transport,
   } from "$lib/state/transport.svelte";
 
-  // Split the keyed mix map into scalar (text) and continuous (graph) features,
-  // each preserving the profile's insertion order.
+  // ── Feature access ────────────────────────────────────────────────────────
+
   const features = $derived(
     inspection.profile ? Object.entries(inspection.profile.mix) : [],
   );
@@ -36,46 +29,20 @@
       (e): e is [string, ScalarFeature] => e[1].render === "scalar",
     ),
   );
-  const continuous = $derived(
-    features.filter(
-      (e): e is [string, ContinuousFeature] => e[1].render === "continuous",
-    ),
-  );
-  const events = $derived(
-    features.filter(
-      (e): e is [string, EventFeature] => e[1].render === "event",
-    ),
-  );
-  const segmentFeatures = $derived(
-    features.filter(
-      (e): e is [string, SegmentFeature] => e[1].render === "segment",
-    ),
-  );
-  const heatmaps = $derived(
-    features.filter(
-      (e): e is [string, HeatmapFeature] => e[1].render === "heatmap",
-    ),
-  );
-  const tagFeatures = $derived(
-    features.filter((e): e is [string, TagsFeature] => e[1].render === "tags"),
-  );
 
-  // Split a keyed feature map by render mode, preserving insertion order. Used
-  // for each stem's feature map (the mix uses the dedicated $derived above).
-  function splitFeatures(map: Record<string, MixFeature>) {
-    const entries = Object.entries(map);
-    return {
-      continuous: entries.filter(
-        (e): e is [string, ContinuousFeature] => e[1].render === "continuous",
-      ),
-      events: entries.filter(
-        (e): e is [string, EventFeature] => e[1].render === "event",
-      ),
-      heatmaps: entries.filter(
-        (e): e is [string, HeatmapFeature] => e[1].render === "heatmap",
-      ),
-    };
-  }
+  // Non-scalar mix features grouped by their catalog category, preserving the
+  // profile's insertion order within each group.
+  const mixByCategory = $derived.by(() => {
+    const groups = new Map<string, [string, MixFeature][]>();
+    for (const entry of features) {
+      if (entry[1].render === "scalar") continue;
+      const cat = entry[1].category;
+      const list = groups.get(cat);
+      if (list) list.push(entry);
+      else groups.set(cat, [entry]);
+    }
+    return [...groups.entries()];
+  });
 
   // Separated stems grouped by engine, then stem (empty on pre-M4 profiles).
   const stems = $derived(
@@ -95,7 +62,46 @@
       : 0,
   );
 
-  // Line colors cycled across the stacked continuous graphs for distinction.
+  // Song-level lane for the pinned strip: RMS if present, else the first
+  // continuous mix feature.
+  const overview = $derived.by(() => {
+    const rms = inspection.profile?.mix["rms"];
+    if (rms?.render === "continuous") return rms.data;
+    const first = features.find((e) => e[1].render === "continuous");
+    return first && first[1].render === "continuous" ? first[1].data : null;
+  });
+
+  // ── Collapse + search state ───────────────────────────────────────────────
+
+  // Sparse overrides over per-group defaults (mix categories open, engines
+  // closed); only toggled groups are recorded.
+  const openOverrides = $state<Record<string, boolean>>({});
+  function isOpen(key: string, dflt: boolean): boolean {
+    return openOverrides[key] ?? dflt;
+  }
+  function toggle(key: string, dflt: boolean): void {
+    openOverrides[key] = !isOpen(key, dflt);
+  }
+
+  let query = $state("");
+  const q = $derived(query.trim().toLowerCase());
+
+  // A feature matches when the query hits its name or its group's context
+  // (category, engine, stem) — so "drums" surfaces every drum lane.
+  function matches(...terms: string[]): boolean {
+    if (q === "") return true;
+    return terms.some((t) => t.toLowerCase().includes(q));
+  }
+
+  // While searching, groups with hits are forced open.
+  function groupOpen(key: string, dflt: boolean, hasHits: boolean): boolean {
+    if (q !== "") return hasHits;
+    return isOpen(key, dflt);
+  }
+
+  // ── Presentation helpers ─────────────────────────────────────────────────
+
+  // Line colors cycled across stacked continuous lanes for distinction.
   const PALETTE = [
     "#6366f1",
     "#06b6d4",
@@ -120,261 +126,46 @@
       f.unit === "normalized" || f.unit === "key" ? "" : ` ${f.unit}`;
     return `${n}${unit}`;
   }
+
+  // Dimmed metadata suffix for a feature row header.
+  function detailOf(feature: MixFeature): string {
+    if (feature.render === "event") return `${feature.events.length} events`;
+    if (feature.render === "segment")
+      return `${feature.segments.length} segments`;
+    if (feature.render === "heatmap")
+      return `${feature.shape[0]}×${feature.shape[1]} ${feature.unit}`;
+    if (feature.render === "tags") return `${feature.labels.length} classes`;
+    if (feature.render === "continuous")
+      return `${feature.unit}${feature.status === "wip" ? " · wip" : ""}`;
+    return "";
+  }
 </script>
-
-<section class="flex w-full max-w-4xl flex-col gap-6">
-  {#if inspection.profile === null}
-    <p class="text-sm text-neutral-500">Loading…</p>
-  {:else}
-    <!-- Scalar features: one value each, shown as a labeled grid. -->
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {#each scalars as [name, feature] (name)}
-        <div
-          class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
-        >
-          <p class="text-xs text-neutral-500 dark:text-neutral-400">
-            {humanize(name)}
-          </p>
-          <p class="text-xl font-semibold tabular-nums">
-            {formatScalar(feature)}
-          </p>
-        </div>
-      {/each}
-    </div>
-
-    <!-- Segment features: labeled time-span lanes on the shared time axis. -->
-    {#each segmentFeatures as [name, feature] (name)}
-      <div
-        class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-      >
-        <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-          {humanize(name)}
-          <span class="text-neutral-400 dark:text-neutral-600"
-            >· {feature.segments.length} segments</span
-          >
-        </p>
-        <SegmentLane
-          segments={feature.segments}
-          maxTimeSec={durationSec}
-          playheadSec={transport.currentTime}
-          follow={transport.playing}
-          onSeek={scrub}
-          onScrubStart={scrubStart}
-          onScrubEnd={scrubEnd}
-        />
-      </div>
-    {/each}
-
-    <!-- Event features: vertical tick lanes on the shared time axis. -->
-    {#each events as [name, feature] (name)}
-      <div
-        class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-      >
-        <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-          {humanize(name)}
-          <span class="text-neutral-400 dark:text-neutral-600"
-            >· {feature.events.length} events</span
-          >
-        </p>
-        <EventLane
-          events={feature.events}
-          maxTimeSec={durationSec}
-          playheadSec={transport.currentTime}
-          follow={transport.playing}
-          labelFor={name === "chords" ? chordLabel : undefined}
-          height={name === "chords" ? 88 : 64}
-          onSeek={scrub}
-          onScrubStart={scrubStart}
-          onScrubEnd={scrubEnd}
-        />
-      </div>
-    {/each}
-
-    <!-- Heatmap features: a .npy matrix rendered as a colormapped image. -->
-    {#if inspection.songDir}
-      {#each heatmaps as [name, feature] (name)}
-        <div
-          class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-        >
-          <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-            {humanize(name)}
-            <span class="text-neutral-400 dark:text-neutral-600"
-              >· {feature.shape[0]}×{feature.shape[1]} {feature.unit}</span
-            >
-          </p>
-          <HeatmapLane
-            path={sidecarPath(feature.sidecar)}
-            {frameRateHz}
-            normalize={name === "spectrogram" ? "global" : "per-row"}
-            playheadSec={transport.currentTime}
-            follow={transport.playing}
-            onSeek={scrub}
-            onScrubStart={scrubStart}
-            onScrubEnd={scrubEnd}
-          />
-        </div>
-      {/each}
-    {/if}
-
-    <!-- Continuous features: stacked line graphs sharing the playhead/scrub. -->
-    <div class="flex flex-col gap-4">
-      {#each continuous as [name, feature], i (name)}
-        <div
-          class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-        >
-          <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-            {humanize(name)}
-            <span class="text-neutral-400 dark:text-neutral-600"
-              >· {feature.unit}{feature.status === "wip" ? " · wip" : ""}</span
-            >
-          </p>
-          <ContinuousLane
-            data={feature.data}
-            {frameRateHz}
-            label={name}
-            color={PALETTE[i % PALETTE.length]}
-            playheadSec={transport.currentTime}
-            follow={transport.playing}
-            onSeek={scrub}
-            onScrubStart={scrubStart}
-            onScrubEnd={scrubEnd}
-          />
-        </div>
-      {/each}
-    </div>
-
-    <!-- Tag features (sound_tags): one line graph per present class, loaded from
-         a shared .npy matrix. -->
-    {#if inspection.songDir}
-      {#each tagFeatures as [name, feature] (name)}
-        <div
-          class="rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-        >
-          <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-            {humanize(name)}
-            <span class="text-neutral-400 dark:text-neutral-600">
-              · {feature.labels.length} classes{feature.status === "wip"
-                ? " · wip"
-                : ""}</span
-            >
-          </p>
-          <TagsLanes
-            path={sidecarPath(feature.sidecar)}
-            labels={feature.labels}
-            {frameRateHz}
-            playheadSec={transport.currentTime}
-            follow={transport.playing}
-            onSeek={scrub}
-            onScrubStart={scrubStart}
-            onScrubEnd={scrubEnd}
-          />
-        </div>
-      {/each}
-    {/if}
-
-    <!-- Per-stem features, grouped by separation engine then stem, so the same
-         stem can be compared across engines. Reuses the mix graph components and
-         shares the playhead/scrub. -->
-    {#if stems.length > 0}
-      <section class="flex flex-col gap-6">
-        <h3 class="text-lg font-semibold tracking-tight">Stems</h3>
-        {#each stems as [engine, engineStems] (engine)}
-          <div class="flex flex-col gap-3">
-            <h4
-              class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400"
-            >
-              {engine}
-            </h4>
-            {#each Object.entries(engineStems) as [stemName, stemData] (stemName)}
-              {@const sf = splitFeatures(stemData.features)}
-              {@const stemKey = `${engine}::${stemName}`}
-              <div
-                class="flex flex-col gap-4 rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
-              >
-                <div class="flex items-center gap-3">
-                  {@render playButton(stemKey)}
-                  <p class="text-sm font-semibold capitalize">{stemName}</p>
-                </div>
-                {@render featureGraphs(sf, stemName)}
-                {#if stemData.substems}
-                  <div
-                    class="ml-2 flex flex-col gap-4 border-l-2 border-neutral-200 pl-3 dark:border-neutral-800"
-                  >
-                    {#each Object.entries(stemData.substems) as [subName, subData] (subName)}
-                      {@const subKey = `${engine}::${stemName}::${subName}`}
-                      {@const ssf = splitFeatures(subData.features)}
-                      <div class="flex flex-col gap-3">
-                        <div class="flex items-center gap-3">
-                          {@render playButton(subKey)}
-                          <p class="text-sm font-medium capitalize">
-                            {subName}
-                          </p>
-                        </div>
-                        {@render featureGraphs(ssf, subName)}
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </section>
-    {/if}
-  {/if}
-</section>
 
 <!-- Play/pause toggle for one audio source key; active while it is audible. -->
 {#snippet playButton(key: string)}
   <button
     onclick={() => playToggle(key)}
-    class="rounded-md border border-indigo-600 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 {transport.playing &&
+    class="self-start rounded-md border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-raised {transport.playing &&
     transport.activeKey === key
-      ? 'bg-indigo-600 text-white hover:bg-indigo-500 dark:text-white'
+      ? 'bg-accent text-surface hover:bg-accent'
       : ''}"
   >
     {transport.playing && transport.activeKey === key ? "Pause" : "Play"}
   </button>
 {/snippet}
 
-<!-- Renders a feature group (events, continuous, heatmaps) for a stem or sub-stem,
-     reused so stems and drum sub-stems share one layout. -->
-{#snippet featureGraphs(
-  sf: ReturnType<typeof splitFeatures>,
-  labelPrefix: string,
-)}
-  {#each sf.events as [name, feature] (name)}
-    <div>
-      <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-        {humanize(name)}
-        <span class="text-neutral-400 dark:text-neutral-600"
-          >· {feature.events.length} events</span
-        >
-      </p>
-      <EventLane
-        events={feature.events}
-        maxTimeSec={durationSec}
-        playheadSec={transport.currentTime}
-        follow={transport.playing}
-        height={64}
-        onSeek={scrub}
-        onScrubStart={scrubStart}
-        onScrubEnd={scrubEnd}
-      />
-    </div>
-  {/each}
-  {#each sf.continuous as [name, feature], i (name)}
-    <div>
-      <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-        {humanize(name)}
-        <span class="text-neutral-400 dark:text-neutral-600"
-          >· {feature.unit}</span
-        >
-      </p>
+<!-- One feature as a lane row: header + the render-mode-appropriate graph. -->
+{#snippet featureRow(name: string, feature: MixFeature, i: number)}
+  <div>
+    <p class="mb-1 text-xs text-ink-muted">
+      {humanize(name)}
+      <span class="text-ink-faint">· {detailOf(feature)}</span>
+    </p>
+    {#if feature.render === "continuous"}
       <ContinuousLane
         data={feature.data}
         {frameRateHz}
-        label={`${labelPrefix} ${name}`}
+        label={name}
         color={PALETTE[i % PALETTE.length]}
         playheadSec={transport.currentTime}
         follow={transport.playing}
@@ -382,28 +173,203 @@
         onScrubStart={scrubStart}
         onScrubEnd={scrubEnd}
       />
-    </div>
+    {:else if feature.render === "event"}
+      <EventLane
+        events={feature.events}
+        maxTimeSec={durationSec}
+        playheadSec={transport.currentTime}
+        follow={transport.playing}
+        labelFor={name === "chords" ? chordLabel : undefined}
+        height={name === "chords" ? 88 : 64}
+        onSeek={scrub}
+        onScrubStart={scrubStart}
+        onScrubEnd={scrubEnd}
+      />
+    {:else if feature.render === "segment"}
+      <SegmentLane
+        segments={feature.segments}
+        maxTimeSec={durationSec}
+        playheadSec={transport.currentTime}
+        follow={transport.playing}
+        onSeek={scrub}
+        onScrubStart={scrubStart}
+        onScrubEnd={scrubEnd}
+      />
+    {:else if feature.render === "heatmap" && inspection.songDir}
+      <HeatmapLane
+        path={sidecarPath(feature.sidecar)}
+        {frameRateHz}
+        normalize={name === "spectrogram" ? "global" : "per-row"}
+        playheadSec={transport.currentTime}
+        follow={transport.playing}
+        onSeek={scrub}
+        onScrubStart={scrubStart}
+        onScrubEnd={scrubEnd}
+      />
+    {:else if feature.render === "tags" && inspection.songDir}
+      <TagsLanes
+        path={sidecarPath(feature.sidecar)}
+        labels={feature.labels}
+        {frameRateHz}
+        playheadSec={transport.currentTime}
+        follow={transport.playing}
+        onSeek={scrub}
+        onScrubStart={scrubStart}
+        onScrubEnd={scrubEnd}
+      />
+    {/if}
+  </div>
+{/snippet}
+
+<!-- A stem (or sub-stem): play control plus its filtered feature rows. -->
+{#snippet stemBody(
+  stemKey: string,
+  featureMap: Record<string, MixFeature>,
+  context: string[],
+)}
+  {@render playButton(stemKey)}
+  {#each Object.entries(featureMap).filter( ([n]) => matches(n, ...context), ) as [name, feature], i (name)}
+    {@render featureRow(name, feature, i)}
   {/each}
-  {#if inspection.songDir}
-    {#each sf.heatmaps as [name, feature] (name)}
-      <div>
-        <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-          {humanize(name)}
-          <span class="text-neutral-400 dark:text-neutral-600"
-            >· {feature.shape[0]}×{feature.shape[1]} {feature.unit}</span
-          >
-        </p>
-        <HeatmapLane
-          path={sidecarPath(feature.sidecar)}
+{/snippet}
+
+<div class="flex h-full flex-col">
+  {#if inspection.profile === null}
+    <div class="flex flex-1 items-center justify-center">
+      <p class="text-sm text-ink-faint">Loading…</p>
+    </div>
+  {:else}
+    <!-- Pinned strip: song-level overview locked to the global playhead, plus
+         the feature search. Stays put while the list scrolls. -->
+    <div
+      class="flex shrink-0 flex-col gap-2 border-b border-edge bg-surface px-4 pb-2 pt-1"
+    >
+      {#if overview}
+        <ContinuousLane
+          data={overview}
           {frameRateHz}
-          normalize="per-row"
+          label="overview"
+          color="#818cf8"
+          height={48}
           playheadSec={transport.currentTime}
           follow={transport.playing}
           onSeek={scrub}
           onScrubStart={scrubStart}
           onScrubEnd={scrubEnd}
         />
+      {/if}
+      <input
+        bind:value={query}
+        placeholder="Search features…"
+        class="w-64 rounded border border-edge bg-app px-2 py-1 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
+      />
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div class="mx-auto flex max-w-4xl flex-col gap-1">
+        <!-- Scalars: one value each, a labeled grid. -->
+        {#if scalars.length > 0 && (q === "" || scalars.some( ([n]) => matches(n), ))}
+          <Group
+            label="Scalars"
+            detail={`${scalars.length}`}
+            open={groupOpen("scalars", true, true)}
+            ontoggle={() => toggle("scalars", true)}
+          >
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {#each scalars.filter( ([n]) => matches(n), ) as [name, feature] (name)}
+                <div class="rounded-md border border-edge bg-surface p-3">
+                  <p class="text-xs text-ink-muted">{humanize(name)}</p>
+                  <p class="text-xl font-semibold tabular-nums">
+                    {formatScalar(feature)}
+                  </p>
+                </div>
+              {/each}
+            </div>
+          </Group>
+        {/if}
+
+        <!-- Mix features by catalog category. -->
+        {#each mixByCategory as [category, entries] (category)}
+          {@const visible = entries.filter(([n]) => matches(n, category))}
+          {#if visible.length > 0}
+            <Group
+              label={humanize(category)}
+              detail={`${visible.length}`}
+              open={groupOpen(`mix.${category}`, true, true)}
+              ontoggle={() => toggle(`mix.${category}`, true)}
+            >
+              {#each visible as [name, feature], i (name)}
+                {@render featureRow(name, feature, i)}
+              {/each}
+            </Group>
+          {/if}
+        {/each}
+
+        <!-- Per-stem features, engine → stem → sub-stem. Engines default
+             collapsed; search reaches inside. -->
+        {#each stems as [engine, engineStems] (engine)}
+          {@const engineHasHits =
+            q !== "" &&
+            Object.entries(engineStems).some(
+              ([stemName, stemData]) =>
+                Object.keys(stemData.features).some((n) =>
+                  matches(n, engine, stemName),
+                ) ||
+                Object.entries(stemData.substems ?? {}).some(([subName, sub]) =>
+                  Object.keys(sub.features).some((n) =>
+                    matches(n, engine, stemName, subName),
+                  ),
+                ),
+            )}
+          {#if q === "" || engineHasHits}
+            <Group
+              label={engine}
+              detail={`${Object.keys(engineStems).length} stems`}
+              open={groupOpen(`stems.${engine}`, false, engineHasHits)}
+              ontoggle={() => toggle(`stems.${engine}`, false)}
+            >
+              {#each Object.entries(engineStems) as [stemName, stemData] (stemName)}
+                {@const stemKey = `${engine}::${stemName}`}
+                {@const stemHits =
+                  q === "" ||
+                  Object.keys(stemData.features).some((n) =>
+                    matches(n, engine, stemName),
+                  )}
+                {#if stemHits}
+                  <Group
+                    label={stemName}
+                    depth={1}
+                    open={groupOpen(stemKey, true, true)}
+                    ontoggle={() => toggle(stemKey, true)}
+                  >
+                    {@render stemBody(stemKey, stemData.features, [
+                      engine,
+                      stemName,
+                    ])}
+                  </Group>
+                {/if}
+                {#each Object.entries(stemData.substems ?? {}) as [subName, subData] (subName)}
+                  {@const subKey = `${engine}::${stemName}::${subName}`}
+                  {#if q === "" || Object.keys(subData.features).some( (n) => matches(n, engine, stemName, subName), )}
+                    <Group
+                      label={`${stemName} · ${subName}`}
+                      depth={2}
+                      open={groupOpen(subKey, true, true)}
+                      ontoggle={() => toggle(subKey, true)}
+                    >
+                      {@render stemBody(subKey, subData.features, [
+                        engine,
+                        stemName,
+                        subName,
+                      ])}
+                    </Group>
+                  {/if}
+                {/each}
+              {/each}
+            </Group>
+          {/if}
+        {/each}
       </div>
-    {/each}
+    </div>
   {/if}
-{/snippet}
+</div>

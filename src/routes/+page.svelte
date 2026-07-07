@@ -24,11 +24,9 @@
   <Sidebar />
   <div class="flex min-w-0 flex-1 flex-col">
     <TopBar />
-    <main class="min-h-0 flex-1 overflow-y-auto">
+    <main class="min-h-0 flex-1 overflow-hidden">
       {#if workspace.tab === "analysis" && inspection.songId !== null}
-        <div class="flex justify-center px-6 py-6">
-          <InspectionView />
-        </div>
+        <InspectionView />
       {:else}
         <TabStub title={activeTab.label} blurb={activeTab.blurb} />
       {/if}

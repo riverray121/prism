@@ -12,9 +12,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 4 — Graph kit complete: SegmentLane/HeatmapLane/TagsLanes on the kit; pure helpers extracted (`graphs/heatmap.ts` colormap+offscreen, `graphs/tags.ts` presentRows, `lib/chords.ts` chordLabel — typed narrowing, no casts, L4); `sidecarPath` moved to inspection state (A2); all four legacy graph components deleted.
 
+- Slice 5 — Analysis tab layout: InspectionView rebuilt as the Analysis tab — pinned strip (overview lane on the global playhead + feature search) above a scrolling grouped list; collapsible `Group` component (mix categories open by default, engines collapsed; collapsed = not rendered); search matches feature name + category/engine/stem context and forces matching groups open; unified `featureRow` snippet renders all five modes; tab owns its scroll (shell `main` is overflow-hidden).
+
 ## Todo
 
-- [ ] Slice 5 — Analysis tab layout
 - [ ] Slice 6 — Favorites
 - [ ] Slice 7 — Onset lanes
 - [ ] Slice 8 — Analyze popup + engine capabilities
