@@ -198,9 +198,7 @@
             <span class="min-w-0 flex-1 truncate">
               {song.artist} · {formatType(song.source_path)} · {formatDuration(
                 song.duration_sec,
-              )}{song.analyzed_at
-                ? ` · analyzed ${shortDate(song.analyzed_at)}`
-                : ""}
+              )}{song.analyzed_at ? ` · ${shortDate(song.analyzed_at)}` : ""}
             </span>
             {#if song.status !== "analyzing"}
               <button
