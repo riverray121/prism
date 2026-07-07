@@ -1,9 +1,8 @@
 <script lang="ts">
-  import { convertFileSrc } from "@tauri-apps/api/core";
   import uPlot from "uplot";
   import "uplot/dist/uPlot.min.css";
 
-  import { parseNpy, type Npy } from "$lib/npy";
+  import { loadNpy, type Npy } from "$lib/npy";
 
   // Concrete graph for heatmap features: a 2D matrix loaded from a .npy sidecar,
   // rendered as a colormapped image in a uPlot draw hook (third concrete graph
@@ -327,9 +326,7 @@
     let cancelled = false;
     (async () => {
       try {
-        const resp = await fetch(convertFileSrc(p));
-        const buf = await resp.arrayBuffer();
-        const m = parseNpy(buf);
+        const m = await loadNpy(p);
         if (cancelled) return;
         offscreen = buildOffscreen(m);
         matrix = m;

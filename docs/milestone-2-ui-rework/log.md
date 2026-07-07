@@ -8,9 +8,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 2 — Global transport: Web Audio engine extracted from InspectionView into `lib/state/transport.svelte.ts` (module-scope runes state; race-guarded via loadToken + playSeq, generation-local buffer cache); `pathForKey`/`playToggle` in inspection state; transport UI (play/pause, clock, active-source, error) in the TopBar; song-change resets wired through open/close + the profile event; shared `formatTime` in `lib/format.ts`.
 
+- Slice 3 — Graph kit core: `lib/graphs/` created — `axis.ts` (pure zoom/pan/follow window math, 19 vitest cases), `TimeAxis.svelte` (uPlot lifecycle, scrub/wheel/playhead/follow, footer — the one interaction implementation), `ContinuousLane`/`EventLane` renderers (ContinuousLane takes `data: number[]`, killing TagsGraph's fake-feature hack); `loadNpy` added to `npy.ts` (A5) and adopted by Heatmap/TagsGraph; legacy ContinuousGraph/EventGraph deleted.
+
 ## Todo
 
-- [ ] Slice 3 — Graph kit core
 - [ ] Slice 4 — Graph kit complete
 - [ ] Slice 5 — Analysis tab layout
 - [ ] Slice 6 — Favorites

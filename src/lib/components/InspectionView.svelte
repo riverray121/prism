@@ -1,9 +1,9 @@
 <script lang="ts">
-  import ContinuousGraph from "$lib/components/ContinuousGraph.svelte";
-  import EventGraph from "$lib/components/EventGraph.svelte";
   import HeatmapGraph from "$lib/components/HeatmapGraph.svelte";
   import SegmentGraph from "$lib/components/SegmentGraph.svelte";
   import TagsGraph from "$lib/components/TagsGraph.svelte";
+  import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
+  import EventLane from "$lib/graphs/EventLane.svelte";
   import type {
     ContinuousFeature,
     EventFeature,
@@ -216,7 +216,7 @@
             >· {feature.events.length} events</span
           >
         </p>
-        <EventGraph
+        <EventLane
           events={feature.events}
           maxTimeSec={durationSec}
           playheadSec={transport.currentTime}
@@ -268,8 +268,8 @@
               >· {feature.unit}{feature.status === "wip" ? " · wip" : ""}</span
             >
           </p>
-          <ContinuousGraph
-            {feature}
+          <ContinuousLane
+            data={feature.data}
             {frameRateHz}
             label={name}
             color={PALETTE[i % PALETTE.length]}
@@ -391,7 +391,7 @@
           >· {feature.events.length} events</span
         >
       </p>
-      <EventGraph
+      <EventLane
         events={feature.events}
         maxTimeSec={durationSec}
         playheadSec={transport.currentTime}
@@ -411,8 +411,8 @@
           >· {feature.unit}</span
         >
       </p>
-      <ContinuousGraph
-        {feature}
+      <ContinuousLane
+        data={feature.data}
         {frameRateHz}
         label={`${labelPrefix} ${name}`}
         color={PALETTE[i % PALETTE.length]}

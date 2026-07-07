@@ -3,9 +3,18 @@
 // string, a version, an ASCII header dict (descr/fortran_order/shape), then the
 // raw buffer; the header is padded so the data start is 64-byte aligned.
 
+import { convertFileSrc } from "@tauri-apps/api/core";
+
 export interface Npy {
   shape: number[];
   data: Float32Array;
+}
+
+// Fetch + parse a sidecar by absolute filesystem path (via the Tauri asset
+// protocol). The one load path for every .npy consumer.
+export async function loadNpy(path: string): Promise<Npy> {
+  const resp = await fetch(convertFileSrc(path));
+  return parseNpy(await resp.arrayBuffer());
 }
 
 export function parseNpy(buffer: ArrayBuffer): Npy {
