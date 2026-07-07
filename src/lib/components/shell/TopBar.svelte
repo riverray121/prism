@@ -3,7 +3,12 @@
   import { close, inspection, playToggle } from "$lib/state/inspection.svelte";
   import { songById } from "$lib/state/library.svelte";
   import { transport } from "$lib/state/transport.svelte";
-  import { setTab, TABS, workspace } from "$lib/state/workspace.svelte";
+  import {
+    setTab,
+    TABS,
+    toggleSplit,
+    workspace,
+  } from "$lib/state/workspace.svelte";
 
   const openSong = $derived(songById(inspection.songId));
 </script>
@@ -61,5 +66,17 @@
         {label}
       </button>
     {/each}
+    <button
+      onclick={toggleSplit}
+      title={workspace.splitTab === null
+        ? "Split view (two tabs side by side)"
+        : "Close split view"}
+      class="border-b-2 border-transparent px-3 text-sm {workspace.splitTab !==
+      null
+        ? 'text-accent'
+        : 'text-ink-muted hover:text-ink'}"
+    >
+      ◫
+    </button>
   </nav>
 </header>

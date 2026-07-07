@@ -24,9 +24,11 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 10 — YouTube import: `sidecar/youtube.py` (yt-dlp → FLAC, `{uploader} - {title}` filename feeds the existing metadata heuristic; explicit ffmpeg-missing error); `library.import_youtube` command runs on a worker thread (downloads must not block the stdin loop); `ImportDialog` behind the sidebar + button (file picker or URL); `library.lastImportError` surfaces failures in the panel; README documents the ffmpeg prerequisite.
 
+- Slice 11 — Split view: workspace state gains `splitTab` (primary + optional second pane); `TabContent` extracted as the host-agnostic tab renderer; `Pane` (slim per-pane tab picker + fullscreen ⤢) rendered in a two-column grid; ◫ toggle in the top bar (opens with the canonical companion tab); both panes read the one global transport. All 11 slices complete — awaiting user testing of the whole milestone.
+
 ## Todo
 
-- [ ] Slice 11 — Split view
+(none — all slices built; user test pass pending)
 
 ## Notes
 

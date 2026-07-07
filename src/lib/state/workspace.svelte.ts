@@ -23,13 +23,41 @@ export const TABS: { id: Tab; label: string; blurb: string }[] = [
   },
 ];
 
-export const workspace = $state<{ tab: Tab; sidebarExpanded: boolean }>({
+// `tab` is the primary pane; `splitTab` non-null puts a second tab beside it.
+export const workspace = $state<{
+  tab: Tab;
+  splitTab: Tab | null;
+  sidebarExpanded: boolean;
+}>({
   tab: "analysis",
+  splitTab: null,
   sidebarExpanded: false,
 });
 
 export function setTab(tab: Tab): void {
   workspace.tab = tab;
+}
+
+export function setSplitTab(tab: Tab): void {
+  workspace.splitTab = tab;
+}
+
+// Open/close the second pane. On open it picks the canonical companion:
+// Mapping beside anything else, Sim beside Mapping.
+export function toggleSplit(): void {
+  if (workspace.splitTab !== null) {
+    workspace.splitTab = null;
+    return;
+  }
+  workspace.splitTab = workspace.tab === "mapping" ? "sim" : "mapping";
+}
+
+// Collapse the split, keeping one pane's tab fullscreen.
+export function fullscreenPane(pane: "primary" | "split"): void {
+  if (pane === "split" && workspace.splitTab !== null) {
+    workspace.tab = workspace.splitTab;
+  }
+  workspace.splitTab = null;
 }
 
 export function toggleSidebar(): void {
