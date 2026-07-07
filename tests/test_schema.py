@@ -59,3 +59,28 @@ def test_settings_event_round_trips():
     dumped = json.loads(ev.model_dump_json())
     assert dumped["type"] == "settings"
     assert dumped["drum_subsep"] is True
+
+
+def test_delete_and_import_lifecycle_models():
+    cmd = schema.DeleteSongCommand.model_validate(
+        {"type": "library.delete", "song_id": "s1"}
+    )
+    assert cmd.song_id == "s1"
+    started = json.loads(schema.ImportStartedEvent(path="u").model_dump_json())
+    finished = json.loads(schema.ImportFinishedEvent(path="u").model_dump_json())
+    assert started["type"] == "library.import_started"
+    assert finished["type"] == "library.import_finished"
+
+
+def test_song_analyzed_at_defaults_none():
+    song = schema.Song(
+        id="1",
+        title="t",
+        artist="a",
+        duration_sec=None,
+        sample_rate=None,
+        source_path="p",
+        status="unanalyzed",
+        imported_at="then",
+    )
+    assert song.analyzed_at is None

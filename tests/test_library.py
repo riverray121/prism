@@ -132,3 +132,12 @@ def test_delete_song_refuses_while_analyzing(con):
     library.mark_analyzing(con, "s1")
     assert library.delete_song(con, "s1") is False
     assert len(library.list_songs(con)) == 1
+
+
+def test_analyzed_at_flows_through_list_songs(con):
+    _insert(con, "s1")
+    assert dict(library.list_songs(con)[0])["analyzed_at"] is None
+    library.mark_queued(con, ["s1"], "t")
+    library.mark_analyzing(con, "s1")
+    library.mark_analyzed(con, "s1", "2026-01-02T00:00:00Z")
+    assert dict(library.list_songs(con)[0])["analyzed_at"] == "2026-01-02T00:00:00Z"

@@ -80,6 +80,19 @@ describe("SidecarEventSchema discriminated union", () => {
     expect(SidecarEventSchema.safeParse({ type: "nope" }).success).toBe(false);
   });
 
+  it("parses import lifecycle events", () => {
+    const started = SidecarEventSchema.parse({
+      type: "library.import_started",
+      path: "https://youtube.com/watch?v=x",
+    });
+    const finished = SidecarEventSchema.parse({
+      type: "library.import_finished",
+      path: "https://youtube.com/watch?v=x",
+    });
+    expect(started.type).toBe("library.import_started");
+    expect(finished.type).toBe("library.import_finished");
+  });
+
   it("parses a settings event", () => {
     const ev = SidecarEventSchema.parse({
       type: "settings",
