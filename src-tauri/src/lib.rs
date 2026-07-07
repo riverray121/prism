@@ -2,7 +2,14 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
+
+mod applog;
+
+// Facts gathered at startup for the frontend's health surface.
+struct StartupInfo {
+    unclean_exit: bool,
+}
 
 // Handle to the running sidecar's stdin, stored in Tauri state.
 struct Sidecar {
@@ -12,6 +19,21 @@ struct Sidecar {
 // Handle to the running sidecar process, stored in Tauri state for lifecycle control.
 struct SidecarProcess {
     child: Mutex<Child>,
+}
+
+// Report startup health facts + the log location to the frontend.
+#[tauri::command]
+fn startup_report(info: State<StartupInfo>) -> serde_json::Value {
+    serde_json::json!({
+        "unclean_exit": info.unclean_exit,
+        "log_dir": applog::dir().to_string_lossy(),
+    })
+}
+
+// Persist a frontend error (window.onerror / unhandledrejection) in app.log.
+#[tauri::command]
+fn log_frontend_error(message: String) {
+    applog::log(&format!("frontend: {message}"));
 }
 
 // Write one JSON-line command to the sidecar's stdin.
@@ -76,6 +98,7 @@ fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
                 .try_state::<SidecarProcess>()
                 .and_then(|s| s.child.lock().ok().and_then(|mut c| c.wait().ok()))
                 .and_then(|status| status.code());
+            applog::log(&format!("sidecar exited with code {code:?}"));
             let _ = app.emit("sidecar-exited", code);
         });
     }
@@ -93,7 +116,7 @@ fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
                     Ok(_) => {
                         trim_newline(&mut buf);
                         let line = String::from_utf8_lossy(&buf).into_owned();
-                        eprintln!("[sidecar] {}", line);
+                        applog::log(&format!("[sidecar] {line}"));
                         let _ = app.emit("sidecar-stderr", line);
                     }
                 }
@@ -106,10 +129,13 @@ fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    applog::init();
+    let unclean_exit = applog::startup_unclean_check();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
+        .setup(move |app| {
+            app.manage(StartupInfo { unclean_exit });
             // Spawn the sidecar; on failure surface an error and keep the app running.
             match spawn_sidecar(app.handle()) {
                 Ok(mut child) => {
@@ -127,13 +153,24 @@ pub fn run() {
                 }
                 Err(e) => {
                     let message = format!("failed to spawn sidecar: {e}");
-                    eprintln!("{message}");
+                    applog::log(&message);
                     let _ = app.emit("sidecar-error", message);
                 }
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![send_to_sidecar])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .invoke_handler(tauri::generate_handler![
+            send_to_sidecar,
+            startup_report,
+            log_frontend_error
+        ])
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            // Orderly shutdown removes the session marker; a crash leaves it
+            // for the next launch to report.
+            if let RunEvent::Exit = event {
+                applog::clean_exit();
+            }
+        });
 }
