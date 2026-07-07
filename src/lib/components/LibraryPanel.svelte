@@ -174,8 +174,19 @@
             ? 'cursor-pointer hover:bg-raised'
             : ''} {inspection.songId === song.id ? 'bg-raised' : ''}"
         >
-          <div class="flex items-center gap-2">
-            <span class="min-w-0 flex-1 truncate text-sm">{song.title}</span>
+          <div class="flex items-center gap-1">
+            <span class="min-w-0 truncate text-sm">{song.title}</span>
+            <button
+              onclick={(e) => {
+                e.stopPropagation();
+                editFor = song;
+              }}
+              title="Edit title and artist"
+              class="shrink-0 rounded px-1.5 py-0.5 text-xs leading-none text-ink-faint hover:bg-raised hover:text-ink"
+            >
+              ✎
+            </button>
+            <span class="flex-1"></span>
             <span
               class="shrink-0 text-xs tabular-nums {STATUS_COLOR[song.status] ??
                 'text-ink-muted'}"
@@ -191,16 +202,6 @@
                 ? ` · analyzed ${shortDate(song.analyzed_at)}`
                 : ""}
             </span>
-            <button
-              onclick={(e) => {
-                e.stopPropagation();
-                editFor = song;
-              }}
-              title="Edit title and artist"
-              class="shrink-0 rounded px-2 py-1 text-sm leading-none text-ink-faint hover:bg-raised hover:text-ink"
-            >
-              ✎
-            </button>
             {#if song.status !== "analyzing"}
               <button
                 onclick={(e) => {
@@ -208,9 +209,21 @@
                   deleteFor = song;
                 }}
                 title="Delete this song and all its analysis data"
-                class="shrink-0 rounded px-2 py-1 text-sm leading-none text-ink-faint hover:bg-raised hover:text-danger"
+                class="shrink-0 rounded p-1 text-ink-faint hover:bg-raised hover:text-danger"
               >
-                🗑
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                >
+                  <path
+                    d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"
+                  />
+                </svg>
               </button>
             {/if}
             {#if song.status === "unanalyzed" || song.status === "failed" || song.status === "analyzed"}
