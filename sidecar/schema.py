@@ -25,6 +25,13 @@ class GetProfileCommand(BaseModel):
     song_id: str
 
 
+class UpdateFavoritesCommand(BaseModel):
+    type: Literal["favorites.update"]
+    song_id: str
+    # Full replacement list of dot-paths into the song's profile.
+    favorites: list[str]
+
+
 class UpdateSettingsCommand(BaseModel):
     type: Literal["settings.update"]
     # Partial update: each field is applied only if present.

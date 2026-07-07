@@ -1,4 +1,4 @@
-import { getProfile } from "$lib/ipc";
+import { getProfile, updateFavorites } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
 import { resetForSong, toggleSource } from "$lib/state/transport.svelte";
 
@@ -55,4 +55,30 @@ export function playToggle(key: string): void {
 // Call sites gate on songDir being set.
 export function sidecarPath(rel: string): string {
   return `${inspection.songDir}/${rel}`;
+}
+
+export function isFavorite(path: string): boolean {
+  return inspection.profile?.favorites.includes(path) ?? false;
+}
+
+// Star/unstar a subfeature. Optimistic: the in-memory profile updates
+// immediately and the sidecar persists the full list into profile.json.
+export function toggleFavorite(path: string): void {
+  const profile = inspection.profile;
+  if (!profile || !inspection.songId) return;
+  profile.favorites = profile.favorites.includes(path)
+    ? profile.favorites.filter((p) => p !== path)
+    : [...profile.favorites, path];
+  void updateFavorites(inspection.songId, profile.favorites);
+}
+
+// Follow a favorites dot-path through the profile; used to warn on stale
+// favorites when a profile loads (a removed feature must not kill the load).
+export function favoriteResolves(profile: Profile, path: string): boolean {
+  let node: unknown = profile;
+  for (const part of path.split(".")) {
+    if (typeof node !== "object" || node === null) return false;
+    node = (node as Record<string, unknown>)[part];
+  }
+  return node !== undefined;
 }

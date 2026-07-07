@@ -182,6 +182,9 @@ export const ProfileSchema = z.object({
   mix: FeatureMapSchema,
   // engine -> stem -> Stem. Absent on pre-M4 profiles, so defaults to empty.
   stems: z.record(z.string(), z.record(z.string(), StemSchema)).default({}),
+  // Dot-paths to starred subfeatures (e.g. "mix.beats",
+  // "stems.htdemucs_ft.bass.features.pitch"). Absent on older profiles.
+  favorites: z.array(z.string()).default([]),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 

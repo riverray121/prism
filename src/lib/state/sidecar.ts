@@ -1,7 +1,7 @@
 import { getSettings, listLibrary, onSidecarEvent } from "$lib/ipc";
 import type { SidecarEvent } from "$lib/ipc/messages";
 import { library } from "$lib/state/library.svelte";
-import { inspection } from "$lib/state/inspection.svelte";
+import { favoriteResolves, inspection } from "$lib/state/inspection.svelte";
 import { settings } from "$lib/state/settings.svelte";
 import { resetForSong } from "$lib/state/transport.svelte";
 
@@ -21,6 +21,11 @@ function applySidecarEvent(event: SidecarEvent): void {
       inspection.songDir = event.song_dir;
       // Arm the transport for the newly loaded song (pre-decodes the mix).
       resetForSong(event.audio_path, event.profile.song.duration_sec ?? 0);
+      // Stale favorites (feature removed by a re-analysis) warn, never fail.
+      for (const fav of event.profile.favorites) {
+        if (!favoriteResolves(event.profile, fav))
+          console.warn("favorite no longer resolves:", fav);
+      }
     }
   } else if (event.type === "settings") {
     settings.engines = event.engines;

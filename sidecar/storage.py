@@ -74,13 +74,27 @@ def write_profile(
         },
         "mix": mix,
         "stems": stems or {},
+        # Re-analysis rewrites the profile wholesale; the user's stars survive
+        # it (stale paths are the frontend's warn-only concern).
+        "favorites": _existing_favorites(song["id"]),
     }
-    path = SONGS_DIR / song["id"] / "profile.json"
+    _write_json_atomic(SONGS_DIR / song["id"] / "profile.json", profile)
+
+
+def _existing_favorites(song_id: str) -> list:
+    try:
+        favorites = read_profile(song_id).get("favorites", [])
+        return favorites if isinstance(favorites, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _write_json_atomic(path: Path, obj: dict) -> None:
     # Write to a sibling temp file then atomically rename, so a kill/full disk
     # mid-write can't leave a truncated profile.json that read_profile chokes on.
     # allow_nan=False makes any non-finite leak fail loudly here rather than emit
     # non-standard JSON tokens.
-    text = json.dumps(profile, indent=2, allow_nan=False)
+    text = json.dumps(obj, indent=2, allow_nan=False)
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
     tmp = Path(tmp_name)
     try:
@@ -89,6 +103,16 @@ def write_profile(
         tmp.replace(path)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def write_favorites(song_id: str, favorites: list[str]) -> None:
+    """Replace the favorites list in an analyzed song's profile.json.
+
+    Raises FileNotFoundError when the song has no profile (unanalyzed).
+    """
+    profile = read_profile(song_id)
+    profile["favorites"] = favorites
+    _write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
 
 
 def write_heatmap(song_id: str, name: str, matrix: np.ndarray) -> str:

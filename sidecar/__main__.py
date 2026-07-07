@@ -16,6 +16,7 @@ from .schema import (
     QueueCancelCommand,
     SettingsEvent,
     Song,
+    UpdateFavoritesCommand,
     UpdateSettingsCommand,
 )
 
@@ -119,6 +120,12 @@ def handle(msg: dict) -> None:
             # A schema-drifted or partially-written profile (missing keys, bad
             # JSON) shouldn't take down the command channel — log and skip.
             log.warning("malformed profile for %s", cmd.song_id)
+    elif msg_type == "favorites.update":
+        cmd = UpdateFavoritesCommand.model_validate(msg)
+        try:
+            storage.write_favorites(cmd.song_id, cmd.favorites)
+        except FileNotFoundError:
+            log.warning("favorites for song without profile: %s", cmd.song_id)
     elif msg_type == "settings.get":
         emit_settings()
     elif msg_type == "settings.update":

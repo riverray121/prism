@@ -33,6 +33,14 @@ export function getSettings(): Promise<void> {
   return sendCommand({ type: "settings.get" });
 }
 
+// Replace a song's full favorites list (dot-paths into its profile).
+export function updateFavorites(
+  songId: string,
+  favorites: string[],
+): Promise<void> {
+  return sendCommand({ type: "favorites.update", song_id: songId, favorites });
+}
+
 export function updateSettings(update: {
   engines?: string[];
   drum_subsep?: boolean;

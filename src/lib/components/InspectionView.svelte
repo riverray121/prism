@@ -9,8 +9,10 @@
   import type { MixFeature, ScalarFeature } from "$lib/ipc/messages";
   import {
     inspection,
+    isFavorite,
     playToggle,
     sidecarPath,
+    toggleFavorite,
   } from "$lib/state/inspection.svelte";
   import {
     scrub,
@@ -154,10 +156,29 @@
   </button>
 {/snippet}
 
+<!-- Favorite star for one subfeature dot-path; favorites feed the M3 mapping tab. -->
+{#snippet star(favPath: string)}
+  <button
+    onclick={() => toggleFavorite(favPath)}
+    title={isFavorite(favPath) ? "Unfavorite" : "Favorite"}
+    class={isFavorite(favPath)
+      ? "text-amber-400 hover:text-amber-300"
+      : "text-ink-faint hover:text-ink"}
+  >
+    {isFavorite(favPath) ? "★" : "☆"}
+  </button>
+{/snippet}
+
 <!-- One feature as a lane row: header + the render-mode-appropriate graph. -->
-{#snippet featureRow(name: string, feature: MixFeature, i: number)}
+{#snippet featureRow(
+  name: string,
+  feature: MixFeature,
+  i: number,
+  favPath: string,
+)}
   <div>
-    <p class="mb-1 text-xs text-ink-muted">
+    <p class="mb-1 flex items-center gap-1 text-xs text-ink-muted">
+      {@render star(favPath)}
       {humanize(name)}
       <span class="text-ink-faint">· {detailOf(feature)}</span>
     </p>
@@ -226,10 +247,11 @@
   stemKey: string,
   featureMap: Record<string, MixFeature>,
   context: string[],
+  favPrefix: string,
 )}
   {@render playButton(stemKey)}
   {#each Object.entries(featureMap).filter( ([n]) => matches(n, ...context), ) as [name, feature], i (name)}
-    {@render featureRow(name, feature, i)}
+    {@render featureRow(name, feature, i, `${favPrefix}.${name}`)}
   {/each}
 {/snippet}
 
@@ -278,7 +300,10 @@
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {#each scalars.filter( ([n]) => matches(n), ) as [name, feature] (name)}
                 <div class="rounded-md border border-edge bg-surface p-3">
-                  <p class="text-xs text-ink-muted">{humanize(name)}</p>
+                  <p class="flex items-center gap-1 text-xs text-ink-muted">
+                    {@render star(`mix.${name}`)}
+                    {humanize(name)}
+                  </p>
                   <p class="text-xl font-semibold tabular-nums">
                     {formatScalar(feature)}
                   </p>
@@ -299,7 +324,7 @@
               ontoggle={() => toggle(`mix.${category}`, true)}
             >
               {#each visible as [name, feature], i (name)}
-                {@render featureRow(name, feature, i)}
+                {@render featureRow(name, feature, i, `mix.${name}`)}
               {/each}
             </Group>
           {/if}
@@ -342,10 +367,12 @@
                     open={groupOpen(stemKey, true, true)}
                     ontoggle={() => toggle(stemKey, true)}
                   >
-                    {@render stemBody(stemKey, stemData.features, [
-                      engine,
-                      stemName,
-                    ])}
+                    {@render stemBody(
+                      stemKey,
+                      stemData.features,
+                      [engine, stemName],
+                      `stems.${engine}.${stemName}.features`,
+                    )}
                   </Group>
                 {/if}
                 {#each Object.entries(stemData.substems ?? {}) as [subName, subData] (subName)}
@@ -357,11 +384,12 @@
                       open={groupOpen(subKey, true, true)}
                       ontoggle={() => toggle(subKey, true)}
                     >
-                      {@render stemBody(subKey, subData.features, [
-                        engine,
-                        stemName,
-                        subName,
-                      ])}
+                      {@render stemBody(
+                        subKey,
+                        subData.features,
+                        [engine, stemName, subName],
+                        `stems.${engine}.${stemName}.substems.${subName}.features`,
+                      )}
                     </Group>
                   {/if}
                 {/each}

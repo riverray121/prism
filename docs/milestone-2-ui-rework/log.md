@@ -14,9 +14,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 5 — Analysis tab layout: InspectionView rebuilt as the Analysis tab — pinned strip (overview lane on the global playhead + feature search) above a scrolling grouped list; collapsible `Group` component (mix categories open by default, engines collapsed; collapsed = not rendered); search matches feature name + category/engine/stem context and forces matching groups open; unified `featureRow` snippet renders all five modes; tab owns its scroll (shell `main` is overflow-hidden).
 
+- Slice 6 — Favorites: star on every feature row + scalar card (dot-paths per profile-schema); optimistic toggle in inspection state + `favorites.update` IPC; sidecar `write_favorites` (atomic rewrite) and `write_profile` now carries favorites through re-analysis; profile zod gains `favorites` (default []); stale paths warn on load, never fail; pytest coverage in test_storage.py.
+
 ## Todo
 
-- [ ] Slice 6 — Favorites
 - [ ] Slice 7 — Onset lanes
 - [ ] Slice 8 — Analyze popup + engine capabilities
 - [ ] Slice 9 — Library management
