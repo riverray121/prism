@@ -10,9 +10,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 3 — Graph kit core: `lib/graphs/` created — `axis.ts` (pure zoom/pan/follow window math, 19 vitest cases), `TimeAxis.svelte` (uPlot lifecycle, scrub/wheel/playhead/follow, footer — the one interaction implementation), `ContinuousLane`/`EventLane` renderers (ContinuousLane takes `data: number[]`, killing TagsGraph's fake-feature hack); `loadNpy` added to `npy.ts` (A5) and adopted by Heatmap/TagsGraph; legacy ContinuousGraph/EventGraph deleted.
 
+- Slice 4 — Graph kit complete: SegmentLane/HeatmapLane/TagsLanes on the kit; pure helpers extracted (`graphs/heatmap.ts` colormap+offscreen, `graphs/tags.ts` presentRows, `lib/chords.ts` chordLabel — typed narrowing, no casts, L4); `sidecarPath` moved to inspection state (A2); all four legacy graph components deleted.
+
 ## Todo
 
-- [ ] Slice 4 — Graph kit complete
 - [ ] Slice 5 — Analysis tab layout
 - [ ] Slice 6 — Favorites
 - [ ] Slice 7 — Onset lanes

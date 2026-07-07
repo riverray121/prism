@@ -1,9 +1,10 @@
 <script lang="ts">
-  import HeatmapGraph from "$lib/components/HeatmapGraph.svelte";
-  import SegmentGraph from "$lib/components/SegmentGraph.svelte";
-  import TagsGraph from "$lib/components/TagsGraph.svelte";
+  import { chordLabel } from "$lib/chords";
   import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
   import EventLane from "$lib/graphs/EventLane.svelte";
+  import HeatmapLane from "$lib/graphs/HeatmapLane.svelte";
+  import SegmentLane from "$lib/graphs/SegmentLane.svelte";
+  import TagsLanes from "$lib/graphs/TagsLanes.svelte";
   import type {
     ContinuousFeature,
     EventFeature,
@@ -13,19 +14,17 @@
     SegmentFeature,
     TagsFeature,
   } from "$lib/ipc/messages";
-  import { inspection, playToggle } from "$lib/state/inspection.svelte";
+  import {
+    inspection,
+    playToggle,
+    sidecarPath,
+  } from "$lib/state/inspection.svelte";
   import {
     scrub,
     scrubEnd,
     scrubStart,
     transport,
   } from "$lib/state/transport.svelte";
-
-  // Resolve a relative sidecar path (heatmap/tags .npy) to its absolute URL.
-  // Call sites gate on inspection.songDir being set.
-  function sidecarUrl(sidecar: string): string {
-    return `${inspection.songDir}/${sidecar}`;
-  }
 
   // Split the keyed mix map into scalar (text) and continuous (graph) features,
   // each preserving the profile's insertion order.
@@ -114,45 +113,6 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
-  // Compact musical shorthand for a chord quality (BTC's vocabulary). Major
-  // renders as the bare root by convention.
-  const CHORD_QUALITY: Record<string, string> = {
-    maj: "",
-    min: "m",
-    dim: "dim",
-    aug: "aug",
-    min6: "m6",
-    maj6: "6",
-    min7: "m7",
-    minmaj7: "mM7",
-    maj7: "maj7",
-    "7": "7",
-    dim7: "dim7",
-    hdim7: "ø7",
-    sus2: "sus2",
-    sus4: "sus4",
-  };
-
-  // Append an ML confidence percentage to a label, when the item carries one.
-  function withConfidence(
-    label: string,
-    item: { confidence?: unknown },
-  ): string {
-    return typeof item.confidence === "number"
-      ? `${label} ${Math.round(item.confidence * 100)}%`
-      : label;
-  }
-
-  // Label a chord event (root/quality passed through the event schema), with the
-  // model's confidence. 'N' (no chord) and 'X' (unknown) carry no quality.
-  function chordLabel(ev: EventFeature["events"][number]): string | null {
-    const c = ev as { root?: string; quality?: string; confidence?: number };
-    if (!c.root) return null;
-    if (c.root === "N" || c.root === "X") return withConfidence(c.root, c);
-    const q = c.quality ?? "";
-    return withConfidence(c.root + (CHORD_QUALITY[q] ?? q), c);
-  }
-
   function formatScalar(f: ScalarFeature): string {
     if (typeof f.value === "string") return f.value;
     const n = f.unit === "normalized" ? f.value.toFixed(2) : f.value.toFixed(1);
@@ -193,7 +153,7 @@
             >· {feature.segments.length} segments</span
           >
         </p>
-        <SegmentGraph
+        <SegmentLane
           segments={feature.segments}
           maxTimeSec={durationSec}
           playheadSec={transport.currentTime}
@@ -242,8 +202,8 @@
               >· {feature.shape[0]}×{feature.shape[1]} {feature.unit}</span
             >
           </p>
-          <HeatmapGraph
-            path={sidecarUrl(feature.sidecar)}
+          <HeatmapLane
+            path={sidecarPath(feature.sidecar)}
             {frameRateHz}
             normalize={name === "spectrogram" ? "global" : "per-row"}
             playheadSec={transport.currentTime}
@@ -298,8 +258,8 @@
                 : ""}</span
             >
           </p>
-          <TagsGraph
-            path={sidecarUrl(feature.sidecar)}
+          <TagsLanes
+            path={sidecarPath(feature.sidecar)}
             labels={feature.labels}
             {frameRateHz}
             playheadSec={transport.currentTime}
@@ -433,8 +393,8 @@
             >· {feature.shape[0]}×{feature.shape[1]} {feature.unit}</span
           >
         </p>
-        <HeatmapGraph
-          path={sidecarUrl(feature.sidecar)}
+        <HeatmapLane
+          path={sidecarPath(feature.sidecar)}
           {frameRateHz}
           normalize="per-row"
           playheadSec={transport.currentTime}

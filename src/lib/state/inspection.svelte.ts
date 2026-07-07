@@ -50,3 +50,9 @@ export function pathForKey(key: string): string | null {
 export function playToggle(key: string): void {
   toggleSource(key, pathForKey(key));
 }
+
+// Resolve a relative sidecar path (heatmap/tags .npy) to its absolute path.
+// Call sites gate on songDir being set.
+export function sidecarPath(rel: string): string {
+  return `${inspection.songDir}/${rel}`;
+}
