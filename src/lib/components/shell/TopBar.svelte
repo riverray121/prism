@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { close, inspection } from "$lib/state/inspection.svelte";
+  import { formatTime } from "$lib/format";
+  import { close, inspection, playToggle } from "$lib/state/inspection.svelte";
   import { songById } from "$lib/state/library.svelte";
+  import { transport } from "$lib/state/transport.svelte";
   import { setTab, TABS, workspace } from "$lib/state/workspace.svelte";
 
   const openSong = $derived(songById(inspection.songId));
@@ -22,6 +24,29 @@
       >
         ×
       </button>
+
+      <!-- Global transport: one clock for every tab. Plays the audible source
+           (mix by default; a stem when soloed from a graph lane). -->
+      <button
+        onclick={() => playToggle(transport.activeKey)}
+        disabled={!inspection.audioPath}
+        class="rounded bg-accent px-3 py-0.5 text-sm font-medium text-surface hover:opacity-90 disabled:opacity-50"
+      >
+        {transport.playing ? "Pause" : "Play"}
+      </button>
+      <span class="text-sm tabular-nums text-ink-muted">
+        {formatTime(transport.currentTime)} / {formatTime(
+          transport.durationSec,
+        )}
+      </span>
+      {#if transport.activeKey !== "mix"}
+        <span class="text-xs text-ink-faint">
+          ♪ {transport.activeKey.split("::").at(-1)}
+        </span>
+      {/if}
+      {#if transport.error}
+        <span class="truncate text-xs text-danger">{transport.error}</span>
+      {/if}
     {/if}
   </div>
 

@@ -3,6 +3,7 @@ import type { SidecarEvent } from "$lib/ipc/messages";
 import { library } from "$lib/state/library.svelte";
 import { inspection } from "$lib/state/inspection.svelte";
 import { settings } from "$lib/state/settings.svelte";
+import { resetForSong } from "$lib/state/transport.svelte";
 
 // Reducer mapping inbound sidecar events onto the durable $state stores. The
 // inbound counterpart to the command senders in lib/ipc; kept out of the route
@@ -18,6 +19,8 @@ function applySidecarEvent(event: SidecarEvent): void {
       inspection.profile = event.profile;
       inspection.audioPath = event.audio_path;
       inspection.songDir = event.song_dir;
+      // Arm the transport for the newly loaded song (pre-decodes the mix).
+      resetForSong(event.audio_path, event.profile.song.duration_sec ?? 0);
     }
   } else if (event.type === "settings") {
     settings.engines = event.engines;

@@ -6,9 +6,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Slice 1 — Shell + theme tokens: workspace shell (top bar with tabs from a single TABS source + close-song control, collapsible sidebar hosting LibraryPanel/AnalysisSettings, stub tabs), dark-first `@theme` tokens (`app/surface/raised/edge/ink*/accent/danger` + `--spacing-bar`), bits-ui adopted (rail tooltip), A6 (`startSidecarSession`/`stopSidecarSession` with generation-token re-entrancy), InspectionView header/back removed (shell owns title/nav).
 
+- Slice 2 — Global transport: Web Audio engine extracted from InspectionView into `lib/state/transport.svelte.ts` (module-scope runes state; race-guarded via loadToken + playSeq, generation-local buffer cache); `pathForKey`/`playToggle` in inspection state; transport UI (play/pause, clock, active-source, error) in the TopBar; song-change resets wired through open/close + the profile event; shared `formatTime` in `lib/format.ts`.
+
 ## Todo
 
-- [ ] Slice 2 — Global transport
 - [ ] Slice 3 — Graph kit core
 - [ ] Slice 4 — Graph kit complete
 - [ ] Slice 5 — Analysis tab layout
@@ -26,3 +27,5 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - ffmpeg is a required system dependency (yt-dlp); documented in README, checked at import.
 - Switching off the Analysis tab unmounts InspectionView and stops playback (cleanup verified leak-free); playback surviving tab switches is slice 2 (transport in state).
 - LibraryPanel in the 32rem sidebar scrolls horizontally as a stopgap; slice 9 rebuilds the rows for the sidebar for real.
+- Graph x-extent (timeline frames) and transport seek clamp (audible buffer) are two deliberate durations; unify consideration belongs to slice 3's kit (`maxTimeSec`).
+- Playback now survives tab switches (module-scope transport); the AudioContext is app-lifetime by design.

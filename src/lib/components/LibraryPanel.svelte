@@ -1,6 +1,7 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
 
+  import { formatTime } from "$lib/format";
   import { cancelAnalysis, importFiles, queueAnalysis } from "$lib/ipc";
   import { library } from "$lib/state/library.svelte";
   import { open as openInspection } from "$lib/state/inspection.svelte";
@@ -36,11 +37,7 @@
 
   // Format seconds as m:ss; em dash when duration is unknown.
   function formatDuration(seconds: number | null): string {
-    if (seconds === null) return "—";
-    const total = Math.round(seconds);
-    const minutes = Math.floor(total / 60);
-    const secs = total % 60;
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+    return seconds === null ? "—" : formatTime(seconds);
   }
 
   // Human verb per pipeline stage.
