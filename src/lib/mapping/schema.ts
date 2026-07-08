@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Profile } from "$lib/ipc/messages";
+import { resolveNode } from "$lib/mapping/sources";
 
 // The mapping doc: derivations + programs + macro, per song. Small,
 // declarative, hand-editable; persisted by the sidecar at
@@ -186,10 +187,5 @@ export function sourceResolves(
 ): boolean {
   const derived = source.match(/^derived\.(.+)$/);
   if (derived) return doc.derivations.some((d) => d.id === derived[1]);
-  let node: unknown = profile;
-  for (const part of source.split(".")) {
-    if (typeof node !== "object" || node === null) return false;
-    node = (node as Record<string, unknown>)[part];
-  }
-  return node !== undefined;
+  return resolveNode(profile, source) !== undefined;
 }

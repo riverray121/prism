@@ -1,5 +1,6 @@
 <script lang="ts">
   import InspectionView from "$lib/components/InspectionView.svelte";
+  import MappingView from "$lib/components/mapping/MappingView.svelte";
   import TabStub from "$lib/components/shell/TabStub.svelte";
   import { inspection } from "$lib/state/inspection.svelte";
   import { TABS, type Tab } from "$lib/state/workspace.svelte";
@@ -12,12 +13,18 @@
 </script>
 
 <!-- The analysis view stays mounted (hidden) while other tabs show, so its
-     scroll position, collapse state, and loaded lanes survive tab switches. -->
+     scroll position, collapse state, and loaded lanes survive tab switches.
+     The mapping view mounts per showing pane instead — its selection lives in
+     the mapping store, so nothing is lost, and hidden uPlot stacks aren't
+     duplicated across split panes. -->
 {#if inspection.songId !== null}
   <div class={tab === "analysis" ? "h-full" : "hidden"}>
     <InspectionView />
   </div>
+  {#if tab === "mapping"}
+    <MappingView />
+  {/if}
 {/if}
-{#if tab !== "analysis" || inspection.songId === null}
+{#if inspection.songId === null || (tab !== "analysis" && tab !== "mapping")}
   <TabStub title={meta.label} blurb={meta.blurb} />
 {/if}

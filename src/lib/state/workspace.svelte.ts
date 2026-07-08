@@ -9,12 +9,12 @@ export const TABS: { id: Tab; label: string; blurb: string }[] = [
   {
     id: "mapping",
     label: "Mapping",
-    blurb: "Map favorited features to light programs — milestone 3.",
+    blurb: "Open a song, star features in Analysis, then map them to light.",
   },
   {
     id: "sim",
     label: "Sim",
-    blurb: "Patch programs onto a simulated rig — milestone 3.",
+    blurb: "Patch programs onto a simulated rig — future milestone.",
   },
   {
     id: "hardware",

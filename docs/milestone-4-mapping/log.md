@@ -8,9 +8,10 @@
 
 - [x] Slice 2 — Mapping doc schema + persistence: `lib/mapping/schema.ts` (zod 0.1.0: derivations/programs/macro with defaults, `sourceResolves` warn-and-mute helper), `sidecar/mapping.py` (atomic read/write under `songs/{uuid}/mapping/mapping.json`; `storage.write_json_atomic` made public), `mapping.get`/`mapping.update` commands + `mapping` event with the profile-style stale guard, `lib/state/mapping.svelte.ts` (load on song open via `inspection.open`, debounced full-doc saves through `touchDoc`, flush on song switch).
 
+- [x] Slice 3 — Derivations: engine + editor: `lib/mapping/derive.ts` (events peak-pick with plateau/min-separation semantics twinned with `sidecar/features/derive.py`, segments hysteresis gate releasing at 0.8×cutoff, strengths carried through), `lib/mapping/sources.ts` (dot-path resolution + favorite listing + labels), Mapping tab replaces the stub (`components/mapping/`: MappingView, SourcesPanel with favorites + derivations, DerivationEditor with cutoff slider/mode toggle/live preview through Continuous+Onset/Segment lanes on the shared window), derivation CRUD actions + `mappingUi` selection state.
+
 ## Todo
 
-- [ ] Slice 3 — Derivations: engine + editor
 - [ ] Slice 4 — Transforms + evaluator (point channels)
 - [ ] Slice 5 — Program editor + ribbon preview
 - [ ] Slice 6 — Pixel dimension + motion

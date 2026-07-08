@@ -1,5 +1,5 @@
 import { updateMapping } from "$lib/ipc";
-import type { MappingDoc } from "$lib/mapping/schema";
+import type { Derivation, MappingDoc } from "$lib/mapping/schema";
 
 // The open song's mapping doc. doc is null while the sidecar fetch is in
 // flight; a song with no saved doc arrives as the empty doc (schema defaults).
@@ -9,6 +9,13 @@ export const mapping = $state<{
   songId: string | null;
   doc: MappingDoc | null;
 }>({ songId: null, doc: null });
+
+// Mapping-tab UI selection. Lives here (not in a component) so it survives
+// tab switches and pane remounts; never persisted.
+export const mappingUi = $state<{
+  // Derivation open in the editor; "new" = drafting a fresh one.
+  editingDerivation: string | null;
+}>({ editingDerivation: null });
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 // Captured at schedule time so a song switch can flush to the right song.
@@ -34,6 +41,7 @@ export function resetMappingForSong(songId: string | null): void {
   flushMappingSave();
   mapping.songId = songId;
   mapping.doc = null;
+  mappingUi.editingDerivation = null;
 }
 
 // Apply an inbound `mapping` event; stale responses (user navigated away
@@ -42,6 +50,35 @@ export function applyMappingEvent(songId: string, doc: MappingDoc): void {
   if (songId !== mapping.songId) return;
   doc.song_id = songId;
   mapping.doc = doc;
+}
+
+// ── Derivation actions ──────────────────────────────────────────────────────
+
+export function addDerivation(derivation: Derivation): void {
+  touchDoc((doc) => {
+    doc.derivations.push(derivation);
+  });
+}
+
+export function updateDerivation(
+  id: string,
+  patch: Partial<Omit<Derivation, "id">>,
+): void {
+  touchDoc((doc) => {
+    const d = doc.derivations.find((x) => x.id === id);
+    if (!d) return;
+    if (patch.source !== undefined) d.source = patch.source;
+    if (patch.threshold !== undefined) d.threshold = patch.threshold;
+  });
+}
+
+// Deleting a derivation is always explicit — nothing calls this implicitly
+// (removing a consuming program never cascades here).
+export function removeDerivation(id: string): void {
+  touchDoc((doc) => {
+    doc.derivations = doc.derivations.filter((d) => d.id !== id);
+  });
+  if (mappingUi.editingDerivation === id) mappingUi.editingDerivation = null;
 }
 
 // Mutate the doc through an action, then debounce a save. All editing actions
