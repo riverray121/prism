@@ -1,6 +1,6 @@
 # Mapping — Implementation
 
-Thin slices in build order. Each leaves the suite green. The repo-wide `/clean` deferred from M2 runs before slice work begins.
+Thin slices in build order. Each leaves the suite green. (The repo-wide `/clean` deferred from M2 was deferred again to M5.)
 
 ## Slice 0 — Shared zoom window (M2 debt)
 

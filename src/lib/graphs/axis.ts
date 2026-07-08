@@ -7,6 +7,11 @@ export interface Win {
   max: number;
 }
 
+// How the view tracks the playhead when zoomed and playing:
+//   center — keep the playhead centered, scrolling the data under it
+//   page   — let the playhead sweep across, jumping the window when it exits
+export type FollowMode = "center" | "page";
+
 // Range multiplier per zoom-in step (deltaY < 0).
 export const ZOOM_FACTOR = 0.75;
 
@@ -70,16 +75,14 @@ export function zoomed(
 }
 
 // Keep the playhead visible while zoomed: center it when following (playing);
-// otherwise only re-center once it has left the view. Modes:
-//   center — keep the playhead centered, scrolling the data under it
-//   page   — let the playhead sweep across, jumping the window when it exits
+// otherwise only re-center once it has left the view (see FollowMode).
 // Returns null when the window should not move.
 export function followed(
   min: number,
   max: number,
   full: number,
   playhead: number,
-  mode: "center" | "page",
+  mode: FollowMode,
   following: boolean,
 ): Win | null {
   const range = max - min;

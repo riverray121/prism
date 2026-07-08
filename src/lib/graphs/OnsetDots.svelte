@@ -1,6 +1,7 @@
 <script lang="ts">
   import type uPlot from "uplot";
 
+  import type { FollowMode, Win } from "$lib/graphs/axis";
   import TimeAxis from "$lib/graphs/TimeAxis.svelte";
 
   // Sub-lane of a continuous feature: its derived onsets as dots on a center
@@ -12,6 +13,9 @@
     color = "#6366f1",
     playheadSec = null,
     follow = false,
+    window: win = null,
+    followMode = "center",
+    onWindowChange,
     onSeek,
     onScrubStart,
     onScrubEnd,
@@ -21,6 +25,9 @@
     color?: string;
     playheadSec?: number | null;
     follow?: boolean;
+    window?: Win | null;
+    followMode?: FollowMode;
+    onWindowChange?: (win: Win | null) => void;
     onSeek?: (sec: number) => void;
     onScrubStart?: () => void;
     onScrubEnd?: () => void;
@@ -66,12 +73,14 @@
   yRange={[0, 1]}
   showYAxis={false}
   showXAxis={false}
-  showControls={false}
   draw={drawDots}
   maxTimeSec={maxTimeSec > 0 ? maxTimeSec : 1}
   height={28}
   {playheadSec}
   {follow}
+  window={win}
+  {followMode}
+  {onWindowChange}
   {onSeek}
   {onScrubStart}
   {onScrubEnd}

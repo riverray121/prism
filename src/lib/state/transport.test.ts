@@ -11,9 +11,12 @@ import {
   scrubEnd,
   scrubStart,
   setRate,
+  setViewWindow,
   switchSource,
+  toggleFollowMode,
   toggleSource,
   transport,
+  view,
 } from "./transport.svelte";
 
 // Minimal Web Audio fake: decodeAudioData parks its resolver in `decodes` so
@@ -79,10 +82,45 @@ beforeEach(() => {
   decodes = [];
   resetForSong(null, 0);
   transport.rate = 1;
+  view.followMode = "center";
   if (ctx) {
     ctx.currentTime = 0;
     ctx.sources = [];
   }
+});
+
+describe("shared view window", () => {
+  it("stores a window and resets it to full extent", () => {
+    setViewWindow({ min: 10, max: 20 });
+    expect(view.window).toEqual({ min: 10, max: 20 });
+    setViewWindow(null);
+    expect(view.window).toBeNull();
+  });
+
+  it("drops equal-value writes so lanes echoing a window don't retrigger", () => {
+    setViewWindow({ min: 10, max: 20 });
+    const held = view.window;
+    setViewWindow({ min: 10, max: 20 });
+    expect(view.window).toBe(held); // same object: the write was skipped
+    setViewWindow(null);
+    const cleared = view.window;
+    setViewWindow(null);
+    expect(view.window).toBe(cleared);
+  });
+
+  it("toggleFollowMode flips between center and page", () => {
+    expect(view.followMode).toBe("center");
+    toggleFollowMode();
+    expect(view.followMode).toBe("page");
+    toggleFollowMode();
+    expect(view.followMode).toBe("center");
+  });
+
+  it("a song change clears the window (new time extent)", () => {
+    setViewWindow({ min: 5, max: 9 });
+    resetForSong(null, 0);
+    expect(view.window).toBeNull();
+  });
 });
 
 describe("resetForSong", () => {

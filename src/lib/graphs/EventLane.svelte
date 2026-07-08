@@ -1,6 +1,7 @@
 <script lang="ts">
   import type uPlot from "uplot";
 
+  import type { FollowMode, Win } from "$lib/graphs/axis";
   import TimeAxis from "$lib/graphs/TimeAxis.svelte";
   import type { EventFeature } from "$lib/ipc/messages";
 
@@ -13,6 +14,9 @@
     height = 64,
     playheadSec = null,
     follow = false,
+    window: win = null,
+    followMode = "center",
+    onWindowChange,
     labelFor,
     onSeek,
     onScrubStart,
@@ -24,6 +28,9 @@
     height?: number;
     playheadSec?: number | null;
     follow?: boolean;
+    window?: Win | null;
+    followMode?: FollowMode;
+    onWindowChange?: (win: Win | null) => void;
     // Optional per-event text label (e.g. chord names). Returns null to skip.
     // Labels drawn in a top band; overlapping ones are dropped so density
     // resolves as you zoom in.
@@ -94,6 +101,9 @@
   {height}
   {playheadSec}
   {follow}
+  window={win}
+  {followMode}
+  {onWindowChange}
   {onSeek}
   {onScrubStart}
   {onScrubEnd}

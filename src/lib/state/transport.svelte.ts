@@ -1,5 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 
+import type { FollowMode, Win } from "$lib/graphs/axis";
+
 // Global playback transport: one clock for the whole app. Playback uses the
 // Web Audio API — files decode into AudioBuffers played through an
 // AudioBufferSourceNode, and the playhead derives from AudioContext.currentTime
@@ -30,6 +32,37 @@ export const transport = $state<{
   rate: 1,
   error: null,
 });
+
+// Shared x-window over every synced lane: zoom/pan anywhere moves all lanes
+// together. `null` = full extent (not zoomed). Overview lanes opt out by not
+// subscribing. Lives here so the window survives tab switches.
+export const view = $state<{
+  window: Win | null;
+  followMode: FollowMode;
+}>({
+  window: null,
+  followMode: "center",
+});
+
+// Windows arrive once per lane per interaction tick; equal-value writes are
+// dropped so one gesture doesn't cascade into redundant redraws.
+export function setViewWindow(win: Win | null): void {
+  const cur = view.window;
+  if (cur === null && win === null) return;
+  if (
+    cur !== null &&
+    win !== null &&
+    Math.abs(cur.min - win.min) < 1e-9 &&
+    Math.abs(cur.max - win.max) < 1e-9
+  ) {
+    return;
+  }
+  view.window = win;
+}
+
+export function toggleFollowMode(): void {
+  view.followMode = view.followMode === "center" ? "page" : "center";
+}
 
 let ctx: AudioContext | undefined;
 let source: AudioBufferSourceNode | undefined;
@@ -260,6 +293,7 @@ export function resetForSong(
   transport.currentTime = 0;
   transport.activeKey = "mix";
   transport.error = null;
+  view.window = null; // a new song has its own time extent
   activePath = path;
   buffers = new Map();
   fallbackDuration = songDurationSec;

@@ -11,7 +11,10 @@
     scrubEnd,
     scrubStart,
     setRate,
+    setViewWindow,
+    toggleFollowMode,
     transport,
+    view,
   } from "$lib/state/transport.svelte";
 
   // The one transport surface: song overview + playhead + controls, shown on
@@ -62,6 +65,23 @@
       {/each}
     </select>
 
+    <!-- Shared-window controls: one place for every synced lane, not per lane. -->
+    <button
+      onclick={toggleFollowMode}
+      title="How zoomed lanes track the playhead while playing"
+      class="shrink-0 rounded border border-edge px-2 py-1 text-sm text-ink-muted hover:text-ink"
+    >
+      Follow: {view.followMode === "center" ? "Center" : "Page"}
+    </button>
+    <button
+      onclick={() => setViewWindow(null)}
+      disabled={view.window === null}
+      title="Reset all lanes to the full time extent"
+      class="shrink-0 rounded border border-edge px-2 py-1 text-sm text-ink-muted hover:text-ink disabled:opacity-50"
+    >
+      Reset zoom
+    </button>
+
     {#if transport.activeKey !== "mix"}
       <button
         onclick={backToMix}
@@ -78,6 +98,8 @@
       </span>
     {/if}
 
+    <!-- Overview lane: opts out of the shared window (no onWindowChange), so
+         it always shows the full song. -->
     <div class="min-w-0 flex-1">
       {#if overview}
         <ContinuousLane
@@ -87,9 +109,7 @@
           color="#74ade8"
           height={88}
           showYAxis={false}
-          showControls={false}
           playheadSec={transport.currentTime}
-          follow={transport.playing}
           onSeek={scrub}
           onScrubStart={scrubStart}
           onScrubEnd={scrubEnd}

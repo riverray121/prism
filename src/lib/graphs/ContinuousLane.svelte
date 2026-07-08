@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { FollowMode, Win } from "$lib/graphs/axis";
   import TimeAxis from "$lib/graphs/TimeAxis.svelte";
 
   // Renderer for one continuous track (one value per timeline frame). Takes a
@@ -12,9 +13,11 @@
     height = 120,
     showYAxis = true,
     showXAxis = true,
-    showControls = true,
     playheadSec = null,
     follow = false,
+    window: win = null,
+    followMode = "center",
+    onWindowChange,
     onSeek,
     onScrubStart,
     onScrubEnd,
@@ -26,9 +29,11 @@
     height?: number;
     showYAxis?: boolean;
     showXAxis?: boolean;
-    showControls?: boolean;
     playheadSec?: number | null;
     follow?: boolean;
+    window?: Win | null;
+    followMode?: FollowMode;
+    onWindowChange?: (win: Win | null) => void;
     onSeek?: (sec: number) => void;
     onScrubStart?: () => void;
     onScrubEnd?: () => void;
@@ -51,9 +56,11 @@
   {height}
   {showYAxis}
   {showXAxis}
-  {showControls}
   {playheadSec}
   {follow}
+  window={win}
+  {followMode}
+  {onWindowChange}
   {onSeek}
   {onScrubStart}
   {onScrubEnd}

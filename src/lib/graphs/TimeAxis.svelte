@@ -1,20 +1,27 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import uPlot from "uplot";
   import "uplot/dist/uPlot.min.css";
 
   import {
     clamp,
+    type FollowMode,
     followed,
     panned,
     wheelDeltaScale,
+    type Win,
     zoomed,
   } from "$lib/graphs/axis";
 
   // The shared interactive time axis: uPlot lifecycle, drag-to-scrub,
-  // wheel pan/zoom, playhead draw + follow, and the footer controls. Renderers
-  // supply only their data, series, and an optional custom draw pass — they
-  // know nothing about interaction, and this shell knows nothing about data
-  // shape.
+  // wheel pan/zoom, playhead draw + follow. Renderers supply only their data,
+  // series, and an optional custom draw pass — they know nothing about
+  // interaction, and this shell knows nothing about data shape.
+  //
+  // The x-window is controlled: `window` comes in as a prop (null = full
+  // extent) and every zoom/pan/follow intent goes out through
+  // `onWindowChange`. Lanes wired to the shared view state therefore move
+  // together; lanes without `onWindowChange` (overviews) stay at full extent.
   let {
     data,
     series,
@@ -23,10 +30,12 @@
     yRange = null,
     showYAxis = true,
     showXAxis = true,
-    showControls = true,
     draw = null,
     playheadSec = null,
     follow = false,
+    window: win = null,
+    followMode = "center",
+    onWindowChange,
     onSeek,
     onScrubStart,
     onScrubEnd,
@@ -38,10 +47,12 @@
     yRange?: [number, number] | null; // fixed y scale (renderers that self-draw)
     showYAxis?: boolean;
     showXAxis?: boolean; // off for sub-lanes that ride under a parent lane
-    showControls?: boolean; // Follow/Reset footer; off for minimal sub-lanes
     draw?: ((u: uPlot) => void) | null; // renderer pass, drawn under the playhead
     playheadSec?: number | null;
     follow?: boolean; // smooth-center the view on the playhead (while playing)
+    window?: Win | null; // controlled x-window; null = full extent
+    followMode?: FollowMode;
+    onWindowChange?: (win: Win | null) => void; // zoom/pan/follow intents; absent = fixed full extent
     onSeek?: (sec: number) => void;
     onScrubStart?: () => void; // pointer pressed on the plot (begin scrubbing)
     onScrubEnd?: () => void; // pointer released (commit scrub)
@@ -50,11 +61,15 @@
   let container: HTMLDivElement;
   let chart: uPlot | undefined;
 
-  // How the view tracks the playhead when zoomed and playing (see axis.ts).
-  let followMode = $state<"center" | "page">("center");
-
   function maxX(): number {
     return maxTimeSec > 0 ? maxTimeSec : 1;
+  }
+
+  // A window spanning the full extent is canonically null, so "not zoomed"
+  // compares equal regardless of which lane produced it.
+  function emitWindow(w: Win): void {
+    if (w.max - w.min >= maxX() - 1e-6) onWindowChange?.(null);
+    else onWindowChange?.(w);
   }
 
   // Time at a pointer/wheel event. Measured from the plot overlay's own rect so
@@ -64,19 +79,22 @@
     return u.posToVal(e.clientX - rect.left, "x");
   }
 
-  function resetZoom() {
-    chart?.setScale("x", { min: 0, max: maxX() });
+  // Push the controlled window into uPlot's x scale.
+  function applyWindow(): void {
+    chart?.setScale("x", win ?? { min: 0, max: maxX() });
   }
 
-  // Keep the playhead visible while zoomed. Returns true if it changed the
-  // scale (which itself redraws, so the caller skips its own).
+  // Keep the playhead visible while zoomed. Emits the new window instead of
+  // rescaling directly — the change flows back through the prop, so every
+  // lane sharing the window moves in the same flush. Returns true when a
+  // change was emitted (the round-trip redraws, so the caller skips its own).
   function trackPlayhead(): boolean {
-    if (!chart || playheadSec === null) return false;
+    if (!chart || playheadSec === null || !onWindowChange) return false;
     const { min, max } = chart.scales.x;
     if (min == null || max == null) return false;
-    const win = followed(min, max, maxX(), playheadSec, followMode, follow);
-    if (!win) return false;
-    chart.setScale("x", win);
+    const w = followed(min, max, maxX(), playheadSec, followMode, follow);
+    if (!w) return false;
+    onWindowChange(w);
     return true;
   }
 
@@ -92,7 +110,7 @@
     ctx.save();
     ctx.beginPath();
     ctx.strokeStyle = "#ef4444";
-    ctx.lineWidth = Math.round(window.devicePixelRatio || 1);
+    ctx.lineWidth = Math.round(globalThis.devicePixelRatio || 1);
     ctx.moveTo(x, u.bbox.top);
     ctx.lineTo(x, u.bbox.top + u.bbox.height);
     ctx.stroke();
@@ -167,7 +185,7 @@
     over.addEventListener("pointercancel", endScrub);
 
     // Double-click resets the zoom to the full time extent.
-    over.addEventListener("dblclick", resetZoom);
+    over.addEventListener("dblclick", () => onWindowChange?.(null));
 
     over.addEventListener(
       "wheel",
@@ -176,6 +194,7 @@
         if (min == null || max == null) return;
         const full = maxX();
         const range = max - min;
+        const zoomable = onWindowChange !== undefined;
 
         // Gesture routing:
         //  - pinch / ctrl+wheel (ctrlKey) -> zoom (below)
@@ -187,27 +206,30 @@
         if (!e.ctrlKey) {
           e.preventDefault();
           const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-          const k = wheelDeltaScale(e.deltaMode, window.innerHeight);
-          if (!horizontal || range >= full - 1e-6) {
+          const k = wheelDeltaScale(e.deltaMode, globalThis.innerHeight);
+          if (!horizontal || !zoomable || range >= full - 1e-6) {
             scrollParentOf(over)?.scrollBy(e.deltaX * k, e.deltaY * k);
             return;
           }
           const dv = (e.deltaX * k * range) / (over.clientWidth || 1);
-          u.setScale("x", panned(min, max, full, dv));
+          emitWindow(panned(min, max, full, dv));
           return;
         }
 
+        if (!zoomable) return;
         e.preventDefault();
-        u.setScale("x", zoomed(min, max, full, timeAtEvent(u, e), e.deltaY));
+        emitWindow(zoomed(min, max, full, timeAtEvent(u, e), e.deltaY));
       },
       { passive: false },
     );
   }
 
-  // Create the chart once per dataset, tear down on change.
+  // Create the chart once per dataset, tear down on change. The controlled
+  // window is applied untracked so zooming never recreates the chart.
   $effect(() => {
     chart = new uPlot(options(), data, container);
     attachInteractions(chart);
+    untrack(applyWindow);
     const ro = new ResizeObserver(() =>
       chart?.setSize({ width: container.clientWidth, height }),
     );
@@ -219,7 +241,13 @@
     };
   });
 
-  // On each playhead move: track it (may rescale), else just redraw.
+  // Window prop changes rescale in place (setScale redraws).
+  $effect(() => {
+    win;
+    applyWindow();
+  });
+
+  // On each playhead move: track it (the emitted window redraws), else redraw.
   $effect(() => {
     playheadSec;
     if (!chart) return;
@@ -227,19 +255,4 @@
   });
 </script>
 
-<div class="flex flex-col gap-2">
-  {#if showControls}
-    <div class="flex items-center justify-end gap-4 text-xs text-ink-muted">
-      <button
-        onclick={() =>
-          (followMode = followMode === "center" ? "page" : "center")}
-        title="How the view tracks the playhead when zoomed and playing"
-        class="hover:text-ink"
-      >
-        Follow: {followMode === "center" ? "Center" : "Page"}
-      </button>
-      <button onclick={resetZoom} class="hover:text-ink"> Reset zoom </button>
-    </div>
-  {/if}
-  <div bind:this={container} class="w-full"></div>
-</div>
+<div bind:this={container} class="w-full"></div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { FollowMode, Win } from "$lib/graphs/axis";
   import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
   import { presentRows } from "$lib/graphs/tags";
   import { loadNpy } from "$lib/npy";
@@ -12,6 +13,9 @@
     color = "#a855f7",
     playheadSec = null,
     follow = false,
+    window: win = null,
+    followMode = "center",
+    onWindowChange,
     onSeek,
     onScrubStart,
     onScrubEnd,
@@ -22,6 +26,9 @@
     color?: string;
     playheadSec?: number | null;
     follow?: boolean;
+    window?: Win | null;
+    followMode?: FollowMode;
+    onWindowChange?: (win: Win | null) => void;
     onSeek?: (sec: number) => void;
     onScrubStart?: () => void;
     onScrubEnd?: () => void;
@@ -66,6 +73,9 @@
           height={80}
           {playheadSec}
           {follow}
+          window={win}
+          {followMode}
+          {onWindowChange}
           {onSeek}
           {onScrubStart}
           {onScrubEnd}

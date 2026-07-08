@@ -1,6 +1,7 @@
 <script lang="ts">
   import type uPlot from "uplot";
 
+  import type { FollowMode, Win } from "$lib/graphs/axis";
   import { buildHeatmapCanvas } from "$lib/graphs/heatmap";
   import TimeAxis from "$lib/graphs/TimeAxis.svelte";
   import { loadNpy, type Npy } from "$lib/npy";
@@ -14,6 +15,9 @@
     normalize = "per-row",
     playheadSec = null,
     follow = false,
+    window: win = null,
+    followMode = "center",
+    onWindowChange,
     onSeek,
     onScrubStart,
     onScrubEnd,
@@ -26,6 +30,9 @@
     normalize?: "per-row" | "global";
     playheadSec?: number | null;
     follow?: boolean;
+    window?: Win | null;
+    followMode?: FollowMode;
+    onWindowChange?: (win: Win | null) => void;
     onSeek?: (sec: number) => void;
     onScrubStart?: () => void;
     onScrubEnd?: () => void;
@@ -108,6 +115,9 @@
     {height}
     {playheadSec}
     {follow}
+    window={win}
+    {followMode}
+    {onWindowChange}
     {onSeek}
     {onScrubStart}
     {onScrubEnd}
