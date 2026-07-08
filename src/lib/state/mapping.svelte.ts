@@ -2,6 +2,7 @@ import { untrack } from "svelte";
 
 import { updateMapping } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
+import type { AutoMapProposal } from "$lib/mapping/automap";
 import {
   applyMacro,
   evaluateDoc,
@@ -206,6 +207,32 @@ export function setProgramChannel(
     if (!p) return;
     if (value === null) delete p.channels[channel];
     else p.channels[channel] = value;
+  });
+}
+
+// ── Auto-map ────────────────────────────────────────────────────────────────
+
+// A doc with nothing authored yet: a proposal may fill it silently.
+export function docIsEmpty(doc: MappingDoc): boolean {
+  return (
+    doc.programs.length === 0 &&
+    doc.derivations.length === 0 &&
+    doc.macro.scenes_from === null &&
+    doc.macro.master === null
+  );
+}
+
+// Append a proposal. Strictly additive: existing programs, derivations,
+// scene source, and scene presets are never removed or rewritten.
+export function applyAutoMapProposal(proposal: AutoMapProposal): void {
+  touchDoc((doc) => {
+    doc.programs.push(...proposal.programs);
+    if (proposal.scenesFrom !== null && doc.macro.scenes_from === null) {
+      doc.macro.scenes_from = proposal.scenesFrom;
+    }
+    for (const [label, scene] of Object.entries(proposal.scenes)) {
+      if (!(label in doc.macro.scenes)) doc.macro.scenes[label] = scene;
+    }
   });
 }
 

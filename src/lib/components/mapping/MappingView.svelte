@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AutoMapButton from "$lib/components/mapping/AutoMapButton.svelte";
   import DerivationEditor from "$lib/components/mapping/DerivationEditor.svelte";
   import LightPreview from "$lib/components/mapping/LightPreview.svelte";
   import MacroPanel from "$lib/components/mapping/MacroPanel.svelte";
@@ -84,6 +85,7 @@
     >
       <SourcesPanel />
       <ProgramList />
+      <AutoMapButton />
     </aside>
     <main class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-32">
       <div class="flex items-start gap-4">

@@ -20,9 +20,7 @@
 
 - [x] Slice 8 — Macro layer: `applyMacro` in the evaluator (order: programs → scene enable/scale → adaptive master; scene presets per section label with exact boundary frames and gate cutting so a scene-muted program reads as off; `absolute` = song max, `windowed` = O(n) rolling-max deque, `share` = per-program brightness ÷ total with an all-quiet clamp; pixel matrices dimmed too; identity-preserving with per-program final reuse — share couples all keys), two-level cache in mapping state (raw per-program + macro finals), `MacroPanel.svelte` behind a disclosure (scenes-from picker over segment favorites, per-label presets with program checkboxes + scale, master mode/source/window controls).
 
-## Todo
-
-- [ ] Slice 9 — Auto-map (on demand)
+- [x] Slice 9 — Auto-map (on demand): `lib/mapping/automap.ts` — pure proposal from favorites only (energy-like→brightness with the silent default chain, onsets/beats→gate, centroid→color_temp, heatmap→position, favorited `sections`→scene seeds), grouped one program per mix/stem, ids uniqued against the doc, scene source never overridden; `AutoMapButton.svelte` in the aside (silent fill on an empty doc, explicit Append/Cancel confirm on a non-empty one, strictly additive apply); nothing runs on song open.
 
 ## Notes
 
