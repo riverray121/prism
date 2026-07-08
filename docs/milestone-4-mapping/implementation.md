@@ -56,8 +56,8 @@ Thin slices in build order. Each leaves the suite green. The repo-wide `/clean` 
 - Touches: `evaluate.ts` (layering: programs → scene enable/scale → master; `adaptive` modes `absolute`/`windowed`/`share`), `schema.ts` (`macro` block), `components/mapping/` macro panel (scene presets per section label: program enables + master scale; master mode + window controls).
 - Acceptance: evaluator tests — section boundary switches presets exactly at the boundary frame, `windowed` normalizes to a rolling max, `share` splits brightness across simultaneously active programs and clamps degenerate all-quiet cases; ribbons and preview reflect the macro result.
 
-## Slice 9 — Auto-map
+## Slice 9 — Auto-map (on demand)
 
-- Goal: opening a song never lands on a blank canvas.
-- Touches: `lib/mapping/automap.ts` (profile → starter doc: per-stem energy→brightness + drum-onset→gate + centroid→color_temp programs, one heatmap→pixel-row program, sections→scenes, windowed master), mapping state (run when `mapping.get` returns nothing, save immediately).
-- Acceptance: `automap.test.ts` over a synthetic profile — programs reference only paths that exist (missing stems/features skipped cleanly), output validates against the schema; first open of an analyzed song shows a working show; an existing `mapping.json` is never overwritten.
+- Goal: a Generate button proposes a starter show from the favorites; hand authoring stays the default path.
+- Touches: `lib/mapping/automap.ts` (favorited features → proposed doc, bindings by feature kind: energy→brightness smoothed, onsets→gate, centroid→color_temp, favorited heatmap→pixel row, sections→scenes if favorited), Mapping tab Generate action (fills an empty doc silently; appends to a non-empty doc after confirmation, never removing existing entries).
+- Acceptance: `automap.test.ts` over synthetic favorites — only favorited paths referenced, output validates against the schema, empty favorites yields a clear "star features first" result; nothing runs on song open; existing programs/derivations survive a generate untouched.

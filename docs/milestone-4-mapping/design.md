@@ -2,7 +2,7 @@
 
 ## Summary
 
-The Mapping tab becomes real: author **derivations** and **programs** from favorited features, evaluate them live in the frontend, and confirm the result against playback as lit-ribbon lanes plus a live light preview. Everything targets one built-in **generic fixture** that implements every channel — programs stay fixture-agnostic per [`formats.md`](formats.md), but with a single all-channel light there is no rig, no patching, and no cue file yet. Opening a song starts from a working **auto-mapped show**, never a blank canvas. The macro layer ships: scenes driven by `sections` and the adaptive master.
+The Mapping tab becomes real: author **derivations** and **programs** from favorited features, evaluate them live in the frontend, and confirm the result against playback as lit-ribbon lanes plus a live light preview. Everything targets one built-in **generic fixture** that implements every channel — programs stay fixture-agnostic per [`formats.md`](formats.md), but with a single all-channel light there is no rig, no patching, and no cue file yet. Authoring is **by hand, from favorites** — the user's judgment drives the show; an on-demand **auto-map** button can generate a starter show from the favorited features for those who want a seed to edit, but it never runs on its own. The macro layer ships: scenes driven by `sections` and the adaptive master.
 
 Seed docs: [`overview.md`](overview.md), [`catalog.md`](catalog.md), [`formats.md`](formats.md), [`visualization.md`](visualization.md).
 
@@ -39,9 +39,9 @@ Edit → re-evaluate → redraw, entirely in the frontend on profile data alread
 - **Scenes from `sections`:** a scene is a per-section-label preset — which programs are enabled plus a master scale. Section boundaries switch presets; the auto-map seeds one scene per detected section label. Fuller palette-swap semantics come with multi-fixture shows.
 - **Adaptive master:** one master brightness over everything, reference selectable — `absolute` / `windowed` (default, few-second window) / `share`.
 
-### Auto-map
+### Auto-map (on demand only)
 
-Opening a song with no mapping doc generates a working show: per-stem programs (`{stem}_energy` → brightness smoothed, drum onsets → gate, `spectral_centroid` → color_temp), a heatmap → pixel-row program, `sections` → scenes, adaptive master on. The user edits a working show.
+A **Generate auto-map** action — never automatic. It reads only the **favorited** features and proposes sensible bindings for them (energy-like → brightness smoothed, onsets → gate, centroid-like → color_temp, favorited heatmap → pixel row, `sections` → scenes if favorited). It fills an empty doc, or appends to an existing one after explicit confirmation; it never replaces hand-built work. Opening a song starts blank by design — hand authoring from favorites is the primary flow.
 
 ### Persistence
 
@@ -53,11 +53,11 @@ M2 promised the zoom window and follow mode in the durable state layer; both liv
 
 ## Usage
 
-Open an analyzed song → the auto-mapped show plays: ribbons under the transport, the light animating. Scrub, watch, then tune — drag a derivation cutoff, swap a source, tweak a colormap — and see ribbons and light update instantly. Star more features in the Analysis|Mapping split to widen the source palette.
+Star features in Analysis → open Mapping → your favorites are the source palette. Build the show by hand: derive gates from the envelopes you trust, bind sources to channels, tune transforms — ribbons and the light update instantly against playback. Star more features in the Analysis|Mapping split to widen the palette; hit Generate auto-map only if you want a machine-proposed seed for your favorites to edit down.
 
 ## Scope
 
-- In: generic fixture (all point channels + pixel dimension + motion primitives), derivations with live re-derivation, programs + v1 transform chains, frontend evaluator on the 100 Hz grid, ribbon lanes + 2-D pixel lane + live light preview, auto-map starter show, macro layer (scenes + adaptive master), mapping-doc persistence via sidecar, shared zoom window (slice 0).
+- In: generic fixture (all point channels + pixel dimension + motion primitives), derivations with live re-derivation, programs + v1 transform chains, frontend evaluator on the 100 Hz grid, ribbon lanes + 2-D pixel lane + live light preview, on-demand auto-map over favorites, macro layer (scenes + adaptive master), mapping-doc persistence via sidecar, shared zoom window (slice 0).
 - Out: rig/rooms and rig UI, patching, the Sim tab (the live preview lives in Mapping), Hardware, on-disk cue files + cue `.npy` sidecars, versioning/snapshots (`enabled` covers muting), additional fixture types, `quantize` transform, true note-duration extraction.
 
 ## Open questions
