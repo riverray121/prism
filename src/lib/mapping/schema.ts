@@ -71,12 +71,23 @@ export const CategoricalStepSchema = z.object({
   }),
 });
 
+// Motion primitive over the pixel strip; meaningful on the `motion` channel,
+// whose bound source (or constant) drives the speed.
+export const MotionStepSchema = z.object({
+  motion: z.object({
+    primitive: z.enum(["chase", "sweep", "pulse"]).default("chase"),
+    // Fraction of the strip lit around the moving head (chase/sweep).
+    width: z.number().positive().max(1).default(0.15),
+  }),
+});
+
 export const TransformStepSchema = z.union([
   NormalizeStepSchema,
   SmoothStepSchema,
   EnvelopeStepSchema,
   ColormapStepSchema,
   CategoricalStepSchema,
+  MotionStepSchema,
 ]);
 export type TransformStep = z.infer<typeof TransformStepSchema>;
 

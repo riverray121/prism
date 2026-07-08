@@ -7,7 +7,7 @@ import { litMask, ribbonRgba } from "./ribbon";
 const HZ = 100;
 
 function output(partial: Partial<ProgramOutput>): ProgramOutput {
-  return { key: "", channels: {}, gate: null, ...partial };
+  return { key: "", channels: {}, gate: null, pixels: null, ...partial };
 }
 
 describe("litMask", () => {

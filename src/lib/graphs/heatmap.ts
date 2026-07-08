@@ -1,6 +1,7 @@
 // Colormapping for heatmap matrices, kept pure so the renderer component only
 // blits. Perceptual-ish colormap (inferno-like) for a normalized value in [0,1].
 
+import type { PixelMatrix } from "$lib/mapping/evaluate";
 import type { Npy } from "$lib/npy";
 
 const STOPS: [number, number, number, number][] = [
@@ -68,6 +69,31 @@ export function buildHeatmapCanvas(
       img.data[idx + 1] = cg;
       img.data[idx + 2] = cb;
       img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+// Same offscreen-strip idea for an evaluated pixel matrix: the evaluator
+// already produced RGB bytes, so this only transposes frame-major triples
+// into a (frames × pixels) canvas, pixel 0 at the bottom.
+export function buildRgbCanvas(pixels: PixelMatrix): HTMLCanvasElement {
+  const { pixelCount, rgb } = pixels;
+  const frames = Math.max(1, rgb.length / (pixelCount * 3));
+  const canvas = document.createElement("canvas");
+  canvas.width = frames;
+  canvas.height = pixelCount;
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.createImageData(frames, pixelCount);
+  for (let f = 0; f < frames; f++) {
+    for (let p = 0; p < pixelCount; p++) {
+      const src = (f * pixelCount + p) * 3;
+      const dst = ((pixelCount - 1 - p) * frames + f) * 4;
+      img.data[dst] = rgb[src];
+      img.data[dst + 1] = rgb[src + 1];
+      img.data[dst + 2] = rgb[src + 2];
+      img.data[dst + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);

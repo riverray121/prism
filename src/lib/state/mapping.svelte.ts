@@ -2,7 +2,12 @@ import { untrack } from "svelte";
 
 import { updateMapping } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
-import { evaluateDoc, type ProgramOutput } from "$lib/mapping/evaluate";
+import {
+  evaluateDoc,
+  type Matrices,
+  type ProgramOutput,
+} from "$lib/mapping/evaluate";
+import { loadNpy } from "$lib/npy";
 import type {
   Channel,
   ChannelValue,
@@ -37,6 +42,33 @@ export const evaluation = $state<{
   outputs: Record<string, ProgramOutput>;
 }>({ outputs: {} });
 
+// Heatmap sidecar matrices for position bindings, keyed by source path.
+// Loaded on demand (loadNpy is async; the evaluator is synchronous); the
+// version counter is the reactive signal that a load landed.
+let matrices: Matrices = {};
+const loadingMatrices = new Set<string>();
+export const matrixVersion = $state({ n: 0 });
+
+export function ensureMatrix(source: string, absPath: string): void {
+  if (matrices[source] || loadingMatrices.has(source)) return;
+  loadingMatrices.add(source);
+  void loadNpy(absPath)
+    .then((npy) => {
+      matrices[source] = {
+        rows: npy.shape[0],
+        cols: npy.shape[1],
+        data: npy.data,
+      };
+      matrixVersion.n++;
+    })
+    .catch((e) => {
+      console.warn("pixel matrix load failed", source, e);
+    })
+    .finally(() => {
+      loadingMatrices.delete(source);
+    });
+}
+
 // Re-render every enabled program against the current profile. Runs inside a
 // $effect in the Mapping tab: reading the doc via snapshot registers deep
 // dependencies; the previous outputs are read untracked so writing the new
@@ -49,7 +81,7 @@ export function reevaluate(profile: Profile | null): void {
     return;
   }
   const previous = untrack(() => evaluation.outputs);
-  evaluation.outputs = evaluateDoc(profile, doc, previous);
+  evaluation.outputs = evaluateDoc(profile, doc, previous, matrices);
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -78,6 +110,8 @@ export function resetMappingForSong(songId: string | null): void {
   mapping.doc = null;
   mappingUi.editingDerivation = null;
   mappingUi.editingProgram = null;
+  matrices = {};
+  loadingMatrices.clear();
 }
 
 // Apply an inbound `mapping` event; stale responses (user navigated away

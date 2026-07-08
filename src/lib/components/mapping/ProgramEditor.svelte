@@ -18,8 +18,7 @@
     mapping.doc?.programs.find((p) => p.id === mappingUi.editingProgram),
   );
 
-  // Point channels editable here; the pixel dimension (position/motion) is
-  // slice 6.
+  // Channel order: gate, the point channels, then the pixel dimension.
   const EDITABLE: Channel[] = [
     "gate",
     "brightness",
@@ -27,16 +26,19 @@
     "saturation",
     "color_temp",
     "strobe_rate",
+    "position",
+    "motion",
   ];
 
-  // Program sources: favorites of any time-shaped kind plus saved derivations.
+  // Program sources: favorites plus saved derivations. Heatmaps stay in the
+  // list for the position channel; a heatmap bound to a point channel simply
+  // mutes (maximum applicability, no special rules).
   const sources = $derived.by(() => {
     const profile = inspection.profile;
     const out: { value: string; label: string }[] = [];
     if (profile) {
       for (const fav of favoriteSources(profile)) {
-        if (fav.feature.render === "heatmap" || fav.feature.render === "tags")
-          continue;
+        if (fav.feature.render === "tags") continue;
         out.push({ value: fav.path, label: sourceLabel(fav.path) });
       }
     }
@@ -120,7 +122,11 @@
               <option value="source" disabled={sources.length === 0}>
                 source
               </option>
-              <option value="constant">constant</option>
+              <!-- Position has no constant meaning: it maps a source's shape
+                   onto the strip. -->
+              <option value="constant" disabled={channel === "position"}>
+                constant
+              </option>
             </select>
 
             {#if mode === "source" && binding}

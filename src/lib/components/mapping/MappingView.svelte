@@ -3,13 +3,21 @@
   import ProgramEditor from "$lib/components/mapping/ProgramEditor.svelte";
   import ProgramList from "$lib/components/mapping/ProgramList.svelte";
   import SourcesPanel from "$lib/components/mapping/SourcesPanel.svelte";
+  import PixelLane from "$lib/graphs/PixelLane.svelte";
   import RibbonLane from "$lib/graphs/RibbonLane.svelte";
-  import { getRawProfile, inspection } from "$lib/state/inspection.svelte";
+  import { resolveFeature } from "$lib/mapping/sources";
+  import {
+    getRawProfile,
+    inspection,
+    sidecarPath,
+  } from "$lib/state/inspection.svelte";
   import {
     editProgram,
+    ensureMatrix,
     evaluation,
     mapping,
     mappingUi,
+    matrixVersion,
     reevaluate,
   } from "$lib/state/mapping.svelte";
   import {
@@ -27,11 +35,24 @@
 
   const ready = $derived(inspection.profile !== null && mapping.doc !== null);
 
-  // Re-evaluate on any doc edit or profile (re)load. reevaluate snapshots the
-  // doc (deep dependency); the profile proxy read makes profile swaps count.
+  // Re-evaluate on any doc edit, profile (re)load, or matrix arrival.
+  // reevaluate snapshots the doc (deep dependency); the profile proxy read
+  // makes profile swaps count; matrixVersion ticks when a sidecar loads.
   $effect(() => {
     inspection.profile;
-    reevaluate(getRawProfile());
+    matrixVersion.n;
+    const profile = getRawProfile();
+    // Heatmap position bindings need their .npy matrices; request any missing.
+    if (profile && mapping.doc && inspection.songDir) {
+      for (const p of mapping.doc.programs) {
+        const pos = p.channels.position;
+        if (pos === undefined || typeof pos === "number") continue;
+        const feature = resolveFeature(profile, pos.source);
+        if (feature?.render === "heatmap")
+          ensureMatrix(pos.source, sidecarPath(feature.sidecar));
+      }
+    }
+    reevaluate(profile);
   });
 
   const frameCount = $derived(inspection.profile?.timeline.frame_count ?? 0);
@@ -118,6 +139,22 @@
                 onScrubStart={scrubStart}
                 onScrubEnd={scrubEnd}
               />
+              {#if output.pixels}
+                <div class="mt-1">
+                  <PixelLane
+                    pixels={output.pixels}
+                    {frameRateHz}
+                    playheadSec={transport.currentTime}
+                    follow={transport.playing}
+                    window={view.window}
+                    followMode={view.followMode}
+                    onWindowChange={setViewWindow}
+                    onSeek={scrub}
+                    onScrubStart={scrubStart}
+                    onScrubEnd={scrubEnd}
+                  />
+                </div>
+              {/if}
             </div>
           {/each}
         </section>

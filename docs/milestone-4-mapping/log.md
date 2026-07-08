@@ -14,9 +14,10 @@
 
 - [x] Slice 5 — Program editor + ribbon preview: `graphs/ribbon.ts` + `RibbonLane.svelte` (lit runs from gate, OKLCH fill from hue/saturation or color_temp, brightness as glow/alpha, toggleable exact-value line; frameCount×1 offscreen strip blitted like heatmaps), `components/mapping/` ProgramList (enabled toggles, dim when muted) + ProgramEditor (per-channel source/constant rows, transform chains behind a disclosure via TransformEditor) + ribbon Preview stack in MappingView on the shared window/transport, re-evaluation `$effect` (doc snapshot deps + raw-profile seam so the evaluator skips $state proxy overhead).
 
+- [x] Slice 6 — Pixel dimension + motion: evaluator position mappings (heatmap row→pixel via caller-provided matrices, `band_energy_*` sibling stacking into zones, continuous→center-out spread), motion primitives (`chase`/`sweep`/`pulse` as the pure `motionPhase` over accumulated cycles; speed from constants, bpm scalars, or normalized continuous sources), per-frame RGB pixel matrix (palette LUT for position, program `channelColor` for motion-only), `buildRgbCanvas` heatmap variant + `PixelLane.svelte` (pixel × time) in the preview stack, on-demand .npy matrix loading in mapping state (cache keys include loaded matrices), position/motion rows + motion transform step in the editors, `channelColor` shared with the ribbon.
+
 ## Todo
 
-- [ ] Slice 6 — Pixel dimension + motion
 - [ ] Slice 7 — Live light preview
 - [ ] Slice 8 — Macro layer
 - [ ] Slice 9 — Auto-map (on demand)

@@ -3,11 +3,12 @@
 // background, fill color from hue/saturation (or color_temp), glow/opacity
 // from brightness.
 
-import { oklchToRgb, PALETTES } from "$lib/color";
-import type { GateSegment, ProgramOutput } from "$lib/mapping/evaluate";
-
-// Practical sRGB chroma ceiling; saturation 0-1 maps onto it.
-const MAX_CHROMA = 0.32;
+import { oklchToRgb } from "$lib/color";
+import {
+  channelColor,
+  type GateSegment,
+  type ProgramOutput,
+} from "$lib/mapping/evaluate";
 
 // Per-frame lit mask from gate segments (null gate = always lit).
 export function litMask(
@@ -29,10 +30,10 @@ export function litMask(
   return mask;
 }
 
-// One RGBA column per frame. Color precedence: hue (+saturation) → color_temp
-// via the warm↔cool palette → neutral warm-white. Alpha carries brightness on
-// lit frames and drops to a faint floor on unlit ones, so the ribbon glows
-// where the light would.
+// One RGBA column per frame. Fill comes from the shared channelColor
+// precedence (hue → color_temp → neutral); alpha carries brightness on lit
+// frames and drops to a faint floor on unlit ones, so the ribbon glows where
+// the light would.
 export function ribbonRgba(
   output: ProgramOutput,
   frameCount: number,
@@ -41,28 +42,11 @@ export function ribbonRgba(
   const { channels, gate } = output;
   const mask = litMask(gate, frameCount, frameRateHz);
   const rgba = new Uint8ClampedArray(frameCount * 4);
-  const hue = channels.hue ?? null;
-  const saturation = channels.saturation ?? null;
-  const colorTemp = channels.color_temp ?? null;
   const brightness = channels.brightness ?? null;
   for (let i = 0; i < frameCount; i++) {
     const b = brightness ? brightness[i] : 1;
-    let color;
-    if (hue) {
-      color = {
-        l: 0.55 + 0.25 * b,
-        c: (saturation ? saturation[i] : 0.8) * MAX_CHROMA,
-        h: hue[i],
-      };
-    } else if (colorTemp) {
-      const base = PALETTES.warm_cool(colorTemp[i]);
-      color = { l: 0.45 + 0.4 * b, c: base.c, h: base.h };
-    } else {
-      color = { l: 0.55 + 0.35 * b, c: 0.02, h: 90 };
-    }
-    const { r, g, b: bl } = oklchToRgb(color);
-    const lit = mask[i] > 0;
-    const alpha = lit ? 0.25 + 0.75 * b : 0.05;
+    const { r, g, b: bl } = oklchToRgb(channelColor(channels, i));
+    const alpha = mask[i] > 0 ? 0.25 + 0.75 * b : 0.05;
     const idx = i * 4;
     rgba[idx] = Math.round(r * 255);
     rgba[idx + 1] = Math.round(g * 255);

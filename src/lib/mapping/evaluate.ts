@@ -4,6 +4,7 @@
 // its output. Per-program outputs carry a cache key so edits re-evaluate only
 // the touched program.
 
+import { type Oklch, oklchToRgb, PALETTES } from "$lib/color";
 import type { Profile } from "$lib/ipc/messages";
 import {
   deriveEvents,
@@ -17,7 +18,7 @@ import type {
   Program,
   TransformStep,
 } from "$lib/mapping/schema";
-import { resolveFeature } from "$lib/mapping/sources";
+import { resolveFeature, resolveNode } from "$lib/mapping/sources";
 import {
   applyColormap,
   applyEnvelope,
@@ -25,6 +26,7 @@ import {
   applySmooth,
   categoricalValues,
   type ColorComponent,
+  colormapRgb,
 } from "$lib/mapping/transforms";
 
 export interface GateSegment {
@@ -33,12 +35,33 @@ export interface GateSegment {
   strength: number;
 }
 
+// The generic fixture's addressable strip.
+export const DEFAULT_PIXELS = 60;
+
+// A heatmap sidecar matrix, loaded by the caller (the evaluator stays pure
+// and synchronous; .npy loading is async and lives in state).
+export interface MatrixData {
+  rows: number;
+  cols: number;
+  data: Float32Array;
+}
+export type Matrices = Record<string, MatrixData>;
+
+// Per-frame RGB bytes for the pixel strip, frame-major:
+// (frame * pixelCount + pixel) * 3.
+export interface PixelMatrix {
+  pixelCount: number;
+  rgb: Uint8ClampedArray;
+}
+
 // One program rendered to channel timelines. `gate` null = no gate binding
-// (the program is always lit); channels absent = not bound (or muted).
+// (the program is always lit); channels absent = not bound (or muted);
+// `pixels` null = no position/motion binding.
 export interface ProgramOutput {
   key: string;
   channels: Partial<Record<Channel, Float32Array>>;
   gate: GateSegment[] | null;
+  pixels: PixelMatrix | null;
 }
 
 // Lit duration of a gate pulse synthesized from a point event.
@@ -353,25 +376,320 @@ function evaluateGate(
   return typeof m.value === "number" && m.value < 0.5 ? [] : null;
 }
 
-// ── Program evaluation ──────────────────────────────────────────────────────
+// ── Pixel dimension ─────────────────────────────────────────────────────────
 
-// Cache key: the program definition plus every derivation it references and
-// the frame grid — anything else unchanged, the previous output is reusable.
-export function programKey(doc: MappingDoc, program: Program): string {
-  const derivedIds: string[] = [];
-  for (const value of Object.values(program.channels)) {
-    if (typeof value === "object" && value.source.startsWith("derived.")) {
-      derivedIds.push(value.source.slice("derived.".length));
+// The one color-precedence rule for a program's evaluated point channels:
+// hue (+saturation) → color_temp via the warm↔cool palette → neutral
+// warm-white; brightness lifts lightness. Shared by the ribbon, the pixel
+// row, and the live preview so they can never disagree.
+export function channelColor(
+  channels: Partial<Record<Channel, Float32Array>>,
+  i: number,
+): Oklch {
+  const b = channels.brightness ? channels.brightness[i] : 1;
+  if (channels.hue) {
+    return {
+      l: 0.55 + 0.25 * b,
+      c: (channels.saturation ? channels.saturation[i] : 0.8) * 0.32,
+      h: channels.hue[i],
+    };
+  }
+  if (channels.color_temp) {
+    const base = PALETTES.warm_cool(channels.color_temp[i]);
+    return { l: 0.45 + 0.4 * b, c: base.c, h: base.h };
+  }
+  return { l: 0.55 + 0.35 * b, c: 0.02, h: 90 };
+}
+
+// Motion primitive intensity for one pixel at one instant. `phase` is
+// accumulated cycles (the integral of the bound speed), so speed changes
+// never make the animation jump. Pure and shared by the evaluator and the
+// live preview.
+export function motionPhase(
+  primitive: "chase" | "sweep" | "pulse",
+  pixel: number,
+  pixelCount: number,
+  phase: number,
+  width: number,
+): number {
+  if (primitive === "pulse") return 0.5 - 0.5 * Math.cos(2 * Math.PI * phase);
+  const w = Math.max(1e-6, width) * pixelCount;
+  let head: number;
+  if (primitive === "chase") {
+    head = (phase - Math.floor(phase)) * pixelCount;
+  } else {
+    // Sweep: one cycle = a full there-and-back.
+    const x = phase - Math.floor(phase);
+    head = (x < 0.5 ? x * 2 : 2 - x * 2) * (pixelCount - 1);
+  }
+  let dist = Math.abs(pixel - head);
+  if (primitive === "chase") dist = Math.min(dist, pixelCount - dist); // ring
+  return Math.max(0, 1 - dist / w);
+}
+
+// Position → per-frame-per-pixel intensity. The mapping mode follows the
+// source's kind: heatmap rows map onto pixels; a band_energy_* source stacks
+// all its sibling bands as strip zones (chunky spectrum analyzer); any other
+// continuous-ish source becomes a center-out spread (stereo width).
+function positionIntensity(
+  profile: Profile,
+  doc: MappingDoc,
+  binding: Binding,
+  matrices: Matrices,
+  frameCount: number,
+  pixelCount: number,
+): Float32Array | null {
+  const source = binding.source;
+  const feature = resolveFeature(profile, source);
+
+  if (feature?.render === "heatmap") {
+    const m = matrices[source];
+    if (!m) return null; // sidecar not loaded (yet)
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i < m.data.length; i++) {
+      const v = m.data[i];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    const span = hi - lo || 1;
+    const out = new Float32Array(frameCount * pixelCount);
+    for (let f = 0; f < frameCount; f++) {
+      const c = Math.min(m.cols - 1, f);
+      for (let p = 0; p < pixelCount; p++) {
+        const r = Math.min(m.rows - 1, Math.floor((p * m.rows) / pixelCount));
+        out[f * pixelCount + p] = (m.data[r * m.cols + c] - lo) / span;
+      }
+    }
+    return out;
+  }
+
+  const parts = source.split(".");
+  if (parts.at(-1)?.startsWith("band_energy")) {
+    // Gather every sibling band in profile order; each is its own zone.
+    const parent = resolveNode(profile, parts.slice(0, -1).join("."));
+    if (typeof parent !== "object" || parent === null) return null;
+    const bands: Float32Array[] = [];
+    for (const [name, value] of Object.entries(parent)) {
+      const f = value as { render?: string; data?: number[] };
+      if (
+        name.startsWith("band_energy") &&
+        f.render === "continuous" &&
+        f.data
+      ) {
+        bands.push(
+          applyNormalize(f.data, {
+            min: null,
+            max: null,
+            curve: "linear",
+            gamma: 2,
+          }),
+        );
+      }
+    }
+    if (bands.length === 0) return null;
+    const out = new Float32Array(frameCount * pixelCount);
+    for (let p = 0; p < pixelCount; p++) {
+      const k = Math.min(
+        bands.length - 1,
+        Math.floor((p * bands.length) / pixelCount),
+      );
+      const band = bands[k];
+      const n = Math.min(frameCount, band.length);
+      for (let f = 0; f < n; f++) out[f * pixelCount + p] = band[f];
+    }
+    return out;
+  }
+
+  // Spread: value = how much of the strip is lit, growing from the center.
+  const hz = profile.timeline.frame_rate_hz;
+  const m = materialize(profile, doc, source);
+  if (!m) return null;
+  const track = applyNormalize(toContinuous(m, hz, frameCount), {
+    min: null,
+    max: null,
+    curve: "linear",
+    gamma: 2,
+  });
+  const center = (pixelCount - 1) / 2;
+  const out = new Float32Array(frameCount * pixelCount);
+  for (let f = 0; f < frameCount; f++) {
+    const half = (track[f] * pixelCount) / 2;
+    if (half <= 0) continue;
+    for (let p = 0; p < pixelCount; p++) {
+      if (Math.abs(p - center) <= half) out[f * pixelCount + p] = 1;
     }
   }
+  return out;
+}
+
+// Speed track (cycles/sec) for the motion channel: constants pass through;
+// a bpm scalar becomes cycles-per-beat; a continuous source's normalized
+// value spans 0–4 cycles/sec.
+const MOTION_MAX_SPEED = 4;
+
+function motionSpeedTrack(
+  profile: Profile,
+  doc: MappingDoc,
+  value: number | Binding,
+  hz: number,
+  frameCount: number,
+): Float32Array | null {
+  if (typeof value === "number")
+    return new Float32Array(frameCount).fill(value);
+  const feature = resolveFeature(profile, value.source);
+  if (feature?.render === "scalar" && typeof feature.value === "number") {
+    const v = feature.unit === "bpm" ? feature.value / 60 : feature.value;
+    return new Float32Array(frameCount).fill(v);
+  }
+  const track = evaluateContinuousBinding(
+    profile,
+    doc,
+    value,
+    "motion",
+    hz,
+    frameCount,
+  );
+  if (!track) return null;
+  for (let i = 0; i < track.length; i++) track[i] *= MOTION_MAX_SPEED;
+  return track;
+}
+
+// Render the strip: position intensity × motion multiplier, colored by the
+// position palette (colormap step, default heat) or — with motion only — by
+// the program's own frame color.
+function evaluatePixels(
+  profile: Profile,
+  doc: MappingDoc,
+  program: Program,
+  channels: Partial<Record<Channel, Float32Array>>,
+  matrices: Matrices,
+  hz: number,
+  frameCount: number,
+): PixelMatrix | null {
+  const posValue = program.channels.position;
+  const motValue = program.channels.motion;
+  if (posValue === undefined && motValue === undefined) return null;
+  const N = DEFAULT_PIXELS;
+
+  let intensity: Float32Array | null = null;
+  let palette = "heat";
+  if (posValue !== undefined && typeof posValue === "object") {
+    const cm = posValue.transform.find(
+      (s): s is Extract<TransformStep, { colormap: unknown }> =>
+        "colormap" in s,
+    );
+    if (cm) palette = cm.colormap.palette;
+    intensity = positionIntensity(
+      profile,
+      doc,
+      posValue,
+      matrices,
+      frameCount,
+      N,
+    );
+  }
+
+  let motion: {
+    primitive: "chase" | "sweep" | "pulse";
+    width: number;
+    phase: Float32Array;
+  } | null = null;
+  if (motValue !== undefined) {
+    const step =
+      typeof motValue === "object"
+        ? motValue.transform.find(
+            (s): s is Extract<TransformStep, { motion: unknown }> =>
+              "motion" in s,
+          )
+        : undefined;
+    const speed = motionSpeedTrack(profile, doc, motValue, hz, frameCount);
+    if (speed) {
+      const phase = new Float32Array(frameCount);
+      let acc = 0;
+      for (let i = 0; i < frameCount; i++) {
+        acc += speed[i] / hz;
+        phase[i] = acc;
+      }
+      motion = {
+        primitive: step?.motion.primitive ?? "chase",
+        width: step?.motion.width ?? 0.15,
+        phase,
+      };
+    }
+  }
+  if (!intensity && !motion) return null; // muted or matrix still loading
+
+  // Palette LUT (256 steps) keeps the per-pixel loop allocation-free.
+  let lut: Uint8ClampedArray | null = null;
+  if (intensity) {
+    const ramp = new Float32Array(256);
+    for (let i = 0; i < 256; i++) ramp[i] = i / 255;
+    const rgbF = colormapRgb(ramp, palette);
+    lut = new Uint8ClampedArray(256 * 3);
+    for (let i = 0; i < rgbF.length; i++) lut[i] = Math.round(rgbF[i] * 255);
+  }
+
+  const rgb = new Uint8ClampedArray(frameCount * N * 3);
+  for (let f = 0; f < frameCount; f++) {
+    let baseR = 0;
+    let baseG = 0;
+    let baseB = 0;
+    if (!lut) {
+      const c = oklchToRgb(channelColor(channels, f));
+      baseR = c.r * 255;
+      baseG = c.g * 255;
+      baseB = c.b * 255;
+    }
+    for (let p = 0; p < N; p++) {
+      let v = intensity ? intensity[f * N + p] : 1;
+      if (motion)
+        v *= motionPhase(motion.primitive, p, N, motion.phase[f], motion.width);
+      const idx = (f * N + p) * 3;
+      if (lut) {
+        // Zero intensity is "off": black, not the palette's dark end.
+        if (v <= 0.02) continue;
+        const li = Math.min(255, Math.max(0, Math.round(v * 255))) * 3;
+        rgb[idx] = lut[li];
+        rgb[idx + 1] = lut[li + 1];
+        rgb[idx + 2] = lut[li + 2];
+      } else {
+        rgb[idx] = baseR * v;
+        rgb[idx + 1] = baseG * v;
+        rgb[idx + 2] = baseB * v;
+      }
+    }
+  }
+  return { pixelCount: N, rgb };
+}
+
+// ── Program evaluation ──────────────────────────────────────────────────────
+
+// Cache key: the program definition, every derivation it references, and
+// which of its heatmap matrices are loaded — anything else unchanged, the
+// previous output is reusable.
+export function programKey(
+  doc: MappingDoc,
+  program: Program,
+  matrices: Matrices = {},
+): string {
+  const derivedIds: string[] = [];
+  const loaded: string[] = [];
+  for (const value of Object.values(program.channels)) {
+    if (typeof value !== "object") continue;
+    if (value.source.startsWith("derived."))
+      derivedIds.push(value.source.slice("derived.".length));
+    if (matrices[value.source]) loaded.push(value.source);
+  }
   const derivations = doc.derivations.filter((d) => derivedIds.includes(d.id));
-  return JSON.stringify({ program, derivations });
+  return JSON.stringify({ program, derivations, loaded });
 }
 
 export function evaluateProgram(
   profile: Profile,
   doc: MappingDoc,
   program: Program,
+  matrices: Matrices = {},
 ): ProgramOutput {
   const hz = profile.timeline.frame_rate_hz;
   const frameCount = profile.timeline.frame_count;
@@ -401,10 +719,19 @@ export function evaluateProgram(
         if (track) channels[channel] = track; // unresolved source: muted
       }
     }
-    // position/motion: the pixel dimension, evaluated in slice 6.
   }
 
-  return { key: programKey(doc, program), channels, gate };
+  const pixels = evaluatePixels(
+    profile,
+    doc,
+    program,
+    channels,
+    matrices,
+    hz,
+    frameCount,
+  );
+
+  return { key: programKey(doc, program, matrices), channels, gate, pixels };
 }
 
 // Evaluate every enabled program, reusing previous outputs whose key still
@@ -413,14 +740,17 @@ export function evaluateDoc(
   profile: Profile,
   doc: MappingDoc,
   previous: Record<string, ProgramOutput> = {},
+  matrices: Matrices = {},
 ): Record<string, ProgramOutput> {
   const out: Record<string, ProgramOutput> = {};
   for (const program of doc.programs) {
     if (!program.enabled) continue;
-    const key = programKey(doc, program);
+    const key = programKey(doc, program, matrices);
     const prev = previous[program.id];
     out[program.id] =
-      prev && prev.key === key ? prev : evaluateProgram(profile, doc, program);
+      prev && prev.key === key
+        ? prev
+        : evaluateProgram(profile, doc, program, matrices);
   }
   return out;
 }

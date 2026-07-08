@@ -22,6 +22,7 @@
     "envelope",
     "colormap",
     "categorical",
+    "motion",
   ] as const;
   type StepKind = (typeof STEP_KINDS)[number];
 
@@ -39,6 +40,8 @@
         return { colormap: { palette: "warm_cool" } };
       case "categorical":
         return { categorical: { map: {} } };
+      case "motion":
+        return { motion: { primitive: "chase", width: 0.15 } };
     }
   }
 
@@ -172,6 +175,46 @@
         <span class="text-ink-faint">
           labels spread evenly over the channel range
         </span>
+      {:else if "motion" in step}
+        <label class="flex items-center gap-1">
+          primitive
+          <select
+            value={step.motion.primitive}
+            onchange={(e) =>
+              patchStep(i, {
+                motion: {
+                  ...step.motion,
+                  primitive: e.currentTarget.value as
+                    | "chase"
+                    | "sweep"
+                    | "pulse",
+                },
+              })}
+            class="rounded border border-edge bg-surface px-1 py-0.5"
+          >
+            <option value="chase">chase</option>
+            <option value="sweep">sweep</option>
+            <option value="pulse">pulse</option>
+          </select>
+        </label>
+        <label class="flex items-center gap-1">
+          width
+          <input
+            type="number"
+            min="0.02"
+            max="1"
+            step="0.01"
+            value={step.motion.width}
+            onchange={(e) =>
+              patchStep(i, {
+                motion: {
+                  ...step.motion,
+                  width: Number(e.currentTarget.value) || 0.15,
+                },
+              })}
+            class="w-16 rounded border border-edge bg-surface px-1 py-0.5"
+          />
+        </label>
       {/if}
 
       <button

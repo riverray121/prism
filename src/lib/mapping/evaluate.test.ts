@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { Profile } from "$lib/ipc/messages";
 
-import { evaluateDoc, evaluateProgram, GATE_PULSE_SEC } from "./evaluate";
-import { MappingDocSchema, type MappingDoc, type Program } from "./schema";
+import {
+  DEFAULT_PIXELS,
+  evaluateDoc,
+  evaluateProgram,
+  GATE_PULSE_SEC,
+  motionPhase,
+} from "./evaluate";
+import { MappingDocSchema, type MappingDoc } from "./schema";
 
 const HZ = 100;
 const FRAMES = 200; // 2 s
@@ -56,6 +62,36 @@ function makeProfile(): Profile {
         source: "librosa",
         unit: "bpm",
         value: 120,
+      },
+      chroma: {
+        render: "heatmap",
+        category: "tonal",
+        source: "librosa",
+        unit: "energy",
+        sidecar: "heatmaps/chroma.npy",
+        shape: [4, FRAMES],
+        axes: ["pitch", "time"],
+      },
+      band_energy_low: {
+        render: "continuous",
+        category: "frequency",
+        source: "librosa",
+        unit: "normalized",
+        data: new Array(FRAMES).fill(0).map((_, i) => (i < 100 ? 1 : 0)),
+      },
+      band_energy_high: {
+        render: "continuous",
+        category: "frequency",
+        source: "librosa",
+        unit: "normalized",
+        data: new Array(FRAMES).fill(0).map((_, i) => (i < 100 ? 0 : 1)),
+      },
+      stereo_width: {
+        render: "continuous",
+        category: "spatial",
+        source: "librosa",
+        unit: "normalized",
+        data: new Array(FRAMES).fill(0).map((_, i) => (i < 100 ? 0.1 : 1)),
       },
     },
     stems: {},
@@ -213,6 +249,133 @@ describe("evaluateProgram — gate", () => {
     const off = doc([{ id: "p", channels: { gate: 0 } }]);
     expect(evaluateProgram(profile, on, on.programs[0]).gate).toBeNull();
     expect(evaluateProgram(profile, off, off.programs[0]).gate).toEqual([]);
+  });
+});
+
+describe("evaluateProgram — pixel dimension", () => {
+  const N = DEFAULT_PIXELS;
+
+  it("a heatmap position binding lands rows on the right pixels", () => {
+    // Row 3 (top quarter) hot everywhere, others cold.
+    const rows = 4;
+    const data = new Float32Array(rows * FRAMES);
+    for (let f = 0; f < FRAMES; f++) data[3 * FRAMES + f] = 1;
+    const d = doc([
+      { id: "p", channels: { position: { source: "mix.chroma" } } },
+    ]);
+    const out = evaluateProgram(profile, d, d.programs[0], {
+      "mix.chroma": { rows, cols: FRAMES, data },
+    });
+    expect(out.pixels).not.toBeNull();
+    const { rgb, pixelCount } = out.pixels!;
+    expect(pixelCount).toBe(N);
+    // Top-quarter pixels bright, bottom-quarter dark (sum RGB as intensity).
+    const sum = (f: number, p: number) =>
+      rgb[(f * N + p) * 3] +
+      rgb[(f * N + p) * 3 + 1] +
+      rgb[(f * N + p) * 3 + 2];
+    expect(sum(50, N - 1)).toBeGreaterThan(sum(50, 0) + 100);
+  });
+
+  it("a heatmap position binding without its matrix stays pending (null)", () => {
+    const d = doc([
+      { id: "p", channels: { position: { source: "mix.chroma" } } },
+    ]);
+    expect(evaluateProgram(profile, d, d.programs[0]).pixels).toBeNull();
+  });
+
+  it("a band_energy source stacks sibling bands as zones", () => {
+    const d = doc([
+      { id: "p", channels: { position: { source: "mix.band_energy_low" } } },
+    ]);
+    const out = evaluateProgram(profile, d, d.programs[0]);
+    const { rgb } = out.pixels!;
+    const sum = (f: number, p: number) =>
+      rgb[(f * N + p) * 3] +
+      rgb[(f * N + p) * 3 + 1] +
+      rgb[(f * N + p) * 3 + 2];
+    // First half of the song: low band on → bottom zone bright, top dark.
+    expect(sum(50, 0)).toBeGreaterThan(sum(50, N - 1) + 100);
+    // Second half: high band on → top zone bright.
+    expect(sum(150, N - 1)).toBeGreaterThan(sum(150, 0) + 100);
+  });
+
+  it("spread widens with stereo_width", () => {
+    const d = doc([
+      { id: "p", channels: { position: { source: "mix.stereo_width" } } },
+    ]);
+    const out = evaluateProgram(profile, d, d.programs[0]);
+    const { rgb } = out.pixels!;
+    const litCount = (f: number) => {
+      let n = 0;
+      for (let p = 0; p < N; p++) {
+        if (rgb[(f * N + p) * 3] + rgb[(f * N + p) * 3 + 1] > 30) n++;
+      }
+      return n;
+    };
+    expect(litCount(150)).toBeGreaterThan(litCount(50)); // wide > narrow
+    expect(litCount(150)).toBeGreaterThanOrEqual(N - 2); // full width
+  });
+
+  it("motion alone renders the program color chased along the strip", () => {
+    const d = doc([
+      { id: "p", channels: { brightness: 1, motion: 1 } }, // 1 cycle/sec
+    ]);
+    const out = evaluateProgram(profile, d, d.programs[0]);
+    expect(out.pixels).not.toBeNull();
+    const { rgb } = out.pixels!;
+    // At t=0.5s (half a cycle) the head sits mid-strip: center bright, ends dim.
+    const sum = (f: number, p: number) =>
+      rgb[(f * N + p) * 3] +
+      rgb[(f * N + p) * 3 + 1] +
+      rgb[(f * N + p) * 3 + 2];
+    expect(sum(50, Math.floor(N / 2))).toBeGreaterThan(sum(50, 2) + 100);
+  });
+});
+
+describe("motionPhase", () => {
+  it("chase head advances with phase and wraps the ring", () => {
+    const N = 60;
+    // Peak pixel at phase 0.25 sits a quarter along the strip.
+    let best = 0;
+    let bestV = -1;
+    for (let p = 0; p < N; p++) {
+      const v = motionPhase("chase", p, N, 0.25, 0.1);
+      if (v > bestV) {
+        bestV = v;
+        best = p;
+      }
+    }
+    expect(best).toBe(15);
+    // Whole cycles land back on the same pixel (speed-proportional advance).
+    expect(motionPhase("chase", 15, N, 1.25, 0.1)).toBeCloseTo(
+      motionPhase("chase", 15, N, 0.25, 0.1),
+      6,
+    );
+  });
+
+  it("sweep bounces instead of wrapping", () => {
+    const N = 60;
+    const headAt = (phase: number) => {
+      let best = 0;
+      let bestV = -1;
+      for (let p = 0; p < N; p++) {
+        const v = motionPhase("sweep", p, N, phase, 0.1);
+        if (v > bestV) {
+          bestV = v;
+          best = p;
+        }
+      }
+      return best;
+    };
+    expect(headAt(0.5)).toBe(N - 1); // end of the forward pass
+    expect(headAt(1.0)).toBe(0); // swept back
+  });
+
+  it("pulse ignores pixel index and oscillates with phase", () => {
+    expect(motionPhase("pulse", 0, 60, 0.5, 0.1)).toBeCloseTo(1, 6);
+    expect(motionPhase("pulse", 30, 60, 0.5, 0.1)).toBeCloseTo(1, 6);
+    expect(motionPhase("pulse", 0, 60, 1, 0.1)).toBeCloseTo(0, 6);
   });
 });
 
