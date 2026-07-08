@@ -77,3 +77,13 @@ pub fn clean_exit() {
     let _ = fs::remove_file(dir().join("session.lock"));
     log("app exiting cleanly");
 }
+
+/// SIGINT/SIGTERM (dev-server stop, system shutdown) kill the process without
+/// the Tauri exit event ever firing — treat them as orderly shutdowns too, so
+/// they don't masquerade as crashes on the next launch.
+pub fn install_signal_cleanup() {
+    let _ = ctrlc::set_handler(|| {
+        clean_exit();
+        std::process::exit(0);
+    });
+}

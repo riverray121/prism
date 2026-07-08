@@ -140,6 +140,7 @@ fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
 pub fn run() {
     applog::init();
     let unclean_exit = applog::startup_unclean_check();
+    applog::install_signal_cleanup();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
