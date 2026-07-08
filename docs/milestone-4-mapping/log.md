@@ -16,9 +16,10 @@
 
 - [x] Slice 6 — Pixel dimension + motion: evaluator position mappings (heatmap row→pixel via caller-provided matrices, `band_energy_*` sibling stacking into zones, continuous→center-out spread), motion primitives (`chase`/`sweep`/`pulse` as the pure `motionPhase` over accumulated cycles; speed from constants, bpm scalars, or normalized continuous sources), per-frame RGB pixel matrix (palette LUT for position, program `channelColor` for motion-only), `buildRgbCanvas` heatmap variant + `PixelLane.svelte` (pixel × time) in the preview stack, on-demand .npy matrix loading in mapping state (cache keys include loaded matrices), position/motion rows + motion transform step in the editors, `channelColor` shared with the ribbon.
 
+- [x] Slice 7 — Live light preview: `components/mapping/LightPreview.svelte` — canvas swatch (glow scales with composite intensity, strobe as a square wave) + pixel row (additive blend of pixel matrices, swatch mirror when none), all enabled programs blended additively, rAF loop only while playing with effect-cleanup on unmount/pause, static frame at the playhead when paused (redraws on scrub and re-evaluation); mounted beside the editor in the Mapping tab.
+
 ## Todo
 
-- [ ] Slice 7 — Live light preview
 - [ ] Slice 8 — Macro layer
 - [ ] Slice 9 — Auto-map (on demand)
 

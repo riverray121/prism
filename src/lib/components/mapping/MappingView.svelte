@@ -1,5 +1,6 @@
 <script lang="ts">
   import DerivationEditor from "$lib/components/mapping/DerivationEditor.svelte";
+  import LightPreview from "$lib/components/mapping/LightPreview.svelte";
   import ProgramEditor from "$lib/components/mapping/ProgramEditor.svelte";
   import ProgramList from "$lib/components/mapping/ProgramList.svelte";
   import SourcesPanel from "$lib/components/mapping/SourcesPanel.svelte";
@@ -84,16 +85,21 @@
       <ProgramList />
     </aside>
     <main class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-32">
-      {#if mappingUi.editingDerivation !== null}
-        <DerivationEditor />
-      {:else if mappingUi.editingProgram !== null}
-        <ProgramEditor />
-      {:else}
-        <p class="text-sm text-ink-faint">
-          Star features in Analysis, then derive gates and author programs from
-          them here.
-        </p>
-      {/if}
+      <div class="flex items-start gap-4">
+        <div class="min-w-0 flex-1">
+          {#if mappingUi.editingDerivation !== null}
+            <DerivationEditor />
+          {:else if mappingUi.editingProgram !== null}
+            <ProgramEditor />
+          {:else}
+            <p class="text-sm text-ink-faint">
+              Star features in Analysis, then derive gates and author programs
+              from them here.
+            </p>
+          {/if}
+        </div>
+        <LightPreview />
+      </div>
 
       {#if previews.length > 0}
         <section class="flex flex-col gap-2">
