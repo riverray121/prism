@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { openPath } from "@tauri-apps/plugin-opener";
 
 // App-health surface: a dead sidecar at runtime, and the previous session's
 // unclean exit reported by the shell at startup. The shell banners render it.
@@ -8,20 +7,25 @@ export const health = $state<{
   sidecarDown: boolean;
   sidecarExitCode: number | null;
   uncleanExit: boolean;
-  logDir: string | null;
 }>({
   sidecarDown: false,
   sidecarExitCode: null,
   uncleanExit: false,
-  logDir: null,
 });
 
+// The shell opens the folder itself: it knows the real log dir and needs no
+// webview path-scope permission.
 export function openLogs(): void {
-  if (health.logDir) void openPath(health.logDir);
+  void invoke("open_logs").catch((e) => console.error("open logs failed", e));
 }
 
 export function dismissUncleanExit(): void {
   health.uncleanExit = false;
+}
+
+// Hides the banner only; the sidecar stays down until the app restarts.
+export function dismissSidecarDown(): void {
+  health.sidecarDown = false;
 }
 
 // Forward uncaught frontend errors into the shell's app.log — WebView errors
@@ -52,11 +56,8 @@ export function startHealthMonitor(): () => void {
       return;
     }
     detach = off;
-    const report = await invoke<{ unclean_exit: boolean; log_dir: string }>(
-      "startup_report",
-    );
+    const report = await invoke<{ unclean_exit: boolean }>("startup_report");
     health.uncleanExit = report.unclean_exit;
-    health.logDir = report.log_dir;
   })();
 
   return () => {

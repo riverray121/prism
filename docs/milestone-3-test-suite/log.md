@@ -15,14 +15,14 @@ Coverage review (M2 slice 12) added: `test_rhythm`, `test_stem` (wiring over fak
 
 - **Slice 5 — Frontend runes reducers.** `vitest.config.ts` gains `@sveltejs/vite-plugin-svelte` (node env → server transform, so `$state` stores compile to plain objects) plus a manual `$lib` alias. `src/lib/state/sidecar.test.ts` drives `applySidecarEvent` through the handler captured from a mocked `onSidecarEvent` (every event type, stale-profile drop, non-resolving-favorite warn) and the session start/stop generation races; `inspection.test.ts` covers open/close, `pathForKey` (mix/stem/sub-stem/misses), favorites toggle round-trip, and transport wiring over a mocked transport module; `transport.test.ts` runs the real transport against a fake `AudioContext` with hand-resolved decodes — pre-decode adopt/abandon, play/pause, superseded-play and reset-during-decode races, scrub clamp/silence/resume, rate changes, paused `switchSource`. 111 pytest + 89 vitest green.
 
-- **Observability subfeature (moved in from its own milestone; design in `observability/design.md`).** O1 — `sidecar/logs.py`: rotated `sidecar.log` (5 MB × 3) beside stderr, `sys/threading.excepthook` CRITICAL tracebacks, `faulthandler` → `crash.log`, `PRISM_LOG_DIR`/`PRISM_LOG` overrides; covered in `tests/test_logs.py`. O2 — Rust `applog` module (rotated `app.log`, panic hook with backtrace, captured sidecar stderr, sidecar exit codes), `session.lock` unclean-exit marker + `startup_report`/`log_frontend_error` commands, frontend `health` state (window error forwarding, sidecar-death banner with exit code, dismissible unclean-exit notice, Open-logs via opener plugin).
+- **Observability subfeature (moved in from its own milestone; design in `observability/design.md`).** O1 — `sidecar/logs.py`: rotated `sidecar.log` (5 MB × 3) beside stderr, `sys/threading.excepthook` CRITICAL tracebacks, `faulthandler` → `crash.log`, `PRISM_LOG_DIR`/`PRISM_LOG` overrides; covered in `tests/test_logs.py`. O2 — Rust `applog` module (rotated `app.log`, panic hook with backtrace, captured sidecar stderr, sidecar exit codes), `session.lock` unclean-exit marker + `startup_report`/`log_frontend_error` commands, frontend `health` state (window error forwarding, sidecar-death banner with exit code, dismissible unclean-exit notice, Open-logs via opener plugin). Runtime verification found Open-logs blocked by the webview path scope — replaced with a shell-side `open_logs` command (opener from Rust; `opener:allow-open-path` capability dropped, `startup_report` no longer sends `log_dir`); the sidecar-death banner gained a dismiss button.
 
 ## Todo
 
 - [x] Slice 5 — Frontend runes reducers
 - [x] Slice 6 — resolved by M2 (axis.ts + helper tests)
 - [x] Slice 7 — Observability: sidecar logs (commit c47126e)
-- [x] Slice 8 — Observability: shell crash detection + health surface (built + checks green; kill-the-sidecar / force-quit runtime verification pending)
+- [x] Slice 8 — Observability: shell crash detection + health surface (runtime-verified: sidecar kill → banner + `app.log` code 137; force-quit → unclean-exit notice; frontend errors land in `app.log`)
 
 ## Notes
 

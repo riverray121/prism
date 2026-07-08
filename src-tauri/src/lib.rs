@@ -3,6 +3,7 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Mutex;
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
+use tauri_plugin_opener::OpenerExt;
 
 mod applog;
 
@@ -21,13 +22,21 @@ struct SidecarProcess {
     child: Mutex<Child>,
 }
 
-// Report startup health facts + the log location to the frontend.
+// Report startup health facts to the frontend.
 #[tauri::command]
 fn startup_report(info: State<StartupInfo>) -> serde_json::Value {
     serde_json::json!({
         "unclean_exit": info.unclean_exit,
-        "log_dir": applog::dir().to_string_lossy(),
     })
+}
+
+// Open the log folder in the OS file browser. Shell-side so no webview
+// path-scope permission is needed and PRISM_LOG_DIR overrides are honored.
+#[tauri::command]
+fn open_logs(app: AppHandle) -> Result<(), String> {
+    app.opener()
+        .open_path(applog::dir().to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 // Persist a frontend error (window.onerror / unhandledrejection) in app.log.
@@ -162,7 +171,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             send_to_sidecar,
             startup_report,
-            log_frontend_error
+            log_frontend_error,
+            open_logs
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

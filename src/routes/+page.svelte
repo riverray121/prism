@@ -7,6 +7,7 @@
   import TopBar from "$lib/components/shell/TopBar.svelte";
   import TransportBar from "$lib/components/shell/TransportBar.svelte";
   import {
+    dismissSidecarDown,
     dismissUncleanExit,
     health,
     openLogs,
@@ -44,6 +45,13 @@
           class="rounded border border-danger px-2 py-0.5 hover:bg-danger hover:text-surface"
         >
           Open logs
+        </button>
+        <button
+          onclick={dismissSidecarDown}
+          title="Dismiss"
+          class="ml-auto rounded px-2 py-0.5 text-ink-faint hover:text-ink"
+        >
+          ×
         </button>
       </div>
     {/if}
