@@ -22,6 +22,10 @@
 
 - [x] Slice 9 — Auto-map (on demand): `lib/mapping/automap.ts` — pure proposal from favorites only (energy-like→brightness with the silent default chain, onsets/beats→gate, centroid→color_temp, heatmap→position, favorited `sections`→scene seeds), grouped one program per mix/stem, ids uniqued against the doc, scene source never overridden; `AutoMapButton.svelte` in the aside (silent fill on an empty doc, explicit Append/Cancel confirm on a non-empty one, strictly additive apply); nothing runs on song open.
 
+## Todo
+
+- [ ] User testing of the full Mapping tab against real analyzed songs (all slices built; suite green at 187 vitest + 118 pytest).
+
 ## Notes
 
 - The repo-wide `/clean` deferred from M2 is deferred again to M5 (user call at slice-0 time); M4 is slice work only.
