@@ -1,5 +1,6 @@
-import { getProfile, updateFavorites } from "$lib/ipc";
+import { getMapping, getProfile, updateFavorites } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
+import { resetMappingForSong } from "$lib/state/mapping.svelte";
 import {
   resetForSong,
   switchSource,
@@ -24,7 +25,9 @@ export function open(songId: string): void {
   inspection.songDir = null;
   // Silence the previous song immediately; the profile event re-arms playback.
   resetForSong(null, 0);
+  resetMappingForSong(songId);
   getProfile(songId);
+  getMapping(songId);
 }
 
 export function close(): void {
@@ -33,6 +36,7 @@ export function close(): void {
   inspection.audioPath = null;
   inspection.songDir = null;
   resetForSong(null, 0);
+  resetMappingForSong(null);
 }
 
 // Resolve a source key to its absolute file path (null if unavailable). Keys:

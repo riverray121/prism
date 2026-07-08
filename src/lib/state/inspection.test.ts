@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Profile } from "$lib/ipc/messages";
 
 const ipc = vi.hoisted(() => ({
+  getMapping: vi.fn(),
   getProfile: vi.fn(),
   updateFavorites: vi.fn(),
+  updateMapping: vi.fn(),
 }));
 vi.mock("$lib/ipc", () => ipc);
 
@@ -96,6 +98,7 @@ describe("open / close", () => {
     expect(inspection.songDir).toBeNull();
     expect(transport.resetForSong).toHaveBeenCalledWith(null, 0);
     expect(ipc.getProfile).toHaveBeenCalledWith("s2");
+    expect(ipc.getMapping).toHaveBeenCalledWith("s2");
   });
 
   it("close empties the store and silences playback", () => {

@@ -57,6 +57,16 @@ export function updateMetadata(
   });
 }
 
+// Request a song's mapping doc (answered by a `mapping` event).
+export function getMapping(songId: string): Promise<void> {
+  return sendCommand({ type: "mapping.get", song_id: songId });
+}
+
+// Replace a song's mapping doc wholesale (the doc is small; saves are debounced).
+export function updateMapping(songId: string, doc: object): Promise<void> {
+  return sendCommand({ type: "mapping.update", song_id: songId, doc });
+}
+
 // Replace a song's full favorites list (dot-paths into its profile).
 export function updateFavorites(
   songId: string,

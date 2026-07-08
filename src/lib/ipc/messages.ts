@@ -1,7 +1,11 @@
 import { z } from "zod";
 
+import { MappingEventSchema } from "$lib/mapping/schema";
+
 // Mirror of the sidecar's pydantic models. Validated at the IPC boundary so a
 // schema mismatch surfaces here, not as a confusing downstream error.
+// (The mapping event's doc schema lives with the mapping engine and is
+// re-exported into the union here.)
 
 export const SongSchema = z.object({
   id: z.string(),
@@ -243,5 +247,6 @@ export const SidecarEventSchema = z.discriminatedUnion("type", [
   ImportFinishedEventSchema,
   ProfileEventSchema,
   SettingsEventSchema,
+  MappingEventSchema,
 ]);
 export type SidecarEvent = z.infer<typeof SidecarEventSchema>;

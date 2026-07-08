@@ -6,9 +6,10 @@
 
 - [x] Slice 1 — Color module: `lib/color.ts` — OKLCH→sRGB with chroma-bisect gamut clamp, `mixOklch`/`gradient` interpolating in OKLCH (shortest-path hue), pitch wheel + warm↔cool + section palettes, named `PALETTES` for the colormap transform.
 
+- [x] Slice 2 — Mapping doc schema + persistence: `lib/mapping/schema.ts` (zod 0.1.0: derivations/programs/macro with defaults, `sourceResolves` warn-and-mute helper), `sidecar/mapping.py` (atomic read/write under `songs/{uuid}/mapping/mapping.json`; `storage.write_json_atomic` made public), `mapping.get`/`mapping.update` commands + `mapping` event with the profile-style stale guard, `lib/state/mapping.svelte.ts` (load on song open via `inspection.open`, debounced full-doc saves through `touchDoc`, flush on song switch).
+
 ## Todo
 
-- [ ] Slice 2 — Mapping doc schema + persistence
 - [ ] Slice 3 — Derivations: engine + editor
 - [ ] Slice 4 — Transforms + evaluator (point channels)
 - [ ] Slice 5 — Program editor + ribbon preview

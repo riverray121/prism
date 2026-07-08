@@ -80,7 +80,7 @@ def write_profile(
         # it (stale paths are the frontend's warn-only concern).
         "favorites": _existing_favorites(song["id"]),
     }
-    _write_json_atomic(SONGS_DIR / song["id"] / "profile.json", profile)
+    write_json_atomic(SONGS_DIR / song["id"] / "profile.json", profile)
 
 
 def _existing_favorites(song_id: str) -> list:
@@ -91,7 +91,7 @@ def _existing_favorites(song_id: str) -> list:
         return []
 
 
-def _write_json_atomic(path: Path, obj: dict) -> None:
+def write_json_atomic(path: Path, obj: dict) -> None:
     # Write to a sibling temp file then atomically rename, so a kill/full disk
     # mid-write can't leave a truncated profile.json that read_profile chokes on.
     # allow_nan=False makes any non-finite leak fail loudly here rather than emit
@@ -114,7 +114,7 @@ def write_favorites(song_id: str, favorites: list[str]) -> None:
     """
     profile = read_profile(song_id)
     profile["favorites"] = favorites
-    _write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
+    write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
 
 
 def heatmap_rel(name: str) -> str:
@@ -178,7 +178,7 @@ def update_profile_metadata(song_id: str, title: str, artist: str) -> None:
         return
     profile["song"]["title"] = title
     profile["song"]["artist"] = artist
-    _write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
+    write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
 
 
 def delete_song_dir(song_id: str) -> None:

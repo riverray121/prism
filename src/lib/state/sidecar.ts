@@ -2,6 +2,7 @@ import { getSettings, listLibrary, onSidecarEvent } from "$lib/ipc";
 import type { SidecarEvent } from "$lib/ipc/messages";
 import { library } from "$lib/state/library.svelte";
 import { favoriteResolves, inspection } from "$lib/state/inspection.svelte";
+import { applyMappingEvent } from "$lib/state/mapping.svelte";
 import { settings } from "$lib/state/settings.svelte";
 import { resetForSong } from "$lib/state/transport.svelte";
 
@@ -34,6 +35,9 @@ function applySidecarEvent(event: SidecarEvent): void {
           console.warn("favorite no longer resolves:", fav);
       }
     }
+  } else if (event.type === "mapping") {
+    // Same stale-response guard as the profile event.
+    applyMappingEvent(event.song_id, event.doc);
   } else if (event.type === "settings") {
     settings.engines = event.engines;
     settings.availableEngines = event.available_engines;

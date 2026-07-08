@@ -49,6 +49,19 @@ class UpdateFavoritesCommand(BaseModel):
     favorites: list[str]
 
 
+class GetMappingCommand(BaseModel):
+    type: Literal["mapping.get"]
+    song_id: str
+
+
+class UpdateMappingCommand(BaseModel):
+    type: Literal["mapping.update"]
+    song_id: str
+    # The full mapping doc, replaced wholesale. The frontend owns the schema;
+    # the sidecar only checks it is an object.
+    doc: dict
+
+
 class UpdateSettingsCommand(BaseModel):
     type: Literal["settings.update"]
     # Partial update: each field is applied only if present.
@@ -117,6 +130,14 @@ class ProfileEvent(BaseModel):
     # Absolute path to the song folder, for resolving sidecar paths (heatmap
     # .npy files) against the profile's relative sidecar fields.
     song_dir: str
+
+
+class MappingEvent(BaseModel):
+    type: Literal["mapping"] = "mapping"
+    song_id: str
+    # The song's mapping doc; an empty dict when none is saved yet (the
+    # frontend's schema defaults expand it to the empty doc).
+    doc: dict
 
 
 class EngineInfo(BaseModel):

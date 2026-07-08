@@ -10,6 +10,7 @@ from . import (
     ipc,
     library,
     logs,
+    mapping,
     metadata,
     separation,
     settings,
@@ -19,6 +20,7 @@ from . import (
 )
 from .schema import (
     DeleteSongCommand,
+    GetMappingCommand,
     GetProfileCommand,
     ImportCommand,
     ImportFailedEvent,
@@ -26,12 +28,14 @@ from .schema import (
     ImportStartedEvent,
     ImportYoutubeCommand,
     LibrarySongsEvent,
+    MappingEvent,
     ProfileEvent,
     QueueAddCommand,
     QueueCancelCommand,
     SettingsEvent,
     Song,
     UpdateFavoritesCommand,
+    UpdateMappingCommand,
     UpdateMetadataCommand,
     UpdateSettingsCommand,
 )
@@ -181,6 +185,13 @@ def handle(msg: dict) -> None:
             storage.write_favorites(cmd.song_id, cmd.favorites)
         except FileNotFoundError:
             log.warning("favorites for song without profile: %s", cmd.song_id)
+    elif msg_type == "mapping.get":
+        cmd = GetMappingCommand.model_validate(msg)
+        doc = mapping.read_mapping(cmd.song_id)
+        ipc.emit(MappingEvent(song_id=cmd.song_id, doc=doc if doc is not None else {}))
+    elif msg_type == "mapping.update":
+        cmd = UpdateMappingCommand.model_validate(msg)
+        mapping.write_mapping(cmd.song_id, cmd.doc)
     elif msg_type == "settings.get":
         emit_settings()
     elif msg_type == "settings.update":
