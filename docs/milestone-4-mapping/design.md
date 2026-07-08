@@ -22,7 +22,7 @@ Programs bind to abstract channels only; the generic fixture happens to implemen
 
 - **Sources panel:** favorited subfeatures (curated in Analysis; extendable live via the Analysis|Mapping split) plus saved derivations.
 - **Program editor:** create/edit programs — pick source + channel, done; transform chains sit behind an advanced affordance with silent defaults (continuous → brightness gets `normalize` + `smooth`). Constants for static channels. `enabled` toggle per program.
-- **Derivation editor:** threshold any continuous feature into `events` (peak-pick) or `segments` (hysteresis gate); cutoff slider re-derives live. Derivations are named, saved, valid with zero consumers, deleted only explicitly.
+- **Derivation editor:** threshold any favorited continuous feature into `events` (peak-pick) or `segments` (hysteresis gate); cutoff slider re-derives live. Derivations are named, saved, valid with zero consumers, deleted only explicitly.
 - **Preview — ribbon lanes:** one lit ribbon per program on the shared time axis against the global transport: lit runs = gate + duration, fill = hue/saturation, glow/opacity = brightness, thin exact-value overlay on demand. Pixel-dimension output renders as a 2-D lane (pixel × time) through the heatmap renderer.
 - **Preview — live light:** a rendered generic light (glowing swatch + pixel row) animating at the transport clock. Ribbons diagnose; this confirms feel.
 

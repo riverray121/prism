@@ -22,7 +22,7 @@ Thin slices in build order. Each leaves the suite green. The repo-wide `/clean` 
 
 ## Slice 3 — Derivations: engine + editor
 
-- Goal: named derivations authored live from any continuous feature.
+- Goal: named derivations authored live from any favorited continuous feature.
 - Touches: `lib/mapping/derive.ts` (threshold primitive: `events` peak-pick / `segments` hysteresis, strength carried through; algorithm twinned with `sidecar/features/derive.py`), Mapping tab skeleton replacing the stub (`components/mapping/`: sources panel listing favorited subfeatures + derivations, derivation editor with cutoff slider + mode toggle), preview of a derivation through the existing event/segment lanes on the shared window.
 - Acceptance: `derive.test.ts` — a drum-roll-like envelope yields N events not one, hysteresis produces stable segments, strengths are peak values; slider drag re-derives live against playback; derivations persist and reload; deleting is explicit (a consuming program never deletes one).
 
