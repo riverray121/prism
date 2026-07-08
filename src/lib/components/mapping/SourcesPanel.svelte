@@ -1,7 +1,11 @@
 <script lang="ts">
   import { sourceLabel, favoriteSources } from "$lib/mapping/sources";
   import { inspection } from "$lib/state/inspection.svelte";
-  import { mapping, mappingUi } from "$lib/state/mapping.svelte";
+  import {
+    editDerivation,
+    mapping,
+    mappingUi,
+  } from "$lib/state/mapping.svelte";
 
   // Source palette for authoring: the song's favorited subfeatures (curated in
   // Analysis; extendable live via the Analysis|Mapping split) plus the saved
@@ -53,7 +57,7 @@
         Derivations
       </p>
       <button
-        onclick={() => (mappingUi.editingDerivation = "new")}
+        onclick={() => editDerivation("new")}
         disabled={!hasContinuousFavorite}
         title={hasContinuousFavorite
           ? "Derive events or gates from a favorited continuous feature"
@@ -72,7 +76,7 @@
         {#each derivations as d (d.id)}
           <li>
             <button
-              onclick={() => (mappingUi.editingDerivation = d.id)}
+              onclick={() => editDerivation(d.id)}
               title={`${d.source} · cutoff ${d.threshold.cutoff.toFixed(2)}`}
               class="flex w-full items-baseline justify-between gap-2 rounded px-1.5 py-1 text-left text-sm hover:bg-raised {mappingUi.editingDerivation ===
               d.id

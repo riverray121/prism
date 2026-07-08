@@ -18,9 +18,23 @@ export const inspection = $state<{
   songDir: string | null;
 }>({ songId: null, profile: null, audioPath: null, songDir: null });
 
+// The profile as a plain object, alongside the reactive proxy. The mapping
+// evaluator loops over full-length feature arrays; reading them through the
+// $state proxy would cost a proxy trap per frame, so it gets the raw object.
+let rawProfile: Profile | null = null;
+
+export function setProfile(profile: Profile | null): void {
+  rawProfile = profile;
+  inspection.profile = profile;
+}
+
+export function getRawProfile(): Profile | null {
+  return rawProfile;
+}
+
 export function open(songId: string): void {
   inspection.songId = songId;
-  inspection.profile = null;
+  setProfile(null);
   inspection.audioPath = null;
   inspection.songDir = null;
   // Silence the previous song immediately; the profile event re-arms playback.
@@ -32,7 +46,7 @@ export function open(songId: string): void {
 
 export function close(): void {
   inspection.songId = null;
-  inspection.profile = null;
+  setProfile(null);
   inspection.audioPath = null;
   inspection.songDir = null;
   resetForSong(null, 0);

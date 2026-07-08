@@ -1,3 +1,5 @@
+import { untrack } from "svelte";
+
 import { updateMapping } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
 import { evaluateDoc, type ProgramOutput } from "$lib/mapping/evaluate";
@@ -23,7 +25,9 @@ export const mapping = $state<{
 export const mappingUi = $state<{
   // Derivation open in the editor; "new" = drafting a fresh one.
   editingDerivation: string | null;
-}>({ editingDerivation: null });
+  // Program open in the editor. Mutually exclusive with editingDerivation.
+  editingProgram: string | null;
+}>({ editingDerivation: null, editingProgram: null });
 
 // Evaluated program outputs, keyed by program id. Replaced wholesale on each
 // re-evaluation, but evaluateDoc reuses per-program outputs whose cache key
@@ -33,18 +37,19 @@ export const evaluation = $state<{
   outputs: Record<string, ProgramOutput>;
 }>({ outputs: {} });
 
-// Re-render every enabled program against the current profile. Called by the
-// Mapping tab whenever the doc or profile changes.
+// Re-render every enabled program against the current profile. Runs inside a
+// $effect in the Mapping tab: reading the doc via snapshot registers deep
+// dependencies; the previous outputs are read untracked so writing the new
+// ones can't loop the effect.
 export function reevaluate(profile: Profile | null): void {
-  if (!profile || mapping.doc === null) {
+  const doc =
+    mapping.doc === null ? null : ($state.snapshot(mapping.doc) as MappingDoc);
+  if (!profile || !doc) {
     evaluation.outputs = {};
     return;
   }
-  evaluation.outputs = evaluateDoc(
-    profile,
-    $state.snapshot(mapping.doc) as MappingDoc,
-    evaluation.outputs,
-  );
+  const previous = untrack(() => evaluation.outputs);
+  evaluation.outputs = evaluateDoc(profile, doc, previous);
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -72,6 +77,7 @@ export function resetMappingForSong(songId: string | null): void {
   mapping.songId = songId;
   mapping.doc = null;
   mappingUi.editingDerivation = null;
+  mappingUi.editingProgram = null;
 }
 
 // Apply an inbound `mapping` event; stale responses (user navigated away
@@ -80,6 +86,17 @@ export function applyMappingEvent(songId: string, doc: MappingDoc): void {
   if (songId !== mapping.songId) return;
   doc.song_id = songId;
   mapping.doc = doc;
+}
+
+// Editor selection — one editor open at a time.
+export function editDerivation(id: string | null): void {
+  mappingUi.editingDerivation = id;
+  if (id !== null) mappingUi.editingProgram = null;
+}
+
+export function editProgram(id: string | null): void {
+  mappingUi.editingProgram = id;
+  if (id !== null) mappingUi.editingDerivation = null;
 }
 
 // ── Derivation actions ──────────────────────────────────────────────────────
@@ -124,6 +141,7 @@ export function removeProgram(id: string): void {
   touchDoc((doc) => {
     doc.programs = doc.programs.filter((p) => p.id !== id);
   });
+  if (mappingUi.editingProgram === id) mappingUi.editingProgram = null;
 }
 
 export function setProgramEnabled(id: string, enabled: boolean): void {

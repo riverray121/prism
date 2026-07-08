@@ -12,9 +12,10 @@
 
 - [x] Slice 4 — Transforms + evaluator (point channels): `lib/mapping/transforms.ts` (normalize clamp+gamma/log, O(n) box smooth, per-event attack-hold-decay envelope with max-combine, colormap component extraction + RGB variant, categorical label spreading), `lib/mapping/evaluate.ts` (source materialization incl. `derived.*`, silent normalize+smooth on continuous→brightness, hue degree semantics, gate from segments/event-pulses/auto-threshold, per-program cache keys with `evaluateDoc` reuse so one edit re-evaluates one program), program CRUD actions + `evaluation` output store in mapping state.
 
+- [x] Slice 5 — Program editor + ribbon preview: `graphs/ribbon.ts` + `RibbonLane.svelte` (lit runs from gate, OKLCH fill from hue/saturation or color_temp, brightness as glow/alpha, toggleable exact-value line; frameCount×1 offscreen strip blitted like heatmaps), `components/mapping/` ProgramList (enabled toggles, dim when muted) + ProgramEditor (per-channel source/constant rows, transform chains behind a disclosure via TransformEditor) + ribbon Preview stack in MappingView on the shared window/transport, re-evaluation `$effect` (doc snapshot deps + raw-profile seam so the evaluator skips $state proxy overhead).
+
 ## Todo
 
-- [ ] Slice 5 — Program editor + ribbon preview
 - [ ] Slice 6 — Pixel dimension + motion
 - [ ] Slice 7 — Live light preview
 - [ ] Slice 8 — Macro layer

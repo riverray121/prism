@@ -1,7 +1,11 @@
 import { getSettings, listLibrary, onSidecarEvent } from "$lib/ipc";
 import type { SidecarEvent } from "$lib/ipc/messages";
 import { library } from "$lib/state/library.svelte";
-import { favoriteResolves, inspection } from "$lib/state/inspection.svelte";
+import {
+  favoriteResolves,
+  inspection,
+  setProfile,
+} from "$lib/state/inspection.svelte";
 import { applyMappingEvent } from "$lib/state/mapping.svelte";
 import { settings } from "$lib/state/settings.svelte";
 import { resetForSong } from "$lib/state/transport.svelte";
@@ -24,7 +28,7 @@ function applySidecarEvent(event: SidecarEvent): void {
   } else if (event.type === "profile") {
     // Ignore stale responses if the user has since navigated away/elsewhere.
     if (event.song_id === inspection.songId) {
-      inspection.profile = event.profile;
+      setProfile(event.profile);
       inspection.audioPath = event.audio_path;
       inspection.songDir = event.song_dir;
       // Arm the transport for the newly loaded song (pre-decodes the mix).
