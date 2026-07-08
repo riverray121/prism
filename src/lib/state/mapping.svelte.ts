@@ -1,5 +1,13 @@
 import { updateMapping } from "$lib/ipc";
-import type { Derivation, MappingDoc } from "$lib/mapping/schema";
+import type { Profile } from "$lib/ipc/messages";
+import { evaluateDoc, type ProgramOutput } from "$lib/mapping/evaluate";
+import type {
+  Channel,
+  ChannelValue,
+  Derivation,
+  MappingDoc,
+  Program,
+} from "$lib/mapping/schema";
 
 // The open song's mapping doc. doc is null while the sidecar fetch is in
 // flight; a song with no saved doc arrives as the empty doc (schema defaults).
@@ -16,6 +24,28 @@ export const mappingUi = $state<{
   // Derivation open in the editor; "new" = drafting a fresh one.
   editingDerivation: string | null;
 }>({ editingDerivation: null });
+
+// Evaluated program outputs, keyed by program id. Replaced wholesale on each
+// re-evaluation, but evaluateDoc reuses per-program outputs whose cache key
+// is unchanged — editing one program recomputes only it. Float32Arrays stay
+// unproxied ($state only wraps plain objects/arrays).
+export const evaluation = $state<{
+  outputs: Record<string, ProgramOutput>;
+}>({ outputs: {} });
+
+// Re-render every enabled program against the current profile. Called by the
+// Mapping tab whenever the doc or profile changes.
+export function reevaluate(profile: Profile | null): void {
+  if (!profile || mapping.doc === null) {
+    evaluation.outputs = {};
+    return;
+  }
+  evaluation.outputs = evaluateDoc(
+    profile,
+    $state.snapshot(mapping.doc) as MappingDoc,
+    evaluation.outputs,
+  );
+}
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 // Captured at schedule time so a song switch can flush to the right song.
@@ -79,6 +109,42 @@ export function removeDerivation(id: string): void {
     doc.derivations = doc.derivations.filter((d) => d.id !== id);
   });
   if (mappingUi.editingDerivation === id) mappingUi.editingDerivation = null;
+}
+
+// ── Program actions ─────────────────────────────────────────────────────────
+
+export function addProgram(program: Program): void {
+  touchDoc((doc) => {
+    doc.programs.push(program);
+  });
+}
+
+export function removeProgram(id: string): void {
+  // Removing a program never cascades into derivations it consumed.
+  touchDoc((doc) => {
+    doc.programs = doc.programs.filter((p) => p.id !== id);
+  });
+}
+
+export function setProgramEnabled(id: string, enabled: boolean): void {
+  touchDoc((doc) => {
+    const p = doc.programs.find((x) => x.id === id);
+    if (p) p.enabled = enabled;
+  });
+}
+
+// Bind or rebind one channel of a program; value null removes the binding.
+export function setProgramChannel(
+  id: string,
+  channel: Channel,
+  value: ChannelValue | null,
+): void {
+  touchDoc((doc) => {
+    const p = doc.programs.find((x) => x.id === id);
+    if (!p) return;
+    if (value === null) delete p.channels[channel];
+    else p.channels[channel] = value;
+  });
 }
 
 // Mutate the doc through an action, then debounce a save. All editing actions

@@ -10,9 +10,10 @@
 
 - [x] Slice 3 — Derivations: engine + editor: `lib/mapping/derive.ts` (events peak-pick with plateau/min-separation semantics twinned with `sidecar/features/derive.py`, segments hysteresis gate releasing at 0.8×cutoff, strengths carried through), `lib/mapping/sources.ts` (dot-path resolution + favorite listing + labels), Mapping tab replaces the stub (`components/mapping/`: MappingView, SourcesPanel with favorites + derivations, DerivationEditor with cutoff slider/mode toggle/live preview through Continuous+Onset/Segment lanes on the shared window), derivation CRUD actions + `mappingUi` selection state.
 
+- [x] Slice 4 — Transforms + evaluator (point channels): `lib/mapping/transforms.ts` (normalize clamp+gamma/log, O(n) box smooth, per-event attack-hold-decay envelope with max-combine, colormap component extraction + RGB variant, categorical label spreading), `lib/mapping/evaluate.ts` (source materialization incl. `derived.*`, silent normalize+smooth on continuous→brightness, hue degree semantics, gate from segments/event-pulses/auto-threshold, per-program cache keys with `evaluateDoc` reuse so one edit re-evaluates one program), program CRUD actions + `evaluation` output store in mapping state.
+
 ## Todo
 
-- [ ] Slice 4 — Transforms + evaluator (point channels)
 - [ ] Slice 5 — Program editor + ribbon preview
 - [ ] Slice 6 — Pixel dimension + motion
 - [ ] Slice 7 — Live light preview
