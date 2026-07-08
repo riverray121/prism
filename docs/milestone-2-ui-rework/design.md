@@ -2,7 +2,7 @@
 
 ## Summary
 
-Complete overhaul of the frontend into a project-centric workspace: one song open at a time, worked through pipeline stages presented as tabs. Milestone 2 ships the workspace shell, a rebuilt Analysis tab at full parity with the current inspection view, and the full library experience. The mapping system is milestone 3; this milestone makes the architecture decisions that let it drop in cleanly. Subfeature background: [`ui/`](ui/overview.md), [`mapping/`](mapping/overview.md), [`library/`](library/ideas.md), [`cleanup/`](cleanup/ideas.md).
+Complete overhaul of the frontend into a project-centric workspace: one song open at a time, worked through pipeline stages presented as tabs. Milestone 2 ships the workspace shell, a rebuilt Analysis tab at full parity with the current inspection view, and the full library experience. The mapping system is milestone 3; this milestone makes the architecture decisions that let it drop in cleanly. Subfeature background: [`ui/`](ui/overview.md), [`mapping/`](../milestone-4-mapping/overview.md) (now milestone 4), [`library/`](library/ideas.md), [`cleanup/`](cleanup/ideas.md).
 
 ## How it works
 

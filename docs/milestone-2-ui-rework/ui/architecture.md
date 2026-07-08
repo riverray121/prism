@@ -11,11 +11,11 @@ Analysis-tab onset lanes are **computed by the sidecar at analysis time** and pe
 - A new extractor pass derives onsets from **every continuous feature** via the threshold primitive (peak-pick, default parameters).
 - **Schema:** an optional `onsets` field on the continuous feature envelope — `[{t, strength}]` riding the parent feature, not a separate catalog entry per feature. Minor `schema_version` bump.
 - **Migration:** already-analyzed songs lack the field until re-analyzed. The UI renders the lane only when present; no re-analysis is forced.
-- Relation to derivations: these are fixed-default, sidecar-computed, per-feature. User-tuned, named, saved derivations (`../mapping/formats.md`) remain a mapping-doc concept in the frontend. Same primitive, two products.
+- Relation to derivations: these are fixed-default, sidecar-computed, per-feature. User-tuned, named, saved derivations (`../../milestone-4-mapping/formats.md`) remain a mapping-doc concept in the frontend. Same primitive, two products.
 
 ## Mapping format rework: programs + patching
 
-Approved change to [`../mapping/formats.md`](../mapping/formats.md): mappings are authored **fixture-agnostic** and bound to lights separately.
+Approved change to [`../../milestone-4-mapping/formats.md`](../../milestone-4-mapping/formats.md): mappings are authored **fixture-agnostic** and bound to lights separately.
 
 - **Program** (per song, in the mapping doc): named recipe of channel bindings — feature/derivation → transform → abstract channel (`gate`, `brightness`, `hue`, …). No fixture reference.
 - **Rig** (app-level, not per song): rooms and their fixtures — id, type, pixel count, position. Shared by Sim and, later, Hardware.

@@ -32,11 +32,11 @@ The song's extracted features, reviewed against playback. Successor to the miles
 
 ## Mapping
 
-Authoring **programs** — fixture-agnostic mapping recipes — from favorited features. The interaction model realizes the [`../mapping/`](../mapping/overview.md) doc set.
+Authoring **programs** — fixture-agnostic mapping recipes — from favorited features. The interaction model realizes the [`mapping docs`](../../milestone-4-mapping/overview.md) doc set.
 
 - **Sources:** the favorited subfeatures (plus saved derivations). Curated in Analysis; extendable live via split view.
 - **Authoring:** create/edit programs (feature → transform → abstract channel), tune derivations (threshold cutoff, mode) with live re-derivation, manage versions/snapshots.
-- **Preview:** lit-ribbon lanes per program (`../mapping/visualization.md`) on the shared time axis, against the global transport.
+- **Preview:** lit-ribbon lanes per program (`../../milestone-4-mapping/visualization.md`) on the shared time axis, against the global transport.
 - Programs bind to no light here — patching happens in Sim/Hardware.
 
 ## Sim

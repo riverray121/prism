@@ -1,6 +1,6 @@
 # Mapping Catalog
 
-Every viable feature → channel mapping, grounded in `../../feature-catalog.md`. Organized by target channel — the authoring question is "what should drive color?", not "where can RMS go?".
+Every viable feature → channel mapping, grounded in `../feature-catalog.md`. Organized by target channel — the authoring question is "what should drive color?", not "where can RMS go?".
 
 Pattern: **continuous → brightness / color / position; events → gates; segments → scenes; scalars → constants.**
 

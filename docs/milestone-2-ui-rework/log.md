@@ -40,7 +40,7 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 ## Notes
 
-- Mapping system, Sim, and Hardware are M3+; M2's obligation is architectural only (graph kit reusable for M3 ribbon lanes, global transport, split-capable workspace). Background in `mapping/`, `ui/`, `library/`, `cleanup/`.
+- Mapping system, Sim, and Hardware are M3+; M2's obligation is architectural only (graph kit reusable for M3 ribbon lanes, global transport, split-capable workspace). Background in `../milestone-4-mapping/` (moved there from `mapping/`), `ui/`, `library/`, `cleanup/`.
 - Test infra (vitest/pytest/pre-push hooks) landed via the parallel milestone-3-test-suite work, earlier than M2's plan assumed — slices 3/7 add coverage, not setup.
 - ffmpeg is a required system dependency (yt-dlp); documented in README, checked at import.
 - Switching off the Analysis tab unmounts InspectionView and stops playback (cleanup verified leak-free); playback surviving tab switches is slice 2 (transport in state).

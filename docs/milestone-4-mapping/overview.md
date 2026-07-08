@@ -79,9 +79,9 @@ An addressable strip is _N pixels_, not one light — a 1-D array. This unlocks 
 
 ## Open questions for `/spec`
 
-- Live re-bake vs. on-demand: can the frontend render cues at the 100 Hz grid live, or does baking go to the sidecar? (Direction: frontend — see `../ui/architecture.md`.)
-- ~~Rig definition~~ — answered: user-defined rooms/fixtures in an app-level rig (`formats.md`, `../ui/architecture.md`).
-- ~~In-app or separate tool~~ — answered: Mapping and Sim are tabs in the Prism workspace (`../ui/overview.md`).
+- Live re-bake vs. on-demand: can the frontend render cues at the 100 Hz grid live, or does baking go to the sidecar? (Direction: frontend — see `../milestone-2-ui-rework/ui/architecture.md`.)
+- ~~Rig definition~~ — answered: user-defined rooms/fixtures in an app-level rig (`formats.md`, `../milestone-2-ui-rework/ui/architecture.md`).
+- ~~In-app or separate tool~~ — answered: Mapping and Sim are tabs in the Prism workspace (`../milestone-2-ui-rework/ui/overview.md`).
 - Color model for colormaps: HSV vs. RGB vs. perceptual (OKLCH).
 - True note-duration extraction (`catalog.md` → onset duration, option 3) — deferred until threshold gating proves insufficient.
 - On-disk location of mapping docs and versions (alongside `profile.json`? a `mappings/` subfolder?).

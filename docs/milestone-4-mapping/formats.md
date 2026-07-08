@@ -60,7 +60,7 @@ The split makes iteration and rollback cheap: versions apply to small recipes, a
 ```
 
 - A **program** is a named recipe of channel bindings — no fixture reference. A channel binds a source through transforms, or holds a constant.
-- `source` is a dot-path into `profile.json` — the same addressing `favorites` uses (`../../profile-schema.md`) — or a `derived.{id}` reference.
+- `source` is a dot-path into `profile.json` — the same addressing `favorites` uses (`../profile-schema.md`) — or a `derived.{id}` reference.
 - `derivations` are named threshold results (see `catalog.md` → Derivations): declared once, referenced by any number of programs. They are **saved and independent** — editable at any time while working on a song, valid with zero consumers (a derivation is an artifact in its own right), and never deleted implicitly: removing a program or other consumer never removes a derivation. Deletion is always explicit.
 - Programs and derivations have stable `id`s (versioning anchors); `enabled` mutes a program without deleting it.
 - `macro` holds the two global layers: scene switching from a segment feature, and the adaptive master (see `overview.md`).
