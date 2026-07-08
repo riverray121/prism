@@ -4,9 +4,10 @@
 
 - [x] Slice 0 — Shared zoom window (M2 debt): x-window + follow mode lifted into `transport.svelte.ts` (`view` state), `TimeAxis` converted to a controlled component (`window` prop in, `onWindowChange` out, footer controls removed), all lane renderers thread the shared window, Follow/Reset moved to the transport bar, overview lane opts out (full extent).
 
+- [x] Slice 1 — Color module: `lib/color.ts` — OKLCH→sRGB with chroma-bisect gamut clamp, `mixOklch`/`gradient` interpolating in OKLCH (shortest-path hue), pitch wheel + warm↔cool + section palettes, named `PALETTES` for the colormap transform.
+
 ## Todo
 
-- [ ] Slice 1 — Color module
 - [ ] Slice 2 — Mapping doc schema + persistence
 - [ ] Slice 3 — Derivations: engine + editor
 - [ ] Slice 4 — Transforms + evaluator (point channels)
