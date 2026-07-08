@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Profile } from "$lib/ipc/messages";
 
 import {
+  applyMacro,
   DEFAULT_PIXELS,
   evaluateDoc,
   evaluateProgram,
@@ -423,5 +424,113 @@ describe("evaluateDoc — incremental re-evaluation", () => {
     const out = evaluateDoc(profile, d);
     expect(out.a).toBeUndefined();
     expect(out.b).toBeDefined();
+  });
+});
+
+describe("applyMacro", () => {
+  function docWithMacro(macro: unknown, programs: unknown[]): MappingDoc {
+    return MappingDocSchema.parse({ programs, macro });
+  }
+
+  it("no scenes and no master returns the raw record untouched", () => {
+    const d = doc([{ id: "p", channels: { brightness: 1 } }]);
+    const raw = evaluateDoc(profile, d);
+    expect(applyMacro(profile, d, raw)).toBe(raw);
+  });
+
+  it("section boundaries switch presets exactly at the boundary frame", () => {
+    // intro: [0,1) — program off; drop: [1,2) — program on at half scale.
+    const d = docWithMacro(
+      {
+        scenes_from: "mix.sections",
+        scenes: {
+          intro: { programs: [], master_scale: 1 },
+          drop: { programs: ["p"], master_scale: 0.5 },
+        },
+      },
+      [{ id: "p", channels: { brightness: 1 } }],
+    );
+    const final = applyMacro(profile, d, evaluateDoc(profile, d));
+    const b = final.p.channels.brightness!;
+    expect(b[99]).toBe(0); // last intro frame
+    expect(b[100]).toBeCloseTo(0.5, 5); // first drop frame
+    // The gate is cut too: the program reads as off during intro.
+    expect(final.p.gate).not.toBeNull();
+    expect(final.p.gate![0].start).toBeCloseTo(1, 5);
+  });
+
+  it("windowed master normalizes to a rolling max; absolute to the song max", () => {
+    // energy: quiet hump (0.8 raw) then loud hump (1.6 raw).
+    const master = (mode: string) => ({
+      scenes_from: null,
+      scenes: {},
+      master: { source: "mix.energy", adaptive: { mode, window_s: 0.5 } },
+    });
+    const programs = [{ id: "p", channels: { brightness: 1 } }];
+
+    const abs = docWithMacro(master("absolute"), programs);
+    const bAbs = applyMacro(profile, abs, evaluateDoc(profile, abs)).p.channels
+      .brightness!;
+    expect(bAbs[50]).toBeCloseTo(0.5, 5); // quiet hump ÷ song max
+    expect(bAbs[130]).toBeCloseTo(1, 5);
+
+    const win = docWithMacro(master("windowed"), programs);
+    const bWin = applyMacro(profile, win, evaluateDoc(profile, win)).p.channels
+      .brightness!;
+    // Inside the quiet hump, the rolling max is the hump itself → full range.
+    expect(bWin[50]).toBeCloseTo(1, 5);
+    expect(bWin[130]).toBeCloseTo(1, 5);
+    // Silence between humps stays dark, not amplified.
+    expect(bWin[110]).toBeLessThanOrEqual(bAbs[110] + 1e-6);
+  });
+
+  it("share splits brightness across simultaneously active programs", () => {
+    const d = docWithMacro(
+      {
+        scenes_from: null,
+        scenes: {},
+        master: {
+          source: "mix.energy",
+          adaptive: { mode: "share", window_s: 4 },
+        },
+      },
+      [
+        { id: "a", channels: { brightness: 0.6 } },
+        { id: "b", channels: { brightness: 0.2 } },
+      ],
+    );
+    const final = applyMacro(profile, d, evaluateDoc(profile, d));
+    expect(final.a.channels.brightness![50]).toBeCloseTo(0.75, 5); // 0.6/0.8
+    expect(final.b.channels.brightness![50]).toBeCloseTo(0.25, 5);
+  });
+
+  it("share clamps the degenerate all-quiet case to dark", () => {
+    const d = docWithMacro(
+      {
+        scenes_from: null,
+        scenes: {},
+        master: {
+          source: "mix.energy",
+          adaptive: { mode: "share", window_s: 4 },
+        },
+      },
+      [{ id: "a", channels: { brightness: 0 } }],
+    );
+    const final = applyMacro(profile, d, evaluateDoc(profile, d));
+    expect(final.a.channels.brightness![50]).toBe(0); // no 0/0 blowup
+  });
+
+  it("reuses per-program finals when nothing feeding them changed", () => {
+    const d = docWithMacro(
+      {
+        scenes_from: "mix.sections",
+        scenes: { drop: { programs: ["p"], master_scale: 0.5 } },
+      },
+      [{ id: "p", channels: { brightness: 1 } }],
+    );
+    const raw = evaluateDoc(profile, d);
+    const first = applyMacro(profile, d, raw);
+    const second = applyMacro(profile, d, raw, first);
+    expect(second.p).toBe(first.p);
   });
 });

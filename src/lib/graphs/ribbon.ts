@@ -6,29 +6,9 @@
 import { oklchToRgb } from "$lib/color";
 import {
   channelColor,
-  type GateSegment,
+  litMask,
   type ProgramOutput,
 } from "$lib/mapping/evaluate";
-
-// Per-frame lit mask from gate segments (null gate = always lit).
-export function litMask(
-  gate: GateSegment[] | null,
-  frameCount: number,
-  frameRateHz: number,
-): Float32Array {
-  const mask = new Float32Array(frameCount);
-  if (gate === null) {
-    mask.fill(1);
-    return mask;
-  }
-  for (const seg of gate) {
-    const a = Math.max(0, Math.round(seg.start * frameRateHz));
-    const b = Math.min(frameCount - 1, Math.round(seg.end * frameRateHz));
-    for (let i = a; i <= b; i++)
-      if (seg.strength > mask[i]) mask[i] = seg.strength;
-  }
-  return mask;
-}
 
 // One RGBA column per frame. Fill comes from the shared channelColor
 // precedence (hue → color_temp → neutral); alpha carries brightness on lit

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProgramOutput } from "$lib/mapping/evaluate";
+import { litMask, type ProgramOutput } from "$lib/mapping/evaluate";
 
-import { litMask, ribbonRgba } from "./ribbon";
+import { ribbonRgba } from "./ribbon";
 
 const HZ = 100;
 

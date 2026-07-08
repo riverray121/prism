@@ -1,9 +1,9 @@
 <script lang="ts">
   import { oklchToRgb } from "$lib/color";
-  import { litMask } from "$lib/graphs/ribbon";
   import {
     channelColor,
     DEFAULT_PIXELS,
+    litMask,
     type ProgramOutput,
   } from "$lib/mapping/evaluate";
   import { inspection } from "$lib/state/inspection.svelte";

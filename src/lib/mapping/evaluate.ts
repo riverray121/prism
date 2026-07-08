@@ -376,6 +376,27 @@ function evaluateGate(
   return typeof m.value === "number" && m.value < 0.5 ? [] : null;
 }
 
+// Per-frame lit mask from gate segments (null gate = always lit). Shared by
+// the ribbon renderer, the live preview, and the share-mode master.
+export function litMask(
+  gate: GateSegment[] | null,
+  frameCount: number,
+  frameRateHz: number,
+): Float32Array {
+  const mask = new Float32Array(frameCount);
+  if (gate === null) {
+    mask.fill(1);
+    return mask;
+  }
+  for (const seg of gate) {
+    const a = Math.max(0, Math.round(seg.start * frameRateHz));
+    const b = Math.min(frameCount - 1, Math.round(seg.end * frameRateHz));
+    for (let i = a; i <= b; i++)
+      if (seg.strength > mask[i]) mask[i] = seg.strength;
+  }
+  return mask;
+}
+
 // ── Pixel dimension ─────────────────────────────────────────────────────────
 
 // The one color-precedence rule for a program's evaluated point channels:
@@ -751,6 +772,235 @@ export function evaluateDoc(
       prev && prev.key === key
         ? prev
         : evaluateProgram(profile, doc, program, matrices);
+  }
+  return out;
+}
+
+// ── Macro layer ─────────────────────────────────────────────────────────────
+// Layering order: program channels → scene enable/scale → adaptive master.
+// `share` needs every active program's contribution, which fixes this
+// ordering (and couples programs: any raw change re-derives every final).
+
+// Below this, a "total brightness" is silence — the share master goes dark
+// instead of amplifying noise.
+const SHARE_EPSILON = 1e-3;
+
+// Per-program scene factor per frame: 1 outside preset-labeled sections;
+// inside one, the preset's master_scale for enabled programs and 0 for the
+// rest. Section boundaries switch exactly at their frame.
+function sceneFactors(
+  profile: Profile,
+  doc: MappingDoc,
+  programIds: string[],
+  frameCount: number,
+  hz: number,
+): Record<string, Float32Array> | null {
+  const macro = doc.macro;
+  if (macro.scenes_from === null) return null;
+  const feature = resolveFeature(profile, macro.scenes_from);
+  if (feature?.render !== "segment") return null;
+  const factors: Record<string, Float32Array> = {};
+  for (const id of programIds)
+    factors[id] = new Float32Array(frameCount).fill(1);
+  let any = false;
+  for (const seg of feature.segments) {
+    const preset = macro.scenes[seg.label];
+    if (!preset) continue;
+    any = true;
+    const a = Math.max(0, Math.round(seg.start * hz));
+    const b = Math.min(frameCount, Math.round(seg.end * hz));
+    for (const id of programIds) {
+      const factor = preset.programs.includes(id) ? preset.master_scale : 0;
+      const track = factors[id];
+      for (let i = a; i < b; i++) track[i] = factor;
+    }
+  }
+  return any ? factors : null;
+}
+
+// Rolling trailing max via a monotonic deque — O(n) for any window size.
+function rollingMax(data: Float32Array, window: number): Float32Array {
+  const out = new Float32Array(data.length);
+  const deque: number[] = [];
+  for (let i = 0; i < data.length; i++) {
+    while (deque.length && data[deque[deque.length - 1]] <= data[i])
+      deque.pop();
+    deque.push(i);
+    if (deque[0] <= i - window) deque.shift();
+    out[i] = data[deque[0]];
+  }
+  return out;
+}
+
+// The adaptive master track for absolute/windowed modes (share is computed
+// from the programs themselves). Null = no master (unbound/unresolved).
+function masterTrack(
+  profile: Profile,
+  doc: MappingDoc,
+  frameCount: number,
+  hz: number,
+): Float32Array | null {
+  const master = doc.macro.master;
+  if (!master || master.adaptive.mode === "share") return null;
+  const m = materialize(profile, doc, master.source);
+  if (!m) return null;
+  const track = toContinuous(m, hz, frameCount);
+  const out = new Float32Array(frameCount);
+  if (master.adaptive.mode === "absolute") {
+    let hi = 0;
+    for (let i = 0; i < frameCount; i++) if (track[i] > hi) hi = track[i];
+    if (hi <= 0) return out; // silent song: master fully dark
+    for (let i = 0; i < frameCount; i++)
+      out[i] = Math.max(0, Math.min(1, track[i] / hi));
+    return out;
+  }
+  const window = Math.max(1, Math.round(master.adaptive.window_s * hz));
+  const ref = rollingMax(track, window);
+  for (let i = 0; i < frameCount; i++) {
+    out[i] =
+      ref[i] > SHARE_EPSILON ? Math.max(0, Math.min(1, track[i] / ref[i])) : 0;
+  }
+  return out;
+}
+
+// Cut a gate down to the frames where the scene keeps the program enabled,
+// so a scene-muted program reads as "off", not "lit but dark".
+function gateWithin(
+  gate: GateSegment[] | null,
+  enabled: Float32Array,
+  hz: number,
+): GateSegment[] | null {
+  let allOn = true;
+  for (let i = 0; i < enabled.length; i++) {
+    if (enabled[i] <= 0) {
+      allOn = false;
+      break;
+    }
+  }
+  if (allOn) return gate;
+  const base: GateSegment[] = gate ?? [
+    { start: 0, end: (enabled.length - 1) / hz, strength: 1 },
+  ];
+  const out: GateSegment[] = [];
+  for (const seg of base) {
+    const a = Math.max(0, Math.round(seg.start * hz));
+    const b = Math.min(enabled.length - 1, Math.round(seg.end * hz));
+    let runStart = -1;
+    for (let i = a; i <= b + 1; i++) {
+      const on = i <= b && enabled[i] > 0;
+      if (on && runStart < 0) runStart = i;
+      if (!on && runStart >= 0) {
+        out.push({
+          start: runStart / hz,
+          end: (i - 1) / hz,
+          strength: seg.strength,
+        });
+        runStart = -1;
+      }
+    }
+  }
+  return out;
+}
+
+// Apply the macro layer over raw per-program outputs. Identity-preserving:
+// with no scenes and no master the raw record is returned as-is, and per-
+// program finals are reused when nothing feeding them changed.
+export function applyMacro(
+  profile: Profile,
+  doc: MappingDoc,
+  raw: Record<string, ProgramOutput>,
+  previous: Record<string, ProgramOutput> = {},
+): Record<string, ProgramOutput> {
+  const macro = doc.macro;
+  const hz = profile.timeline.frame_rate_hz;
+  const frameCount = profile.timeline.frame_count;
+  const ids = Object.keys(raw);
+
+  const scenes = sceneFactors(profile, doc, ids, frameCount, hz);
+  const share = macro.master?.adaptive.mode === "share";
+  const master = masterTrack(profile, doc, frameCount, hz);
+  if (!scenes && !share && !master) return raw;
+
+  const macroJson = JSON.stringify(macro);
+  // Share couples every program's output; its cache key must see all of them.
+  const coupling = share ? ids.map((id) => raw[id].key).join("§") : "";
+
+  // Scene-adjusted brightness contribution per program (share denominator).
+  const contribution: Record<string, Float32Array> = {};
+  for (const id of ids) {
+    const output = raw[id];
+    const b = new Float32Array(frameCount);
+    const brightness = output.channels.brightness ?? null;
+    const mask = litMask(output.gate, frameCount, hz);
+    const factor = scenes?.[id] ?? null;
+    for (let i = 0; i < frameCount; i++) {
+      b[i] =
+        (brightness ? brightness[i] : 1) * mask[i] * (factor ? factor[i] : 1);
+    }
+    contribution[id] = b;
+  }
+  let total: Float32Array | null = null;
+  if (share) {
+    total = new Float32Array(frameCount);
+    for (const id of ids) {
+      const c = contribution[id];
+      for (let i = 0; i < frameCount; i++) total[i] += c[i];
+    }
+  }
+
+  const out: Record<string, ProgramOutput> = {};
+  for (const id of ids) {
+    const rawOut = raw[id];
+    const key = `${rawOut.key}§${macroJson}${coupling ? `§${coupling}` : ""}`;
+    const prev = previous[id];
+    if (prev && prev.key === key) {
+      out[id] = prev;
+      continue;
+    }
+
+    const factor = scenes?.[id] ?? null;
+    // Final brightness: share replaces it with the program's share of the
+    // total; otherwise scene factor × master scale the raw value.
+    const brightness = new Float32Array(frameCount);
+    const rawB = rawOut.channels.brightness ?? null;
+    for (let i = 0; i < frameCount; i++) {
+      if (share) {
+        brightness[i] =
+          total![i] > SHARE_EPSILON ? contribution[id][i] / total![i] : 0;
+      } else {
+        brightness[i] =
+          (rawB ? rawB[i] : 1) *
+          (factor ? factor[i] : 1) *
+          (master ? master[i] : 1);
+      }
+    }
+
+    // Overall dim per frame, for the pixel matrix.
+    let pixels = rawOut.pixels;
+    if (pixels && (factor || master || share)) {
+      const rgb = new Uint8ClampedArray(pixels.rgb.length);
+      const N = pixels.pixelCount;
+      for (let f = 0; f < frameCount; f++) {
+        const dim = share
+          ? total![f] > SHARE_EPSILON
+            ? contribution[id][f] / total![f]
+            : 0
+          : (factor ? factor[f] : 1) * (master ? master[f] : 1);
+        if (dim <= 0) continue;
+        const rowStart = f * N * 3;
+        for (let k = 0; k < N * 3; k++) {
+          rgb[rowStart + k] = pixels.rgb[rowStart + k] * dim;
+        }
+      }
+      pixels = { pixelCount: N, rgb };
+    }
+
+    out[id] = {
+      key,
+      channels: { ...rawOut.channels, brightness },
+      gate: factor ? gateWithin(rawOut.gate, factor, hz) : rawOut.gate,
+      pixels,
+    };
   }
   return out;
 }

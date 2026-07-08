@@ -1,6 +1,7 @@
 <script lang="ts">
   import DerivationEditor from "$lib/components/mapping/DerivationEditor.svelte";
   import LightPreview from "$lib/components/mapping/LightPreview.svelte";
+  import MacroPanel from "$lib/components/mapping/MacroPanel.svelte";
   import ProgramEditor from "$lib/components/mapping/ProgramEditor.svelte";
   import ProgramList from "$lib/components/mapping/ProgramList.svelte";
   import SourcesPanel from "$lib/components/mapping/SourcesPanel.svelte";
@@ -100,6 +101,8 @@
         </div>
         <LightPreview />
       </div>
+
+      <MacroPanel />
 
       {#if previews.length > 0}
         <section class="flex flex-col gap-2">

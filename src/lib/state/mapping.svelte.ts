@@ -3,6 +3,7 @@ import { untrack } from "svelte";
 import { updateMapping } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
 import {
+  applyMacro,
   evaluateDoc,
   type Matrices,
   type ProgramOutput,
@@ -12,8 +13,10 @@ import type {
   Channel,
   ChannelValue,
   Derivation,
+  Macro,
   MappingDoc,
   Program,
+  Scene,
 } from "$lib/mapping/schema";
 
 // The open song's mapping doc. doc is null while the sidecar fetch is in
@@ -69,6 +72,10 @@ export function ensureMatrix(source: string, absPath: string): void {
     });
 }
 
+// Raw (pre-macro) outputs, cached per program so an edit re-evaluates only
+// its program; the macro layer applies on top with its own reuse.
+let rawOutputs: Record<string, ProgramOutput> = {};
+
 // Re-render every enabled program against the current profile. Runs inside a
 // $effect in the Mapping tab: reading the doc via snapshot registers deep
 // dependencies; the previous outputs are read untracked so writing the new
@@ -77,11 +84,13 @@ export function reevaluate(profile: Profile | null): void {
   const doc =
     mapping.doc === null ? null : ($state.snapshot(mapping.doc) as MappingDoc);
   if (!profile || !doc) {
+    rawOutputs = {};
     evaluation.outputs = {};
     return;
   }
+  rawOutputs = evaluateDoc(profile, doc, rawOutputs, matrices);
   const previous = untrack(() => evaluation.outputs);
-  evaluation.outputs = evaluateDoc(profile, doc, previous, matrices);
+  evaluation.outputs = applyMacro(profile, doc, rawOutputs, previous);
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -112,6 +121,7 @@ export function resetMappingForSong(songId: string | null): void {
   mappingUi.editingProgram = null;
   matrices = {};
   loadingMatrices.clear();
+  rawOutputs = {};
 }
 
 // Apply an inbound `mapping` event; stale responses (user navigated away
@@ -196,6 +206,28 @@ export function setProgramChannel(
     if (!p) return;
     if (value === null) delete p.channels[channel];
     else p.channels[channel] = value;
+  });
+}
+
+// ── Macro actions ───────────────────────────────────────────────────────────
+
+export function setScenesFrom(source: string | null): void {
+  touchDoc((doc) => {
+    doc.macro.scenes_from = source;
+  });
+}
+
+// Set (or clear, with null) the preset for one section label.
+export function setScene(label: string, scene: Scene | null): void {
+  touchDoc((doc) => {
+    if (scene === null) delete doc.macro.scenes[label];
+    else doc.macro.scenes[label] = scene;
+  });
+}
+
+export function setMaster(master: Macro["master"]): void {
+  touchDoc((doc) => {
+    doc.macro.master = master;
   });
 }
 

@@ -18,9 +18,10 @@
 
 - [x] Slice 7 — Live light preview: `components/mapping/LightPreview.svelte` — canvas swatch (glow scales with composite intensity, strobe as a square wave) + pixel row (additive blend of pixel matrices, swatch mirror when none), all enabled programs blended additively, rAF loop only while playing with effect-cleanup on unmount/pause, static frame at the playhead when paused (redraws on scrub and re-evaluation); mounted beside the editor in the Mapping tab.
 
+- [x] Slice 8 — Macro layer: `applyMacro` in the evaluator (order: programs → scene enable/scale → adaptive master; scene presets per section label with exact boundary frames and gate cutting so a scene-muted program reads as off; `absolute` = song max, `windowed` = O(n) rolling-max deque, `share` = per-program brightness ÷ total with an all-quiet clamp; pixel matrices dimmed too; identity-preserving with per-program final reuse — share couples all keys), two-level cache in mapping state (raw per-program + macro finals), `MacroPanel.svelte` behind a disclosure (scenes-from picker over segment favorites, per-label presets with program checkboxes + scale, master mode/source/window controls).
+
 ## Todo
 
-- [ ] Slice 8 — Macro layer
 - [ ] Slice 9 — Auto-map (on demand)
 
 ## Notes
