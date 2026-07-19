@@ -23,10 +23,10 @@
 <div class="flex flex-col">
   <button
     onclick={ontoggle}
-    class="flex items-center gap-2 py-1.5 text-left text-base text-ink-muted hover:text-ink"
+    class="group flex items-center gap-2 py-1.5 text-left text-base text-ink-muted hover:text-ink"
     style:padding-left={`${depth * 0.75}rem`}
   >
-    <span class="w-5 text-lg leading-none text-ink-faint">
+    <span class="w-7 text-2xl leading-none text-ink-faint group-hover:text-ink">
       {open ? "▾" : "▸"}
     </span>
     <span class="font-medium">{label}</span>
