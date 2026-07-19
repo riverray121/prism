@@ -45,33 +45,28 @@
 
   const offscreen = $derived(buildRgbCanvas(pixels));
 
-  // New evaluation → new closure → the chart re-arms with current content.
-  const drawPixels = $derived((u: uPlot) => {
-    const { min, max } = u.scales.x;
-    if (min == null || max == null) return;
-    const { ctx } = u;
-    const { left, top, width, height: h } = u.bbox;
-    let sx = min * frameRateHz;
-    let sw = (max - min) * frameRateHz;
-    if (sx < 0) {
-      sw += sx;
-      sx = 0;
-    }
-    if (sx + sw > frameCount) sw = frameCount - sx;
-    ctx.save();
-    ctx.imageSmoothingEnabled = false; // pixels should read as pixels
-    ctx.drawImage(
-      offscreen,
-      sx,
-      0,
-      Math.max(1, sw),
-      pixels.pixelCount,
-      left,
-      top,
-      width,
-      h,
-    );
-    ctx.restore();
+  // Content read outside the closure: a new evaluation yields a new draw
+  // function, which TimeAxis repaints on.
+  const drawPixels = $derived.by(() => {
+    const strip = offscreen;
+    const rows = pixels.pixelCount;
+    return (u: uPlot) => {
+      const { min, max } = u.scales.x;
+      if (min == null || max == null) return;
+      const { ctx } = u;
+      const { left, top, width, height: h } = u.bbox;
+      let sx = min * frameRateHz;
+      let sw = (max - min) * frameRateHz;
+      if (sx < 0) {
+        sw += sx;
+        sx = 0;
+      }
+      if (sx + sw > frameCount) sw = frameCount - sx;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false; // pixels should read as pixels
+      ctx.drawImage(strip, sx, 0, Math.max(1, sw), rows, left, top, width, h);
+      ctx.restore();
+    };
   });
 </script>
 

@@ -52,45 +52,52 @@
     buildRibbonCanvas(output, frameCount, frameRateHz),
   );
 
-  // A $derived closure: a new evaluation (or value-line toggle) gives the
-  // draw pass a new identity, which re-arms the chart with current content.
-  const drawRibbon = $derived((u: uPlot) => {
-    const { min, max } = u.scales.x;
-    if (min == null || max == null) return;
-    const { ctx } = u;
-    const { left, top, width, height: h } = u.bbox;
-    let sx = min * frameRateHz;
-    let sw = (max - min) * frameRateHz;
-    if (sx < 0) {
-      sw += sx;
-      sx = 0;
-    }
-    if (sx + sw > frameCount) sw = frameCount - sx;
-    ctx.save();
-    // Dark bed so unlit stretches read as "off".
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(left, top, width, h);
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(offscreen, sx, 0, Math.max(1, sw), 1, left, top, width, h);
-
-    // Exact brightness values as a thin line, sampled per pixel column.
-    const brightness = output.channels.brightness;
-    if (showValueLine && brightness) {
-      const dpr = globalThis.devicePixelRatio || 1;
-      ctx.strokeStyle = "rgba(255,255,255,0.7)";
-      ctx.lineWidth = Math.round(dpr);
-      ctx.beginPath();
-      for (let px = 0; px <= width; px += 2) {
-        const t = min + ((max - min) * px) / width;
-        const frame = Math.round(t * frameRateHz);
-        if (frame < 0 || frame >= frameCount) continue;
-        const y = top + (1 - brightness[frame]) * h;
-        if (px === 0) ctx.moveTo(left + px, y);
-        else ctx.lineTo(left + px, y);
+  // Content is read here, outside the closure, so a new evaluation or a
+  // value-line toggle produces a new draw function — TimeAxis repaints on
+  // that identity change. (Reads inside the closure would register nothing:
+  // it runs during canvas draws, untracked.)
+  const drawRibbon = $derived.by(() => {
+    const strip = offscreen;
+    const brightness = showValueLine
+      ? (output.channels.brightness ?? null)
+      : null;
+    return (u: uPlot) => {
+      const { min, max } = u.scales.x;
+      if (min == null || max == null) return;
+      const { ctx } = u;
+      const { left, top, width, height: h } = u.bbox;
+      let sx = min * frameRateHz;
+      let sw = (max - min) * frameRateHz;
+      if (sx < 0) {
+        sw += sx;
+        sx = 0;
       }
-      ctx.stroke();
-    }
-    ctx.restore();
+      if (sx + sw > frameCount) sw = frameCount - sx;
+      ctx.save();
+      // Dark bed so unlit stretches read as "off".
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(left, top, width, h);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(strip, sx, 0, Math.max(1, sw), 1, left, top, width, h);
+
+      // Exact brightness values as a thin line, sampled per pixel column.
+      if (brightness) {
+        const dpr = globalThis.devicePixelRatio || 1;
+        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.lineWidth = Math.round(dpr);
+        ctx.beginPath();
+        for (let px = 0; px <= width; px += 2) {
+          const t = min + ((max - min) * px) / width;
+          const frame = Math.round(t * frameRateHz);
+          if (frame < 0 || frame >= frameCount) continue;
+          const y = top + (1 - brightness[frame]) * h;
+          if (px === 0) ctx.moveTo(left + px, y);
+          else ctx.lineTo(left + px, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
   });
 </script>
 

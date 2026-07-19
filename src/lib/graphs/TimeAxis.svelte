@@ -224,15 +224,29 @@
     );
   }
 
-  // Create the chart once per dataset, tear down on change. The controlled
-  // window is applied untracked so zooming never recreates the chart.
+  // A lane inside a display:none ancestor (the kept-mounted hidden tab).
+  // Drawing there is pure waste — playhead ticks and zooms across dozens of
+  // hidden lanes are what make visible zooming lag — so redraw paths bail;
+  // the ResizeObserver catches the un-hide and repaints.
+  function isHidden(): boolean {
+    return !container || container.offsetParent === null;
+  }
+
+  // Create the chart once per dataset, tear down on change. options() is
+  // untracked so a renderer handing over a new draw closure (fresh content)
+  // repaints in place below instead of recreating the chart; the controlled
+  // window is untracked so zooming never recreates it either.
   $effect(() => {
-    chart = new uPlot(options(), data, container);
+    chart = new uPlot(untrack(options), data, container);
     attachInteractions(chart);
     untrack(applyWindow);
-    const ro = new ResizeObserver(() =>
-      chart?.setSize({ width: container.clientWidth, height }),
-    );
+    const ro = new ResizeObserver(() => {
+      if (!chart) return;
+      chart.setSize({ width: container.clientWidth, height });
+      // Un-hidden lanes resize from 0: catch up on the window (and playhead)
+      // changes they skipped while hidden.
+      untrack(applyWindow);
+    });
     ro.observe(container);
     return () => {
       ro.disconnect();
@@ -241,16 +255,26 @@
     };
   });
 
+  // Renderer content changed (new draw identity): repaint in place. This is
+  // what makes value-line toggles, cutoff slider drags, and re-evaluations
+  // show up immediately — closures capture their data, so a content change
+  // arrives here as a new function.
+  $effect(() => {
+    draw;
+    chart?.redraw(false);
+  });
+
   // Window prop changes rescale in place (setScale redraws).
   $effect(() => {
     win;
+    if (isHidden()) return;
     applyWindow();
   });
 
   // On each playhead move: track it (the emitted window redraws), else redraw.
   $effect(() => {
     playheadSec;
-    if (!chart) return;
+    if (!chart || isHidden()) return;
     if (!trackPlayhead()) chart.redraw(false);
   });
 </script>

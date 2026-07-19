@@ -59,7 +59,19 @@
     [0, 0],
   ] as [number[], number[]]);
 
-  function drawBands(u: uPlot) {
+  // Segments read outside the closure so a re-derivation (cutoff slider)
+  // hands TimeAxis a new draw function to repaint with.
+  const drawBands = $derived.by(() => {
+    const list = segments;
+    const colors = labelColors;
+    return (u: uPlot) => drawBandList(u, list, colors);
+  });
+
+  function drawBandList(
+    u: uPlot,
+    list: SegmentFeature["segments"],
+    colors: Map<string, string>,
+  ) {
     const { min, max } = u.scales.x;
     if (min == null || max == null) return;
     const { ctx } = u;
@@ -70,11 +82,11 @@
     ctx.save();
     ctx.font = `${Math.round(11 * dpr)}px ui-sans-serif, system-ui, sans-serif`;
     ctx.textBaseline = "middle";
-    for (const seg of segments) {
+    for (const seg of list) {
       if (seg.end < min || seg.start > max) continue;
       const x0 = u.valToPos(Math.max(seg.start, min), "x", true);
       const x1 = u.valToPos(Math.min(seg.end, max), "x", true);
-      const color = labelColors.get(seg.label) ?? PALETTE[0];
+      const color = colors.get(seg.label) ?? PALETTE[0];
       // Translucent band with solid edges at the true boundaries.
       ctx.fillStyle = color + "33";
       ctx.fillRect(x0, bandTop, x1 - x0, bottom - bandTop);

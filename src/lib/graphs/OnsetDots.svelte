@@ -38,33 +38,38 @@
     [0, 0],
   ] as [number[], number[]]);
 
-  function drawDots(u: uPlot) {
-    const { min, max } = u.scales.x;
-    if (min == null || max == null) return;
-    const { ctx } = u;
-    const dpr = window.devicePixelRatio || 1;
-    const mid = u.bbox.top + u.bbox.height / 2;
-    // Faint baseline the dots sit on.
-    ctx.save();
-    ctx.strokeStyle = "rgba(128,128,128,0.3)";
-    ctx.lineWidth = Math.round(dpr);
-    ctx.beginPath();
-    ctx.moveTo(u.bbox.left, mid);
-    ctx.lineTo(u.bbox.left + u.bbox.width, mid);
-    ctx.stroke();
-    // One dot per onset; opacity and radius both track strength so hard hits
-    // read clearly darker and bigger than weak ones.
-    ctx.fillStyle = color;
-    for (const onset of onsets) {
-      if (onset.t < min || onset.t > max) continue;
-      const x = u.valToPos(onset.t, "x", true);
-      ctx.globalAlpha = 0.12 + 0.88 * onset.strength;
+  // Onsets are read outside the closure so a re-derivation (cutoff slider)
+  // hands TimeAxis a new draw function to repaint with.
+  const drawDots = $derived.by(() => {
+    const list = onsets;
+    return (u: uPlot) => {
+      const { min, max } = u.scales.x;
+      if (min == null || max == null) return;
+      const { ctx } = u;
+      const dpr = window.devicePixelRatio || 1;
+      const mid = u.bbox.top + u.bbox.height / 2;
+      // Faint baseline the dots sit on.
+      ctx.save();
+      ctx.strokeStyle = "rgba(128,128,128,0.3)";
+      ctx.lineWidth = Math.round(dpr);
       ctx.beginPath();
-      ctx.arc(x, mid, (1.5 + 2 * onset.strength) * dpr, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
+      ctx.moveTo(u.bbox.left, mid);
+      ctx.lineTo(u.bbox.left + u.bbox.width, mid);
+      ctx.stroke();
+      // One dot per onset; opacity and radius both track strength so hard
+      // hits read clearly darker and bigger than weak ones.
+      ctx.fillStyle = color;
+      for (const onset of list) {
+        if (onset.t < min || onset.t > max) continue;
+        const x = u.valToPos(onset.t, "x", true);
+        ctx.globalAlpha = 0.12 + 0.88 * onset.strength;
+        ctx.beginPath();
+        ctx.arc(x, mid, (1.5 + 2 * onset.strength) * dpr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    };
+  });
 </script>
 
 <TimeAxis

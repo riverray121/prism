@@ -46,49 +46,55 @@
     [0, 0],
   ] as [number[], number[]]);
 
-  function drawTicks(u: uPlot) {
-    const { min, max } = u.scales.x;
-    if (min == null || max == null) return;
-    const { ctx } = u;
-    const dpr = window.devicePixelRatio || 1;
-    const top = u.bbox.top;
-    const bottom = u.bbox.top + u.bbox.height;
-    // Reserve a top band for labels so text doesn't sit on the ticks.
-    const labelBand = labelFor ? 14 * dpr : 0;
-    const tickTop = top + labelBand;
-    // Event ticks within the current view.
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.round(dpr);
-    ctx.beginPath();
-    for (const ev of events) {
-      if (ev.t < min || ev.t > max) continue;
-      const x = u.valToPos(ev.t, "x", true);
-      ctx.moveTo(x, tickTop);
-      ctx.lineTo(x, bottom);
-    }
-    ctx.stroke();
-    ctx.restore();
-    // Per-event labels in the top band; drop any that would overlap the
-    // previously drawn one (events are in chronological order).
-    if (labelFor) {
+  // Events read outside the closure so changed content hands TimeAxis a new
+  // draw function to repaint with.
+  const drawTicks = $derived.by(() => {
+    const list = events;
+    const labeler = labelFor;
+    return (u: uPlot) => {
+      const { min, max } = u.scales.x;
+      if (min == null || max == null) return;
+      const { ctx } = u;
+      const dpr = window.devicePixelRatio || 1;
+      const top = u.bbox.top;
+      const bottom = u.bbox.top + u.bbox.height;
+      // Reserve a top band for labels so text doesn't sit on the ticks.
+      const labelBand = labeler ? 14 * dpr : 0;
+      const tickTop = top + labelBand;
+      // Event ticks within the current view.
       ctx.save();
-      ctx.fillStyle = color;
-      ctx.textBaseline = "top";
-      ctx.font = `${Math.round(11 * dpr)}px ui-sans-serif, system-ui, sans-serif`;
-      let lastRight = -Infinity;
-      for (const ev of events) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.round(dpr);
+      ctx.beginPath();
+      for (const ev of list) {
         if (ev.t < min || ev.t > max) continue;
-        const label = labelFor(ev);
-        if (!label) continue;
         const x = u.valToPos(ev.t, "x", true);
-        if (x < lastRight + 4 * dpr) continue;
-        ctx.fillText(label, x + 2 * dpr, top + 1 * dpr);
-        lastRight = x + 2 * dpr + ctx.measureText(label).width;
+        ctx.moveTo(x, tickTop);
+        ctx.lineTo(x, bottom);
       }
+      ctx.stroke();
       ctx.restore();
-    }
-  }
+      // Per-event labels in the top band; drop any that would overlap the
+      // previously drawn one (events are in chronological order).
+      if (labeler) {
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.textBaseline = "top";
+        ctx.font = `${Math.round(11 * dpr)}px ui-sans-serif, system-ui, sans-serif`;
+        let lastRight = -Infinity;
+        for (const ev of list) {
+          if (ev.t < min || ev.t > max) continue;
+          const label = labeler(ev);
+          if (!label) continue;
+          const x = u.valToPos(ev.t, "x", true);
+          if (x < lastRight + 4 * dpr) continue;
+          ctx.fillText(label, x + 2 * dpr, top + 1 * dpr);
+          lastRight = x + 2 * dpr + ctx.measureText(label).width;
+        }
+        ctx.restore();
+      }
+    };
+  });
 </script>
 
 <TimeAxis

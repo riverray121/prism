@@ -8,7 +8,7 @@
     resolveFeature,
     sourceLabel,
   } from "$lib/mapping/sources";
-  import { inspection } from "$lib/state/inspection.svelte";
+  import { getRawProfile, inspection } from "$lib/state/inspection.svelte";
   import {
     addDerivation,
     mapping,
@@ -115,10 +115,15 @@
 
   // ── Live preview ────────────────────────────────────────────────────────
 
-  const feature = $derived(
-    profile && source ? resolveFeature(profile, source) : undefined,
-  );
-  const data = $derived(feature?.render === "continuous" ? feature.data : null);
+  // Envelope data comes from the raw profile: the slider re-derives over the
+  // full track per input, and the $state proxy would add a trap per sample.
+  // (The `profile` read keeps this reactive to profile loads.)
+  const data = $derived.by(() => {
+    if (!profile || !source) return null;
+    const raw = getRawProfile();
+    const feature = raw ? resolveFeature(raw, source) : undefined;
+    return feature?.render === "continuous" ? feature.data : null;
+  });
   const frameRateHz = $derived(profile?.timeline.frame_rate_hz ?? 100);
   const durationSec = $derived(
     profile
