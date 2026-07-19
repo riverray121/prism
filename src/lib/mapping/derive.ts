@@ -17,10 +17,22 @@ export interface DerivedSegment {
 
 // Two peaks closer than this collapse into the higher one (sidecar's dense mode).
 export const MIN_SEPARATION_SEC = 0.1;
-// Segments release at this fraction of the cutoff: once on, the envelope must
-// fall clearly below the trigger level to turn off, so wobble around the
-// cutoff doesn't shred one sustained hit into many segments.
-export const HYSTERESIS_RELEASE = 0.8;
+
+// Optional band/sensitivity refinements on the threshold primitive.
+export interface ThresholdOpts {
+  // Upper bound of the considered band (normalized); values above are ignored.
+  max?: number;
+  // 1 (default) = every qualifying change counts. Lower values demand a
+  // bigger swing: events need more peak prominence, segments a deeper dip
+  // (wider hysteresis) before re-triggering.
+  sensitivity?: number;
+}
+
+// Sensitivity 1 reproduces the classic release at 0.8 × cutoff; lower
+// sensitivity pushes the release floor down so wobbles merge.
+function releaseLevel(cutoff: number, sensitivity: number): number {
+  return cutoff * (0.3 + 0.5 * sensitivity);
+}
 
 // Min-max normalize to [0,1]; null for flat/degenerate signals (no derivation).
 function normalized(data: ArrayLike<number>): Float64Array | null {
@@ -74,44 +86,74 @@ function spaced(
   return kept.sort((a, b) => a - b);
 }
 
-// Peak-pick: local maxima at or above the cutoff, min separation apart.
+// Keep only peaks that rise at least `prominence` above the valley since the
+// previously kept peak — as sensitivity drops, ripples riding a sustained
+// level stop counting as separate hits.
+function prominentOnly(
+  peaks: number[],
+  norm: Float64Array,
+  prominence: number,
+): number[] {
+  const kept: number[] = [];
+  let valley = Infinity;
+  let from = 0;
+  for (const p of peaks) {
+    for (let i = from; i <= p; i++) if (norm[i] < valley) valley = norm[i];
+    if (norm[p] - valley >= prominence) {
+      kept.push(p);
+      valley = norm[p]; // the next hit must dip and rise again
+    }
+    from = p + 1;
+  }
+  return kept;
+}
+
+// Peak-pick: local maxima within [cutoff, max], min separation apart.
 // Distinct hits survive even when the envelope stays high between them.
 export function deriveEvents(
   data: ArrayLike<number>,
   frameRateHz: number,
   cutoff: number,
+  opts: ThresholdOpts = {},
 ): DerivedEvent[] {
   const norm = normalized(data);
   if (!norm) return [];
-  const distance = Math.max(1, Math.round(MIN_SEPARATION_SEC * frameRateHz));
-  const peaks = spaced(
-    localMaxima(norm).filter((i) => norm[i] >= cutoff),
-    norm,
-    distance,
+  const hi = opts.max ?? 1;
+  const prominence = (1 - (opts.sensitivity ?? 1)) * 0.5;
+  let peaks = localMaxima(norm).filter(
+    (i) => norm[i] >= cutoff && norm[i] <= hi,
   );
-  return peaks.map((i) => ({ t: i / frameRateHz, strength: norm[i] }));
+  if (prominence > 0) peaks = prominentOnly(peaks, norm, prominence);
+  const distance = Math.max(1, Math.round(MIN_SEPARATION_SEC * frameRateHz));
+  return spaced(peaks, norm, distance).map((i) => ({
+    t: i / frameRateHz,
+    strength: norm[i],
+  }));
 }
 
-// Hysteresis gate: on at cutoff, off below cutoff × HYSTERESIS_RELEASE.
-// The rising edge is the onset; the segment length is the duration.
+// Hysteresis gate: on inside [cutoff, max], off below the release level (or
+// above the band). The rising edge is the onset; the segment length is the
+// duration.
 export function deriveSegments(
   data: ArrayLike<number>,
   frameRateHz: number,
   cutoff: number,
+  opts: ThresholdOpts = {},
 ): DerivedSegment[] {
   const norm = normalized(data);
   if (!norm) return [];
-  const release = cutoff * HYSTERESIS_RELEASE;
+  const hi = opts.max ?? 1;
+  const release = releaseLevel(cutoff, opts.sensitivity ?? 1);
   const segments: DerivedSegment[] = [];
   let start = -1;
   let peak = 0;
   for (let i = 0; i < norm.length; i++) {
     if (start < 0) {
-      if (norm[i] >= cutoff) {
+      if (norm[i] >= cutoff && norm[i] <= hi) {
         start = i;
         peak = norm[i];
       }
-    } else if (norm[i] < release) {
+    } else if (norm[i] < release || norm[i] > hi) {
       segments.push({
         start: start / frameRateHz,
         end: i / frameRateHz,

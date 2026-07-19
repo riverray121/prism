@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { oklchToCss } from "$lib/color";
   import TransformEditor from "$lib/components/mapping/TransformEditor.svelte";
   import { favoriteSources, sourceLabel } from "$lib/mapping/sources";
   import type { Channel } from "$lib/mapping/schema";
@@ -79,6 +80,16 @@
     if (v === undefined) return "off";
     return typeof v === "number" ? "constant" : "source";
   }
+
+  // Hue slider track: the actual OKLCH wheel the hue channel selects from.
+  const HUE_GRADIENT = `linear-gradient(to right, ${Array.from(
+    { length: 13 },
+    (_, i) => oklchToCss({ l: 0.7, c: 0.15, h: i * 30 }),
+  ).join(", ")})`;
+
+  function hueCss(h: number): string {
+    return oklchToCss({ l: 0.7, c: 0.15, h });
+  }
 </script>
 
 {#if program}
@@ -149,31 +160,53 @@
                 {/if}
               </select>
             {:else if mode === "constant" && typeof value === "number"}
-              <input
-                type="number"
-                min={channel === "hue" ? 0 : 0}
-                max={channel === "hue"
-                  ? 360
-                  : channel === "strobe_rate"
-                    ? 30
-                    : 1}
-                step={channel === "hue" ? 1 : 0.05}
-                {value}
-                onchange={(e) =>
-                  setProgramChannel(
-                    program.id,
-                    channel,
-                    Number(e.currentTarget.value) || 0,
-                  )}
-                class="w-24 rounded border border-edge bg-app px-1.5 py-0.5"
-              />
-              <span class="text-xs text-ink-faint">
-                {channel === "hue"
-                  ? "degrees"
-                  : channel === "strobe_rate"
-                    ? "Hz"
-                    : "0–1"}
-              </span>
+              {#if channel === "hue"}
+                <!-- Pick the hue off the actual color wheel, not a number. -->
+                <div class="flex min-w-56 flex-1 items-center gap-2">
+                  <span
+                    class="h-5 w-5 shrink-0 rounded-full border border-edge"
+                    style:background={hueCss(value)}
+                  ></span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="359"
+                    step="1"
+                    {value}
+                    oninput={(e) =>
+                      setProgramChannel(
+                        program.id,
+                        channel,
+                        Number(e.currentTarget.value) || 0,
+                      )}
+                    style:background={HUE_GRADIENT}
+                    class="h-3 flex-1 appearance-none rounded-full [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-black/40 [&::-webkit-slider-thumb]:bg-white"
+                  />
+                  <span
+                    class="w-9 text-right text-xs tabular-nums text-ink-faint"
+                  >
+                    {Math.round(value)}°
+                  </span>
+                </div>
+              {:else}
+                <input
+                  type="number"
+                  min="0"
+                  max={channel === "strobe_rate" ? 30 : 1}
+                  step="0.05"
+                  {value}
+                  onchange={(e) =>
+                    setProgramChannel(
+                      program.id,
+                      channel,
+                      Number(e.currentTarget.value) || 0,
+                    )}
+                  class="w-24 rounded border border-edge bg-app px-1.5 py-0.5"
+                />
+                <span class="text-xs text-ink-faint">
+                  {channel === "strobe_rate" ? "Hz" : "0–1"}
+                </span>
+              {/if}
             {/if}
           </div>
 

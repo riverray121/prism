@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveEvents, deriveSegments, HYSTERESIS_RELEASE } from "./derive";
+import { deriveEvents, deriveSegments } from "./derive";
 
 const HZ = 100;
 
@@ -72,7 +72,6 @@ describe("deriveSegments", () => {
       0, 0, 0.6, 0.7, 0.45, 0.45, 0.7, 0.8, 0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       0, 1,
     ];
-    expect(HYSTERESIS_RELEASE).toBeCloseTo(0.8);
     const segments = deriveSegments(data, HZ, 0.5);
     expect(segments).toHaveLength(2); // the wobbly hit + the final spike
     expect(segments[0].start).toBeCloseTo(2 / HZ, 5);
@@ -100,5 +99,54 @@ describe("deriveSegments", () => {
 
   it("flat signals yield nothing", () => {
     expect(deriveSegments([1, 1, 1, 1], HZ, 0.5)).toEqual([]);
+  });
+});
+
+describe("threshold band and sensitivity", () => {
+  it("events above the ceiling are ignored (range, not just lower bound)", () => {
+    const data = [0, ...bump(0.5, 21), ...bump(1, 21), 0];
+    const all = deriveEvents(data, HZ, 0.1);
+    expect(all).toHaveLength(2);
+    const banded = deriveEvents(data, HZ, 0.1, { max: 0.7 });
+    expect(banded).toHaveLength(1);
+    expect(banded[0].strength).toBeCloseTo(0.5, 5); // the loud hit dropped
+  });
+
+  it("lower sensitivity drops shallow ripples between events", () => {
+    // Two ripples riding a high floor: crests at 1.0 and 0.9, dipping only
+    // to 0.8 between them.
+    const data = [0, 0.4, 0.8, 1, 0.8, 0.9, 0.8, 0.4, 0];
+    const sensitive = deriveEvents(data, 10, 0.5, { sensitivity: 1 });
+    expect(sensitive).toHaveLength(2);
+    const strict = deriveEvents(data, 10, 0.5, { sensitivity: 0.5 });
+    expect(strict).toHaveLength(1); // the 0.1-deep ripple no longer counts
+  });
+
+  it("segments turn off above the ceiling", () => {
+    const data = [0, 0.6, 0.6, 1, 1, 0.6, 0.6, 0, 0, 0];
+    const whole = deriveSegments(data, HZ, 0.5);
+    expect(whole).toHaveLength(1);
+    const banded = deriveSegments(data, HZ, 0.5, { max: 0.8 });
+    expect(banded).toHaveLength(2); // split where the level exceeds the band
+  });
+
+  it("lower sensitivity widens the hysteresis so dips merge", () => {
+    // Drops to 0.3 mid-hit: release at 0.8×cutoff (0.4) ends the segment,
+    // but a low-sensitivity release (0.5×0.55×… < 0.3) rides through it.
+    const data = [0, 0.6, 0.3, 0.6, 0.1, 0, 0, 0, 0, 1];
+    const twitchy = deriveSegments(data, 10, 0.5, { sensitivity: 1 });
+    expect(twitchy.length).toBeGreaterThanOrEqual(3);
+    const steady = deriveSegments(data, 10, 0.5, { sensitivity: 0.2 });
+    expect(steady).toHaveLength(2); // one merged hit + the final spike
+  });
+
+  it("defaults reproduce the classic behavior exactly", () => {
+    const data = [0, ...bump(0.5, 21), ...bump(1, 21), 0.45, 0.2, 0];
+    expect(deriveEvents(data, HZ, 0.3, {})).toEqual(
+      deriveEvents(data, HZ, 0.3),
+    );
+    expect(deriveSegments(data, HZ, 0.3, {})).toEqual(
+      deriveSegments(data, HZ, 0.3),
+    );
   });
 });

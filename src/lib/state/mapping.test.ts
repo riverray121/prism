@@ -70,7 +70,7 @@ describe("debounced saves", () => {
       doc.derivations.push({
         id: "d1",
         source: "mix.rms",
-        threshold: { cutoff: 0.5, mode: "events" },
+        threshold: { cutoff: 0.5, max: 1, sensitivity: 1, mode: "events" },
       });
     });
     resetMappingForSong("s2");

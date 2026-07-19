@@ -59,8 +59,10 @@
   const draft = $state<{
     source: string;
     cutoff: number;
+    max: number;
+    sensitivity: number;
     mode: "events" | "segments";
-  }>({ source: "", cutoff: 0.4, mode: "segments" });
+  }>({ source: "", cutoff: 0.4, max: 1, sensitivity: 1, mode: "segments" });
   $effect(() => {
     // Default the draft source to the first continuous favorite.
     if (isNew && draft.source === "" && continuousFavorites.length > 0) {
@@ -73,23 +75,20 @@
   const cutoff = $derived(
     isNew ? draft.cutoff : (existing?.threshold.cutoff ?? 0.4),
   );
+  const maxBound = $derived(isNew ? draft.max : (existing?.threshold.max ?? 1));
+  const sensitivity = $derived(
+    isNew ? draft.sensitivity : (existing?.threshold.sensitivity ?? 1),
+  );
   const mode = $derived(
     isNew ? draft.mode : (existing?.threshold.mode ?? "segments"),
   );
 
-  function setCutoff(value: number): void {
-    if (isNew) draft.cutoff = value;
+  type Threshold = NonNullable<typeof existing>["threshold"];
+  function patchThreshold(patch: Partial<Threshold>): void {
+    if (isNew) Object.assign(draft, patch);
     else if (existing)
       updateDerivation(existing.id, {
-        threshold: { cutoff: value, mode: existing.threshold.mode },
-      });
-  }
-
-  function setMode(value: "events" | "segments"): void {
-    if (isNew) draft.mode = value;
-    else if (existing)
-      updateDerivation(existing.id, {
-        threshold: { cutoff: existing.threshold.cutoff, mode: value },
+        threshold: { ...existing.threshold, ...patch },
       });
   }
 
@@ -123,7 +122,12 @@
     addDerivation({
       id,
       source: draft.source,
-      threshold: { cutoff: draft.cutoff, mode: draft.mode },
+      threshold: {
+        cutoff: draft.cutoff,
+        max: draft.max,
+        sensitivity: draft.sensitivity,
+        mode: draft.mode,
+      },
     });
     mappingUi.editingDerivation = id;
   }
@@ -162,16 +166,43 @@
   );
 
   const events = $derived(
-    data && mode === "events" ? deriveEvents(data, frameRateHz, cutoff) : [],
+    data && mode === "events"
+      ? deriveEvents(data, frameRateHz, cutoff, { max: maxBound, sensitivity })
+      : [],
   );
   const derivedSegments = $derived(
     data && mode === "segments"
-      ? deriveSegments(data, frameRateHz, cutoff)
+      ? deriveSegments(data, frameRateHz, cutoff, {
+          max: maxBound,
+          sensitivity,
+        })
       : [],
   );
   const segments = $derived(
     derivedSegments.map((s) => ({ start: s.start, end: s.end, label: "" })),
   );
+
+  // Threshold guides drawn over the source lane, in its raw units (the
+  // cutoff/ceiling are fractions of the source's own range).
+  const dataRange = $derived.by(() => {
+    if (!data) return null;
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    return hi > lo ? { lo, hi } : null;
+  });
+  const hlines = $derived.by(() => {
+    if (!dataRange) return [];
+    const { lo, hi } = dataRange;
+    const lines = [{ value: lo + cutoff * (hi - lo), color: "#f59e0b" }];
+    if (maxBound < 0.995)
+      lines.push({ value: lo + maxBound * (hi - lo), color: "#ef4444" });
+    return lines;
+  });
 
   // Audition: mirror the current threshold result into the live light while
   // the editor is open, so tuning is judged by feel, not just the lanes —
@@ -261,7 +292,7 @@
     <div class="flex items-center gap-1" role="group" aria-label="Mode">
       {#each ["segments", "events"] as const as m (m)}
         <button
-          onclick={() => setMode(m)}
+          onclick={() => patchThreshold({ mode: m })}
           title={m === "events"
             ? "Peak-pick: one event per distinct hit"
             : "Hysteresis gate: on/off spans with duration"}
@@ -274,22 +305,6 @@
       {/each}
     </div>
 
-    <label class="flex min-w-56 flex-1 items-center gap-2">
-      <span class="text-ink-muted">Cutoff</span>
-      <input
-        type="range"
-        min="0.02"
-        max="0.98"
-        step="0.01"
-        value={cutoff}
-        oninput={(e) => setCutoff(Number(e.currentTarget.value))}
-        class="flex-1 accent-[var(--color-accent,#74ade8)]"
-      />
-      <span class="w-10 text-right tabular-nums text-ink-muted">
-        {cutoff.toFixed(2)}
-      </span>
-    </label>
-
     {#if isNew}
       <button
         onclick={create}
@@ -301,6 +316,70 @@
     {/if}
   </div>
 
+  <!-- Threshold controls. Cutoff/ceiling bound the considered band (drawn as
+       guide lines on the source lane); sensitivity sets how big a swing
+       starts a new event/segment. -->
+  <div class="flex flex-wrap items-center gap-6 text-sm">
+    <label class="flex min-w-52 flex-1 items-center gap-2">
+      <span class="w-16 text-[#f59e0b]">Cutoff</span>
+      <input
+        type="range"
+        min="0.02"
+        max="0.98"
+        step="0.01"
+        value={cutoff}
+        oninput={(e) =>
+          patchThreshold({
+            cutoff: Math.min(Number(e.currentTarget.value), maxBound - 0.02),
+          })}
+        class="flex-1"
+      />
+      <span class="w-10 text-right tabular-nums text-ink-muted">
+        {cutoff.toFixed(2)}
+      </span>
+    </label>
+    <label class="flex min-w-52 flex-1 items-center gap-2">
+      <span class="w-16 text-[#ef4444]">Ceiling</span>
+      <input
+        type="range"
+        min="0.05"
+        max="1"
+        step="0.01"
+        value={maxBound}
+        oninput={(e) =>
+          patchThreshold({
+            max: Math.max(Number(e.currentTarget.value), cutoff + 0.02),
+          })}
+        class="flex-1"
+      />
+      <span class="w-10 text-right tabular-nums text-ink-muted">
+        {maxBound.toFixed(2)}
+      </span>
+    </label>
+    <label
+      class="flex min-w-52 flex-1 items-center gap-2"
+      title="1 = every qualifying change counts; lower = only bigger swings start a new {mode ===
+      'events'
+        ? 'event'
+        : 'segment'}"
+    >
+      <span class="w-16 text-ink-muted">Sensitivity</span>
+      <input
+        type="range"
+        min="0.05"
+        max="1"
+        step="0.01"
+        value={sensitivity}
+        oninput={(e) =>
+          patchThreshold({ sensitivity: Number(e.currentTarget.value) })}
+        class="flex-1"
+      />
+      <span class="w-10 text-right tabular-nums text-ink-muted">
+        {sensitivity.toFixed(2)}
+      </span>
+    </label>
+  </div>
+
   {#if data}
     <div class="flex flex-col gap-1">
       <ContinuousLane
@@ -309,6 +388,8 @@
         label={sourceLabel(source)}
         color="#74ade8"
         height={200}
+        showYAxis={false}
+        {hlines}
         playheadSec={transport.currentTime}
         follow={transport.playing}
         window={view.window}

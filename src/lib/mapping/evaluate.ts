@@ -112,22 +112,21 @@ function materialize(
     const feature = resolveFeature(profile, derivation.source);
     if (feature?.render !== "continuous") return null;
     const hz = profile.timeline.frame_rate_hz;
+    const { cutoff, max, sensitivity } = derivation.threshold;
     if (derivation.threshold.mode === "events") {
-      const events = deriveEvents(
-        feature.data,
-        hz,
-        derivation.threshold.cutoff,
-      );
+      const events = deriveEvents(feature.data, hz, cutoff, {
+        max,
+        sensitivity,
+      });
       return {
         kind: "events",
         events: events.map((e) => ({ ...e, label: null })),
       };
     }
-    const segments = deriveSegments(
-      feature.data,
-      hz,
-      derivation.threshold.cutoff,
-    );
+    const segments = deriveSegments(feature.data, hz, cutoff, {
+      max,
+      sensitivity,
+    });
     return {
       kind: "segments",
       segments: segments.map((s) => ({ ...s, label: "" })),
@@ -410,16 +409,16 @@ export function channelColor(
   const b = channels.brightness ? channels.brightness[i] : 1;
   if (channels.hue) {
     return {
-      l: 0.55 + 0.25 * b,
+      l: 0.5 + 0.42 * b,
       c: (channels.saturation ? channels.saturation[i] : 0.8) * 0.32,
       h: channels.hue[i],
     };
   }
   if (channels.color_temp) {
     const base = PALETTES.warm_cool(channels.color_temp[i]);
-    return { l: 0.45 + 0.4 * b, c: base.c, h: base.h };
+    return { l: 0.45 + 0.5 * b, c: base.c, h: base.h };
   }
-  return { l: 0.55 + 0.35 * b, c: 0.02, h: 90 };
+  return { l: 0.5 + 0.48 * b, c: 0.02, h: 90 };
 }
 
 // Motion primitive intensity for one pixel at one instant. `phase` is

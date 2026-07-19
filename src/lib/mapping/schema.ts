@@ -123,6 +123,12 @@ export const DerivationSchema = z.object({
   source: z.string(),
   threshold: z.object({
     cutoff: z.number().min(0).max(1).default(0.4),
+    // Upper bound of the considered band: values above it are ignored, so a
+    // derivation can target the mid-range and skip the loudest hits.
+    max: z.number().min(0).max(1).default(1),
+    // 1 = every qualifying change counts; lower = only bigger changes start
+    // a new event/segment (peak prominence / wider hysteresis).
+    sensitivity: z.number().min(0).max(1).default(1),
     mode: z.enum(["events", "segments"]).default("segments"),
   }),
 });
