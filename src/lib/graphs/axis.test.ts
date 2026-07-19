@@ -4,6 +4,7 @@ import {
   clamp,
   followed,
   panned,
+  pinched,
   wheelDeltaScale,
   ZOOM_FACTOR,
   zoomed,
@@ -72,6 +73,36 @@ describe("zoomed", () => {
     const w = zoomed(90, 100, 100, 99.9, 100);
     expect(w.max).toBe(100);
     expect(w.min).toBeCloseTo(100 - (w.max - w.min), 10);
+  });
+});
+
+describe("pinched", () => {
+  it("scale 2 halves the range, keeping the anchor's fraction fixed", () => {
+    // Anchor at 25% of a [0,100] start window.
+    const w = pinched({ min: 0, max: 100 }, 400, 25, 2);
+    expect(w.max - w.min).toBeCloseTo(50, 10);
+    expect((25 - w.min) / (w.max - w.min)).toBeCloseTo(0.25, 10);
+  });
+
+  it("scale below 1 zooms out, clamping at the full extent", () => {
+    const grown = pinched({ min: 100, max: 200 }, 400, 150, 0.5);
+    expect(grown.max - grown.min).toBeCloseTo(200, 10);
+    expect(pinched({ min: 0, max: 300 }, 400, 150, 0.5)).toEqual({
+      min: 0,
+      max: 400,
+    });
+  });
+
+  it("clamps to the track edges when zooming out near them", () => {
+    const w = pinched({ min: 0, max: 100 }, 400, 2, 0.5);
+    expect(w.min).toBe(0);
+    const right = pinched({ min: 300, max: 400 }, 400, 399, 0.5);
+    expect(right.max).toBe(400);
+  });
+
+  it("never collapses below the minimum window", () => {
+    const w = pinched({ min: 0, max: 100 }, 400, 50, 1e9);
+    expect(w.max - w.min).toBeCloseTo(0.05, 6);
   });
 });
 

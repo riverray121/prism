@@ -76,6 +76,33 @@ export function zoomed(
   return { min: nmin, max: nmax };
 }
 
+// Pinch zoom from a WebKit gesture's cumulative scale: resize the
+// gesture-start window around the anchor time (the fingers' midpoint), so
+// the content under the fingers stays put. WKWebView delivers pinches as
+// gesture events with `scale`, not as ctrl+wheel.
+export function pinched(
+  start: Win,
+  full: number,
+  anchor: number,
+  scale: number,
+): Win {
+  const startRange = start.max - start.min;
+  let nrange = startRange / Math.max(0.05, scale);
+  nrange = Math.max(nrange, 0.05); // don't collapse to a degenerate window
+  if (nrange >= full) return { min: 0, max: full };
+  const frac = startRange > 0 ? (anchor - start.min) / startRange : 0.5;
+  let nmin = anchor - frac * nrange;
+  let nmax = nmin + nrange;
+  if (nmin < 0) {
+    nmin = 0;
+    nmax = nrange;
+  } else if (nmax > full) {
+    nmax = full;
+    nmin = full - nrange;
+  }
+  return { min: nmin, max: nmax };
+}
+
 // Keep the playhead visible while zoomed: center it when following (playing);
 // otherwise only re-center once it has left the view (see FollowMode).
 // Returns null when the window should not move.

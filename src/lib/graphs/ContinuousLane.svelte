@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { FollowMode, Win } from "$lib/graphs/axis";
+  import { decimateMinMax, LOD_THRESHOLD_POINTS } from "$lib/graphs/lod";
   import TimeAxis from "$lib/graphs/TimeAxis.svelte";
 
   // Renderer for one continuous track (one value per timeline frame). Takes a
@@ -40,13 +41,24 @@
   } = $props();
 
   // X axis is time in seconds, derived from the frame index (no timestamps stored).
-  const aligned = $derived.by(() => {
+  const fullAligned = $derived.by(() => {
     const xs = data.map((_, i) => i / frameRateHz);
     return [xs, data] as [number[], number[]];
   });
   const maxTimeSec = $derived(
     data.length > 1 ? (data.length - 1) / frameRateHz : 1,
   );
+
+  // Min/max-decimated dataset for wide views: at full extent a 30k-point
+  // path per redraw is the cost driver; the decimated set draws the same
+  // shape from ~4k points. Zoomed in, the full data wins (uPlot clips to the
+  // visible range, so it's cheap and exact).
+  const lod = $derived(decimateMinMax(data, frameRateHz));
+  const aligned = $derived.by(() => {
+    if (!lod) return fullAligned;
+    const visibleSec = win ? win.max - win.min : maxTimeSec;
+    return visibleSec * frameRateHz > LOD_THRESHOLD_POINTS ? lod : fullAligned;
+  });
 </script>
 
 <TimeAxis

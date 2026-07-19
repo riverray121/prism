@@ -8,6 +8,7 @@
     type FollowMode,
     followed,
     panned,
+    pinched,
     wheelDeltaScale,
     type Win,
     zoomed,
@@ -70,6 +71,31 @@
   function emitWindow(w: Win): void {
     if (w.max - w.min >= maxX() - 1e-6) onWindowChange?.(null);
     else onWindowChange?.(w);
+  }
+
+  // Zoom/pan intents are coalesced to one emission per animation frame, and
+  // successive deltas chain off the pending window — so a burst of wheel or
+  // pinch events never queues a redraw per event, and no input is dropped
+  // when a frame runs long.
+  let pendingWin: Win | null = null;
+  let emitRaf: number | null = null;
+
+  function queueWindow(w: Win): void {
+    pendingWin = w;
+    if (emitRaf !== null) return;
+    emitRaf = requestAnimationFrame(() => {
+      emitRaf = null;
+      if (pendingWin) emitWindow(pendingWin);
+      pendingWin = null;
+    });
+  }
+
+  // The window gestures should compute from: what's pending this frame, else
+  // the chart's applied scale.
+  function currentWin(u: uPlot): Win | null {
+    if (pendingWin) return pendingWin;
+    const { min, max } = u.scales.x;
+    return min == null || max == null ? null : { min, max };
   }
 
   // Time at a pointer/wheel event. Measured from the plot overlay's own rect so
@@ -190,14 +216,14 @@
     over.addEventListener(
       "wheel",
       (e) => {
-        const { min, max } = u.scales.x;
-        if (min == null || max == null) return;
+        const cur = currentWin(u);
+        if (!cur) return;
         const full = maxX();
-        const range = max - min;
+        const range = cur.max - cur.min;
         const zoomable = onWindowChange !== undefined;
 
         // Gesture routing:
-        //  - pinch / ctrl+wheel (ctrlKey) -> zoom (below)
+        //  - ctrl+wheel -> zoom (below)
         //  - horizontal two-finger swipe on a zoomed view -> pan
         //  - anything else -> scroll, forwarded to the nearest scrollable
         //    ancestor explicitly because the absolutely-positioned uPlot
@@ -212,49 +238,117 @@
             return;
           }
           const dv = (e.deltaX * k * range) / (over.clientWidth || 1);
-          emitWindow(panned(min, max, full, dv));
+          queueWindow(panned(cur.min, cur.max, full, dv));
           return;
         }
 
         if (!zoomable) return;
         e.preventDefault();
-        emitWindow(zoomed(min, max, full, timeAtEvent(u, e), e.deltaY));
+        queueWindow(
+          zoomed(cur.min, cur.max, full, timeAtEvent(u, e), e.deltaY),
+        );
       },
       { passive: false },
     );
+
+    // Trackpad pinch. WKWebView (Safari engine) does NOT synthesize
+    // ctrl+wheel for pinches like Chromium — it fires proprietary gesture
+    // events carrying a cumulative scale. Without these, pinch never reaches
+    // the zoom path at all.
+    type GestureEvent = UIEvent & { scale: number; clientX: number };
+    let pinchStart: Win | null = null;
+    let pinchAnchor = 0;
+    over.addEventListener("gesturestart", (e) => {
+      if (!onWindowChange) return;
+      e.preventDefault();
+      const cur = currentWin(u);
+      if (!cur) return;
+      pinchStart = cur;
+      pinchAnchor = timeAtEvent(u, e as GestureEvent);
+    });
+    over.addEventListener("gesturechange", (e) => {
+      if (!pinchStart) return;
+      e.preventDefault();
+      queueWindow(
+        pinched(pinchStart, maxX(), pinchAnchor, (e as GestureEvent).scale),
+      );
+    });
+    over.addEventListener("gestureend", (e) => {
+      e.preventDefault();
+      pinchStart = null;
+    });
   }
 
-  // Whether the lane sits under a display:none ancestor (the kept-mounted
-  // hidden tab). Drawing there is pure waste, so redraw paths bail — but the
-  // flag is CACHED and only updated by the ResizeObserver: querying layout
+  // Lanes that can't be seen skip ALL redraw work — that's most of them:
+  // the Analysis column mounts every feature lane, but only a handful are in
+  // the viewport at once, and a hidden tab's lanes are none of them. Both
+  // flags are CACHED and only updated by observer callbacks: querying layout
   // (offsetParent/clientWidth) inside the per-tick effects forces a reflow
   // per lane per frame, which lags every visible graph.
-  let hiddenLane = false;
+  let hiddenLane = false; // display:none ancestor (ResizeObserver)
+  let culled = true; // outside the viewport (IntersectionObserver)
 
-  // Create the chart once per dataset, tear down on change. options() is
-  // untracked so a renderer handing over a new draw closure (fresh content)
-  // repaints in place below instead of recreating the chart; the controlled
-  // window is untracked so zooming never recreates it either.
+  function skipDrawing(): boolean {
+    return hiddenLane || culled;
+  }
+
+  // Repaint with the current window/playhead — the catch-up when a lane
+  // scrolls back into view or its tab is re-shown.
+  function repaint(): void {
+    if (!chart) return;
+    untrack(applyWindow); // setScale short-circuits on equal values…
+    chart.redraw(false); // …so always follow with an explicit paint
+  }
+
+  // Create the chart once per mount. options() and the initial data are
+  // untracked: dataset swaps (LOD level changes) go through setData below,
+  // renderer content changes repaint via the draw effect, and the controlled
+  // window applies via setScale — none of them recreate the chart, which
+  // keeps gesture listeners and pointer state alive through all of it.
   $effect(() => {
-    chart = new uPlot(untrack(options), data, container);
+    appliedData = untrack(() => data);
+    chart = new uPlot(untrack(options), appliedData, container);
     attachInteractions(chart);
     untrack(applyWindow);
-    hiddenLane = container.clientWidth === 0; // one layout read, at mount only
     const ro = new ResizeObserver(() => {
       const width = container.clientWidth; // safe here: RO fires post-layout
+      const wasHidden = hiddenLane;
       hiddenLane = width === 0;
       if (hiddenLane || !chart) return;
       chart.setSize({ width, height });
-      // An un-hidden lane resizes from 0: catch up on the window (and
-      // playhead) changes it skipped while hidden.
-      untrack(applyWindow);
+      if (wasHidden) repaint(); // catch up on what was skipped while hidden
     });
     ro.observe(container);
+    // Cull lanes scrolled out of view; the margin keeps the next screenful
+    // warm so scrolling doesn't reveal blank lanes.
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries[entries.length - 1].isIntersecting;
+        const wasCulled = culled;
+        culled = !visible;
+        if (wasCulled && visible) repaint();
+      },
+      { rootMargin: "200px 0px" },
+    );
+    io.observe(container);
     return () => {
       ro.disconnect();
+      io.disconnect();
+      if (emitRaf !== null) cancelAnimationFrame(emitRaf);
       chart?.destroy();
       chart = undefined;
     };
+  });
+
+  // Dataset changed (a renderer swapped LOD level or loaded new content):
+  // swap it in place, keeping the window and gesture state.
+  let appliedData: uPlot.AlignedData | null = null;
+  $effect(() => {
+    const d = data;
+    if (!chart || d === appliedData) return;
+    appliedData = d;
+    chart.setData(d, false);
+    if (!skipDrawing()) repaint();
   });
 
   // Renderer content changed (new draw identity): repaint in place. This is
@@ -263,21 +357,21 @@
   // arrives here as a new function.
   $effect(() => {
     draw;
-    if (hiddenLane) return; // the un-hide resize repaints with current draw
+    if (skipDrawing()) return; // the visibility catch-up repaints instead
     chart?.redraw(false);
   });
 
   // Window prop changes rescale in place (setScale redraws).
   $effect(() => {
     win;
-    if (hiddenLane) return;
+    if (skipDrawing()) return;
     applyWindow();
   });
 
   // On each playhead move: track it (the emitted window redraws), else redraw.
   $effect(() => {
     playheadSec;
-    if (!chart || hiddenLane) return;
+    if (!chart || skipDrawing()) return;
     if (!trackPlayhead()) chart.redraw(false);
   });
 </script>
