@@ -3,6 +3,7 @@
   import OnsetDots from "$lib/graphs/OnsetDots.svelte";
   import SegmentLane from "$lib/graphs/SegmentLane.svelte";
   import { deriveEvents, deriveSegments } from "$lib/mapping/derive";
+  import { GATE_PULSE_SEC } from "$lib/mapping/evaluate";
   import {
     favoriteSources,
     resolveFeature,
@@ -11,6 +12,7 @@
   import { getRawProfile, inspection } from "$lib/state/inspection.svelte";
   import {
     addDerivation,
+    audition,
     mapping,
     mappingUi,
     removeDerivation,
@@ -134,15 +136,38 @@
   const events = $derived(
     data && mode === "events" ? deriveEvents(data, frameRateHz, cutoff) : [],
   );
-  const segments = $derived(
+  const derivedSegments = $derived(
     data && mode === "segments"
-      ? deriveSegments(data, frameRateHz, cutoff).map((s) => ({
-          start: s.start,
-          end: s.end,
-          label: "",
-        }))
+      ? deriveSegments(data, frameRateHz, cutoff)
       : [],
   );
+  const segments = $derived(
+    derivedSegments.map((s) => ({ start: s.start, end: s.end, label: "" })),
+  );
+
+  // Audition: mirror the current threshold result into the live light while
+  // the editor is open, so tuning is judged by feel, not just the lanes —
+  // even before any program consumes this derivation.
+  $effect(() => {
+    const gate =
+      mode === "events"
+        ? events.map((e) => ({
+            start: e.t,
+            end: e.t + GATE_PULSE_SEC,
+            strength: e.strength,
+          }))
+        : derivedSegments.map((s) => ({
+            start: s.start,
+            end: s.end,
+            strength: s.strength,
+          }));
+    audition.output = data
+      ? { key: "audition", channels: {}, gate, pixels: null }
+      : null;
+    return () => {
+      audition.output = null;
+    };
+  });
 </script>
 
 <div class="flex flex-col gap-3">

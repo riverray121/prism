@@ -7,7 +7,7 @@
     type ProgramOutput,
   } from "$lib/mapping/evaluate";
   import { inspection } from "$lib/state/inspection.svelte";
-  import { evaluation, mapping } from "$lib/state/mapping.svelte";
+  import { audition, evaluation, mapping } from "$lib/state/mapping.svelte";
   import { transport } from "$lib/state/transport.svelte";
 
   // The feel check: a rendered generic light (glowing swatch + pixel row)
@@ -25,7 +25,9 @@
     inspection.profile?.timeline.frame_rate_hz ?? 100,
   );
 
-  // Evaluated programs with their lit masks, recomputed per evaluation.
+  // Evaluated programs with their lit masks, recomputed per evaluation. The
+  // derivation editor's audition layer (its live threshold result) blends in
+  // on top while it's open.
   const sampled = $derived.by(() => {
     const out: { output: ProgramOutput; mask: Float32Array }[] = [];
     for (const p of mapping.doc?.programs ?? []) {
@@ -35,6 +37,12 @@
           output,
           mask: litMask(output.gate, frameCount, frameRateHz),
         });
+    }
+    if (audition.output) {
+      out.push({
+        output: audition.output,
+        mask: litMask(audition.output.gate, frameCount, frameRateHz),
+      });
     }
     return out;
   });

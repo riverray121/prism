@@ -38,6 +38,13 @@ export const mappingUi = $state<{
   editingProgram: string | null;
 }>({ editingDerivation: null, editingProgram: null });
 
+// Transient audition layer: the derivation editor mirrors its current
+// threshold result here so the live light fires while tuning, even when no
+// program consumes the derivation yet. Never persisted.
+export const audition = $state<{ output: ProgramOutput | null }>({
+  output: null,
+});
+
 // Evaluated program outputs, keyed by program id. Replaced wholesale on each
 // re-evaluation, but evaluateDoc reuses per-program outputs whose cache key
 // is unchanged — editing one program recomputes only it. Float32Arrays stay
@@ -120,6 +127,7 @@ export function resetMappingForSong(songId: string | null): void {
   mapping.doc = null;
   mappingUi.editingDerivation = null;
   mappingUi.editingProgram = null;
+  audition.output = null;
   matrices = {};
   loadingMatrices.clear();
   rawOutputs = {};
