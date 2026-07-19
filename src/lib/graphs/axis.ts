@@ -47,7 +47,9 @@ export function panned(
 }
 
 // Zoom centered on the cursor. Deltas vary by device (small for pinch, large
-// for a mouse notch), so the step is scaled by |deltaY| and capped.
+// for a mouse notch), so the step is scaled by |deltaY| and capped. The
+// multiplier is tuned for trackpad pinches (per-event deltas of 1-10, dozens
+// of events per gesture); mouse notches (~120) hit the cap either way.
 export function zoomed(
   min: number,
   max: number,
@@ -56,7 +58,7 @@ export function zoomed(
   deltaY: number,
 ): Win {
   const range = max - min;
-  const intensity = Math.min(Math.abs(deltaY) * 0.035, 2);
+  const intensity = Math.min(Math.abs(deltaY) * 0.1, 2);
   const step = Math.pow(ZOOM_FACTOR, intensity);
   const nrange = deltaY < 0 ? range * step : range / step;
   const leftPct = range > 0 ? (center - min) / range : 0.5;
