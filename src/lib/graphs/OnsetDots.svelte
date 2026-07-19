@@ -11,6 +11,7 @@
     onsets,
     maxTimeSec,
     color = "#6366f1",
+    height = 28,
     playheadSec = null,
     follow = false,
     window: win = null,
@@ -23,6 +24,7 @@
     onsets: { t: number; strength: number }[];
     maxTimeSec: number;
     color?: string;
+    height?: number;
     playheadSec?: number | null;
     follow?: boolean;
     window?: Win | null;
@@ -80,7 +82,7 @@
   showXAxis={false}
   draw={drawDots}
   maxTimeSec={maxTimeSec > 0 ? maxTimeSec : 1}
-  height={28}
+  {height}
   {playheadSec}
   {follow}
   window={win}

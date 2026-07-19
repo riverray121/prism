@@ -229,7 +229,7 @@
         {frameRateHz}
         label={sourceLabel(source)}
         color="#74ade8"
-        height={130}
+        height={200}
         playheadSec={transport.currentTime}
         follow={transport.playing}
         window={view.window}
@@ -244,6 +244,7 @@
           onsets={events}
           maxTimeSec={durationSec}
           color="#f59e0b"
+          height={110}
           playheadSec={transport.currentTime}
           follow={transport.playing}
           window={view.window}
@@ -258,7 +259,7 @@
         <SegmentLane
           {segments}
           maxTimeSec={durationSec}
-          height={56}
+          height={130}
           playheadSec={transport.currentTime}
           follow={transport.playing}
           window={view.window}
