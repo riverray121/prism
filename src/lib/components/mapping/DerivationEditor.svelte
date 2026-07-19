@@ -10,9 +10,10 @@
     sourceLabel,
   } from "$lib/mapping/sources";
   import {
+    backToMix,
     getRawProfile,
     inspection,
-    playToggle,
+    soloSource,
   } from "$lib/state/inspection.svelte";
   import {
     addDerivation,
@@ -97,9 +98,17 @@
     else if (existing) updateDerivation(existing.id, { source: value });
   }
 
-  // Suggested id: source feature name + mode suffix, uniqued against the doc.
+  // Suggested id: stem context + feature name + mode suffix, uniqued against
+  // the doc — a stem's feature is named just "energy", so without the stem
+  // prefix every stem's gate would suggest the same id.
   function suggestedId(): string {
-    const name = source.split(".").at(-1) ?? "derivation";
+    const parts = source.split(".");
+    let name = parts.at(-1) ?? "derivation";
+    if (parts[0] === "stems") {
+      const context =
+        parts[3] === "substems" ? `${parts[2]}_${parts[4]}` : parts[2];
+      if (!name.startsWith(context)) name = `${context}_${name}`;
+    }
     const base = `${name}_${mode === "events" ? "hits" : "gate"}`;
     const taken = new Set(mapping.doc?.derivations.map((d) => d.id));
     if (!taken.has(base)) return base;
@@ -128,8 +137,10 @@
       ? `${parts[1]}::${parts[2]}::${parts[4]}`
       : `${parts[1]}::${parts[2]}`;
   });
+  // Soloed = the stem is the audible source, playing or paused; the button
+  // toggles the source only and never starts/stops playback.
   const soloed = $derived(
-    audioKey !== null && transport.playing && transport.activeKey === audioKey,
+    audioKey !== null && transport.activeKey === audioKey,
   );
 
   // ── Live preview ────────────────────────────────────────────────────────
@@ -223,15 +234,15 @@
 
     {#if audioKey}
       <button
-        onclick={() => playToggle(audioKey)}
+        onclick={() => (soloed ? backToMix() : soloSource(audioKey))}
         title={soloed
-          ? "Pause"
-          : "Solo the audio to this stem (the transport bar returns to the mix)"}
+          ? "Switch the audio back to the full mix"
+          : "Solo the audio to this stem"}
         class="rounded-md border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-raised {soloed
           ? 'bg-accent text-surface hover:bg-accent'
           : ''}"
       >
-        {soloed ? "Pause" : "♪ Solo stem"}
+        {soloed ? "♪ Soloed — back to mix" : "♪ Solo stem"}
       </button>
     {/if}
 

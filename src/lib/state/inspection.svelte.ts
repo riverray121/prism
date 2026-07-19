@@ -79,6 +79,12 @@ export function backToMix(): void {
   switchSource("mix", pathForKey("mix"));
 }
 
+// Switch the audible source to a stem without toggling play/pause — the solo
+// affordances' half of the toggle (backToMix is the other half).
+export function soloSource(key: string): void {
+  switchSource(key, pathForKey(key));
+}
+
 // Resolve a relative sidecar path (heatmap/tags .npy) to its absolute path.
 // Call sites gate on songDir being set.
 export function sidecarPath(rel: string): string {
