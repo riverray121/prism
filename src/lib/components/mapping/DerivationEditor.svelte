@@ -9,7 +9,11 @@
     resolveFeature,
     sourceLabel,
   } from "$lib/mapping/sources";
-  import { getRawProfile, inspection } from "$lib/state/inspection.svelte";
+  import {
+    getRawProfile,
+    inspection,
+    playToggle,
+  } from "$lib/state/inspection.svelte";
   import {
     addDerivation,
     audition,
@@ -115,6 +119,19 @@
     mappingUi.editingDerivation = id;
   }
 
+  // Audio key for a stem source ("engine::stem[::substem]"), so the audible
+  // track can be soloed to what's being thresholded — same keys as Analysis.
+  const audioKey = $derived.by(() => {
+    const parts = source.split(".");
+    if (parts[0] !== "stems") return null;
+    return parts[3] === "substems"
+      ? `${parts[1]}::${parts[2]}::${parts[4]}`
+      : `${parts[1]}::${parts[2]}`;
+  });
+  const soloed = $derived(
+    audioKey !== null && transport.playing && transport.activeKey === audioKey,
+  );
+
   // ── Live preview ────────────────────────────────────────────────────────
 
   // Envelope data comes from the raw profile: the slider re-derives over the
@@ -203,6 +220,20 @@
         {/if}
       </select>
     </label>
+
+    {#if audioKey}
+      <button
+        onclick={() => playToggle(audioKey)}
+        title={soloed
+          ? "Pause"
+          : "Solo the audio to this stem (the transport bar returns to the mix)"}
+        class="rounded-md border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-raised {soloed
+          ? 'bg-accent text-surface hover:bg-accent'
+          : ''}"
+      >
+        {soloed ? "Pause" : "♪ Solo stem"}
+      </button>
+    {/if}
 
     <div class="flex items-center gap-1" role="group" aria-label="Mode">
       {#each ["segments", "events"] as const as m (m)}
