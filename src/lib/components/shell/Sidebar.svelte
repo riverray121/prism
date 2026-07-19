@@ -28,46 +28,50 @@
     ? 'w-[32rem]'
     : 'w-10'}"
 >
+  <!-- The toggle occupies the same slot in both states — leftmost in a
+       header-height row — so collapsing/expanding never moves it. -->
   {#if workspace.sidebarExpanded}
     <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div class="flex h-bar shrink-0 items-center justify-between px-3">
-        <span class="text-base font-semibold">Library</span>
+      <div class="flex h-bar shrink-0 items-center gap-2 px-1">
         <button
           onclick={toggleSidebar}
           title="Collapse the library sidebar"
-          class="rounded px-3 py-1.5 text-xl leading-none text-ink-muted hover:bg-raised hover:text-ink"
+          class="rounded px-2 py-1.5 text-xl leading-none text-ink-muted hover:bg-raised hover:text-ink"
         >
           «
         </button>
+        <span class="text-base font-semibold">Library</span>
       </div>
       <div class="flex flex-col gap-6 px-3 pb-6">
         <LibraryPanel />
       </div>
     </div>
   {:else}
-    <div class="flex flex-1 flex-col items-center pt-2">
+    <div class="flex flex-1 flex-col">
       <Tooltip.Provider delayDuration={300}>
-        <Tooltip.Root>
-          <Tooltip.Trigger
-            onclick={toggleSidebar}
-            title="Expand the library sidebar"
-            class="rounded px-2.5 py-1.5 text-xl text-ink-muted hover:bg-raised hover:text-ink"
-          >
-            »
-          </Tooltip.Trigger>
-          <Tooltip.Portal>
-            <Tooltip.Content
-              side="right"
-              sideOffset={6}
-              class="rounded border border-edge bg-raised px-2 py-1 text-xs text-ink"
+        <div class="flex h-bar shrink-0 items-center px-1">
+          <Tooltip.Root>
+            <Tooltip.Trigger
+              onclick={toggleSidebar}
+              title="Expand the library sidebar"
+              class="rounded px-2 py-1.5 text-xl leading-none text-ink-muted hover:bg-raised hover:text-ink"
             >
-              Expand library
-            </Tooltip.Content>
-          </Tooltip.Portal>
-        </Tooltip.Root>
+              »
+            </Tooltip.Trigger>
+            <Tooltip.Portal>
+              <Tooltip.Content
+                side="right"
+                sideOffset={6}
+                class="rounded border border-edge bg-raised px-2 py-1 text-xs text-ink"
+              >
+                Expand library
+              </Tooltip.Content>
+            </Tooltip.Portal>
+          </Tooltip.Root>
+        </div>
 
         <!-- One ring per queued/analyzing song; queued shows a static arc. -->
-        <div class="mt-3 flex flex-col items-center gap-2">
+        <div class="mt-1 flex flex-col items-center gap-2">
           {#each inFlight as song (song.id)}
             <Tooltip.Root>
               <Tooltip.Trigger
