@@ -233,17 +233,29 @@
     </label>
 
     {#if audioKey}
-      <button
-        onclick={() => (soloed ? backToMix() : soloSource(audioKey))}
-        title={soloed
-          ? "Switch the audio back to the full mix"
-          : "Solo the audio to this stem"}
-        class="rounded-md border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-raised {soloed
-          ? 'bg-accent text-surface hover:bg-accent'
-          : ''}"
+      <label
+        title="Audio follows this stem while on; off = the full mix"
+        class="flex cursor-pointer select-none items-center gap-2 text-xs text-ink-muted hover:text-ink"
       >
-        {soloed ? "♪ Soloed — back to mix" : "♪ Solo stem"}
-      </button>
+        <input
+          type="checkbox"
+          checked={soloed}
+          onchange={() => (soloed ? backToMix() : soloSource(audioKey))}
+          class="sr-only"
+        />
+        <span
+          class="relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors {soloed
+            ? 'bg-accent'
+            : 'bg-edge'}"
+        >
+          <span
+            class="absolute h-3 w-3 rounded-full bg-surface transition-transform {soloed
+              ? 'translate-x-[1.125rem]'
+              : 'translate-x-0.5'}"
+          ></span>
+        </span>
+        Solo stem
+      </label>
     {/if}
 
     <div class="flex items-center gap-1" role="group" aria-label="Mode">

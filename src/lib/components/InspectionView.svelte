@@ -312,12 +312,24 @@
   {:else}
     <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-32 pt-3">
       <div class="flex w-full flex-col gap-1">
-        <input
-          bind:value={query}
-          placeholder="Search features…"
-          title="Filter features by name, category, engine, or stem"
-          class="mb-2 w-72 rounded border border-edge bg-app px-2 py-1.5 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
-        />
+        <div class="mb-2 flex items-center gap-3">
+          <input
+            bind:value={query}
+            placeholder="Search features…"
+            title="Filter features by name, category, engine, or stem"
+            class="w-72 rounded border border-edge bg-app px-2 py-1.5 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
+          />
+          <!-- The mix's own play control, shown while a stem is soloed — the
+               way back to the full song. -->
+          {#if transport.activeKey !== "mix"}
+            <button
+              onclick={() => playToggle("mix")}
+              class="rounded-md border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-raised"
+            >
+              ♪ Play mix
+            </button>
+          {/if}
+        </div>
         <!-- Scalars: one value each, a labeled grid. -->
         {#if scalars.length > 0 && (q === "" || scalars.some( ([n]) => matches(n), ))}
           <Group

@@ -1,11 +1,7 @@
 <script lang="ts">
   import { formatTime } from "$lib/format";
   import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
-  import {
-    backToMix,
-    inspection,
-    playToggle,
-  } from "$lib/state/inspection.svelte";
+  import { inspection, playToggle } from "$lib/state/inspection.svelte";
   import {
     scrub,
     scrubEnd,
@@ -81,16 +77,6 @@
     >
       Reset zoom
     </button>
-
-    {#if transport.activeKey !== "mix"}
-      <button
-        onclick={backToMix}
-        title="Switch the audible source back to the original mix"
-        class="shrink-0 rounded border border-edge px-2 py-1 text-sm text-ink-muted hover:text-ink"
-      >
-        ♪ {transport.activeKey.split("::").at(-1)} → mix
-      </button>
-    {/if}
 
     {#if transport.error}
       <span class="truncate text-sm text-danger" title={transport.error}>
