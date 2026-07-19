@@ -224,13 +224,12 @@
     );
   }
 
-  // A lane inside a display:none ancestor (the kept-mounted hidden tab).
-  // Drawing there is pure waste — playhead ticks and zooms across dozens of
-  // hidden lanes are what make visible zooming lag — so redraw paths bail;
-  // the ResizeObserver catches the un-hide and repaints.
-  function isHidden(): boolean {
-    return !container || container.offsetParent === null;
-  }
+  // Whether the lane sits under a display:none ancestor (the kept-mounted
+  // hidden tab). Drawing there is pure waste, so redraw paths bail — but the
+  // flag is CACHED and only updated by the ResizeObserver: querying layout
+  // (offsetParent/clientWidth) inside the per-tick effects forces a reflow
+  // per lane per frame, which lags every visible graph.
+  let hiddenLane = false;
 
   // Create the chart once per dataset, tear down on change. options() is
   // untracked so a renderer handing over a new draw closure (fresh content)
@@ -240,11 +239,14 @@
     chart = new uPlot(untrack(options), data, container);
     attachInteractions(chart);
     untrack(applyWindow);
+    hiddenLane = container.clientWidth === 0; // one layout read, at mount only
     const ro = new ResizeObserver(() => {
-      if (!chart) return;
-      chart.setSize({ width: container.clientWidth, height });
-      // Un-hidden lanes resize from 0: catch up on the window (and playhead)
-      // changes they skipped while hidden.
+      const width = container.clientWidth; // safe here: RO fires post-layout
+      hiddenLane = width === 0;
+      if (hiddenLane || !chart) return;
+      chart.setSize({ width, height });
+      // An un-hidden lane resizes from 0: catch up on the window (and
+      // playhead) changes it skipped while hidden.
       untrack(applyWindow);
     });
     ro.observe(container);
@@ -261,20 +263,21 @@
   // arrives here as a new function.
   $effect(() => {
     draw;
+    if (hiddenLane) return; // the un-hide resize repaints with current draw
     chart?.redraw(false);
   });
 
   // Window prop changes rescale in place (setScale redraws).
   $effect(() => {
     win;
-    if (isHidden()) return;
+    if (hiddenLane) return;
     applyWindow();
   });
 
   // On each playhead move: track it (the emitted window redraws), else redraw.
   $effect(() => {
     playheadSec;
-    if (!chart || isHidden()) return;
+    if (!chart || hiddenLane) return;
     if (!trackPlayhead()) chart.redraw(false);
   });
 </script>
