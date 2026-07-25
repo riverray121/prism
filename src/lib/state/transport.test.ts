@@ -13,7 +13,7 @@ import {
   setRate,
   setViewWindow,
   switchSource,
-  toggleFollowMode,
+  setFollowMode,
   toggleSource,
   transport,
   view,
@@ -108,11 +108,11 @@ describe("shared view window", () => {
     expect(view.window).toBe(cleared);
   });
 
-  it("toggleFollowMode flips between center and page", () => {
+  it("setFollowMode selects center or page", () => {
     expect(view.followMode).toBe("center");
-    toggleFollowMode();
+    setFollowMode("page");
     expect(view.followMode).toBe("page");
-    toggleFollowMode();
+    setFollowMode("center");
     expect(view.followMode).toBe("center");
   });
 

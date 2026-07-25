@@ -23,21 +23,24 @@ export const TABS: { id: Tab; label: string; blurb: string }[] = [
   },
 ];
 
-// Drag-resize bounds for the expanded library sidebar (px).
-export const SIDEBAR_MIN_WIDTH = 240;
-export const SIDEBAR_MAX_WIDTH = 800;
+// Drag-resize bounds shared by the left-docked panels (px).
+export const PANEL_MIN_WIDTH = 240;
+export const PANEL_MAX_WIDTH = 800;
 
 // `tab` is the primary pane; `splitTab` non-null puts a second tab beside it.
+// Panel widths live here so they survive tab switches and collapses.
 export const workspace = $state<{
   tab: Tab;
   splitTab: Tab | null;
   sidebarExpanded: boolean;
   sidebarWidth: number;
+  mappingPanelWidth: number;
 }>({
   tab: "analysis",
   splitTab: null,
   sidebarExpanded: false,
   sidebarWidth: 384,
+  mappingPanelWidth: 288,
 });
 
 export function setTab(tab: Tab): void {
@@ -68,11 +71,4 @@ export function fullscreenPane(pane: "primary" | "split"): void {
 
 export function toggleSidebar(): void {
   workspace.sidebarExpanded = !workspace.sidebarExpanded;
-}
-
-export function setSidebarWidth(px: number): void {
-  workspace.sidebarWidth = Math.min(
-    SIDEBAR_MAX_WIDTH,
-    Math.max(SIDEBAR_MIN_WIDTH, px),
-  );
 }

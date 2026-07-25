@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatTime } from "./format";
+import { formatTime, humanize } from "./format";
 
 describe("formatTime", () => {
   it("formats zero and sub-minute values", () => {
@@ -17,5 +17,20 @@ describe("formatTime", () => {
 
   it("floors fractional seconds (a clock never rounds up)", () => {
     expect(formatTime(59.9)).toBe("0:59");
+  });
+});
+
+describe("humanize", () => {
+  it("sentence-cases snake_case identifiers", () => {
+    expect(humanize("color_temp")).toBe("Color temp");
+    expect(humanize("strobe_rate")).toBe("Strobe rate");
+    expect(humanize("auto_mix")).toBe("Auto mix");
+    expect(humanize("saturation")).toBe("Saturation");
+  });
+
+  it("keeps acronyms in canonical casing", () => {
+    expect(humanize("rms")).toBe("RMS");
+    expect(humanize("loudness_lufs")).toBe("Loudness LUFS");
+    expect(humanize("bpm")).toBe("BPM");
   });
 });

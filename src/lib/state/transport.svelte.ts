@@ -60,8 +60,8 @@ export function setViewWindow(win: Win | null): void {
   view.window = win;
 }
 
-export function toggleFollowMode(): void {
-  view.followMode = view.followMode === "center" ? "page" : "center";
+export function setFollowMode(mode: FollowMode): void {
+  view.followMode = mode;
 }
 
 let ctx: AudioContext | undefined;
