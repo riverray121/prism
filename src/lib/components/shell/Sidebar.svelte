@@ -4,7 +4,11 @@
   import LibraryPanel from "$lib/components/LibraryPanel.svelte";
   import ProgressRing from "$lib/components/shell/ProgressRing.svelte";
   import { library } from "$lib/state/library.svelte";
-  import { toggleSidebar, workspace } from "$lib/state/workspace.svelte";
+  import {
+    setSidebarWidth,
+    toggleSidebar,
+    workspace,
+  } from "$lib/state/workspace.svelte";
 
   // Songs with analysis in flight — the collapsed rail keeps them glanceable.
   const inFlight = $derived(
@@ -21,12 +25,33 @@
       ? song.current_step / song.total_steps
       : null;
   }
+
+  // Edge-drag resize. Pointer capture keeps the drag alive when the cursor
+  // leaves the thin handle; the sidebar sits at x=0, so clientX is the width.
+  let resizing = $state(false);
+
+  function startResize(e: PointerEvent): void {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    resizing = true;
+  }
+
+  function moveResize(e: PointerEvent): void {
+    if (resizing) setSidebarWidth(e.clientX);
+  }
+
+  function endResize(): void {
+    resizing = false;
+  }
 </script>
 
 <aside
-  class="flex shrink-0 border-r border-edge bg-surface {workspace.sidebarExpanded
-    ? 'w-[32rem]'
+  class="relative flex shrink-0 border-r border-edge bg-surface {workspace.sidebarExpanded
+    ? ''
     : 'w-10'}"
+  style={workspace.sidebarExpanded
+    ? `width: ${workspace.sidebarWidth}px`
+    : undefined}
 >
   <!-- The toggle occupies the same slot in both states — leftmost in a
        header-height row — so collapsing/expanding never moves it. -->
@@ -93,5 +118,21 @@
         </div>
       </Tooltip.Provider>
     </div>
+  {/if}
+
+  {#if workspace.sidebarExpanded}
+    <!-- Drag handle straddling the right border; wider hit area than the 1px
+         edge it visually is, highlighted while hovered or dragging. -->
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      onpointerdown={startResize}
+      onpointermove={moveResize}
+      onpointerup={endResize}
+      onpointercancel={endResize}
+      class="absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none {resizing
+        ? 'bg-accent/40'
+        : 'hover:bg-accent/25'}"
+    ></div>
   {/if}
 </aside>
