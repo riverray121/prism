@@ -93,6 +93,8 @@ class Song(BaseModel):
     # the separation backends expose no intra-step progress).
     current_step: int | None = None
     total_steps: int | None = None
+    # Whole-analysis fraction (0..1), monotonic across stages; null unless analyzing.
+    progress: float | None = None
     # Populated when status='failed'; shown in the library with a retry action.
     error_message: str | None = None
 

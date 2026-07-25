@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS songs (
     current_engine         TEXT,
     current_step           INTEGER,
     total_steps            INTEGER,
+    progress               REAL,
     analyzed_at            TEXT,
     error_message          TEXT
 );
@@ -49,12 +50,14 @@ _ADDED_COLUMNS = {
     "current_engine": "TEXT",
     "current_step": "INTEGER",
     "total_steps": "INTEGER",
+    "progress": "REAL",
 }
 
 # Nulls every in-progress column. Shared by the terminal transitions so adding a
 # progress column can't leave a stale value at one site.
 _CLEAR_PROGRESS = (
-    "current_stage=NULL, current_engine=NULL, current_step=NULL, total_steps=NULL"
+    "current_stage=NULL, current_engine=NULL, current_step=NULL, total_steps=NULL, "
+    "progress=NULL"
 )
 
 
@@ -120,7 +123,7 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
         """
         SELECT id, title, artist, duration_sec, sample_rate, source_path,
                status, imported_at, analyzed_at, current_stage, current_engine,
-               current_step, total_steps, error_message
+               current_step, total_steps, progress, error_message
         FROM songs
         ORDER BY imported_at
         """
@@ -193,21 +196,24 @@ def mark_stage(
     engine: str | None = None,
     step: int | None = None,
     total: int | None = None,
+    progress: float | None = None,
 ) -> None:
-    """Record the worker's current stage, engine, and discrete step (k of total).
+    """Record the worker's current stage, engine, discrete step, and overall progress.
 
-    The snapshot reads these so the UI stays a pure function of song rows. Progress
-    is reported as a step count (engine k of total), not a percentage — the
-    separation backends expose no intra-step progress. ``engine``/``step``/``total``
-    are None for non-separation stages (e.g. dsp-mix).
+    The snapshot reads these so the UI stays a pure function of song rows. ``step``
+    of ``total`` counts within the current stage (the separation backends expose no
+    intra-step progress); ``progress`` is the worker's whole-analysis fraction
+    (0..1), monotonic across stages. ``engine``/``step``/``total`` are None for
+    non-separation stages (e.g. dsp-mix).
     """
     con.execute(
         """
         UPDATE songs
-        SET current_stage=?, current_engine=?, current_step=?, total_steps=?
+        SET current_stage=?, current_engine=?, current_step=?, total_steps=?,
+            progress=?
         WHERE id=?
         """,
-        (stage, engine, step, total, song_id),
+        (stage, engine, step, total, progress, song_id),
     )
 
 

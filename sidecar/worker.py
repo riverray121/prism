@@ -55,6 +55,12 @@ N_FFT = 2048
 # Number of dsp-mix progress checkpoints (see _analyze's on_step calls).
 MIX_STEPS = 8
 
+# Whole-analysis progress weights: the mix DSP pass is short next to separation,
+# and within an engine separation dominates the per-stem feature pass. Coarse
+# wall-clock guesses — only monotonicity matters for the UI.
+MIX_WEIGHT = 0.15
+ENGINE_SEP_FRAC = 0.6
+
 
 def _analyze(
     y: np.ndarray,
@@ -193,10 +199,19 @@ def _set_stage(
     engine: str | None = None,
     step: int | None = None,
     total: int | None = None,
+    progress: float | None = None,
 ) -> None:
-    """Record the worker's current stage (+ engine step k/total) and push a snapshot."""
+    """Record the worker's current stage (+ step and overall fraction); push a snapshot."""
     with library.connect() as con:
-        library.mark_stage(con, song_id, stage, engine=engine, step=step, total=total)
+        library.mark_stage(
+            con,
+            song_id,
+            stage,
+            engine=engine,
+            step=step,
+            total=total,
+            progress=progress,
+        )
     on_change()
 
 
@@ -252,9 +267,19 @@ def _separate_and_analyze_stems(
     total = len(engines)
     result: dict[str, dict] = {}
 
+    # Each engine owns an equal share of the post-mix progress span; separation
+    # takes the leading ENGINE_SEP_FRAC of that share, the stem pass the rest.
+    engine_share = (1.0 - MIX_WEIGHT) / total if total else 0.0
+
     for i, engine in enumerate(engines):
         _set_stage(
-            song_id, "separate", on_change, engine=engine, step=i + 1, total=total
+            song_id,
+            "separate",
+            on_change,
+            engine=engine,
+            step=i + 1,
+            total=total,
+            progress=MIX_WEIGHT + engine_share * i,
         )
         stem_paths = separation.separate(audio_path, stems_root / engine, engine)
 
@@ -269,6 +294,9 @@ def _separate_and_analyze_stems(
                 engine=f"{engine} · {stem_name}",
                 step=j + 1,
                 total=len(stem_paths),
+                progress=MIX_WEIGHT
+                + engine_share
+                * (i + ENGINE_SEP_FRAC + (1 - ENGINE_SEP_FRAC) * j / len(stem_paths)),
             )
             entry = _stem_entry(
                 song_id,
@@ -283,6 +311,7 @@ def _separate_and_analyze_stems(
             # Second stage: split the drums stem into kick/snare/etc. Shown as a
             # distinct transient, then dsp-stem is restored for the remaining stems.
             if drum_subsep and stem_name == "drums":
+                # Sub-separation rides inside the drums stem's progress slot.
                 _set_stage(
                     song_id,
                     "drum-subsep",
@@ -290,6 +319,13 @@ def _separate_and_analyze_stems(
                     engine=engine,
                     step=i + 1,
                     total=total,
+                    progress=MIX_WEIGHT
+                    + engine_share
+                    * (
+                        i
+                        + ENGINE_SEP_FRAC
+                        + (1 - ENGINE_SEP_FRAC) * (j + 0.5) / len(stem_paths)
+                    ),
                 )
                 sub_dir = stems_root / engine / "drums"
                 sub_paths = separation.separate_drums(path, sub_dir)
@@ -328,13 +364,18 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
 
         # Stage: mix-level DSP. Heatmap payloads go to .npy sidecars; only their
         # envelopes sit in the profile.
-        _set_stage(song_id, "dsp-mix", on_change, step=0, total=MIX_STEPS)
+        _set_stage(song_id, "dsp-mix", on_change, step=0, total=MIX_STEPS, progress=0.0)
         frame_rate_hz, frame_count, mix, heatmaps = _analyze(
             y,
             y_stereo,
             sr,
             on_step=lambda k: _set_stage(
-                song_id, "dsp-mix", on_change, step=k, total=MIX_STEPS
+                song_id,
+                "dsp-mix",
+                on_change,
+                step=k,
+                total=MIX_STEPS,
+                progress=MIX_WEIGHT * k / MIX_STEPS,
             ),
         )
         for name, matrix in heatmaps.items():

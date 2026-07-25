@@ -56,6 +56,7 @@ const song: Song = {
   current_engine: null,
   current_step: null,
   total_steps: null,
+  progress: null,
   error_message: null,
 };
 
