@@ -12,6 +12,7 @@
     maxTimeSec,
     color = "#6366f1",
     height = 64,
+    gutter = false,
     playheadSec = null,
     follow = false,
     window: win = null,
@@ -26,6 +27,7 @@
     maxTimeSec: number; // full time extent, from the timeline (events alone don't define it)
     color?: string;
     height?: number;
+    gutter?: boolean;
     playheadSec?: number | null;
     follow?: boolean;
     window?: Win | null;
@@ -102,6 +104,7 @@
   series={[{}, { show: false }]}
   yRange={[0, 1]}
   showYAxis={false}
+  {gutter}
   draw={drawTicks}
   maxTimeSec={maxTimeSec > 0 ? maxTimeSec : 1}
   {height}

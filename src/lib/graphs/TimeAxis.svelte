@@ -31,6 +31,7 @@
     yRange = null,
     showYAxis = true,
     showXAxis = true,
+    gutter = false,
     draw = null,
     playheadSec = null,
     follow = false,
@@ -48,6 +49,9 @@
     yRange?: [number, number] | null; // fixed y scale (renderers that self-draw)
     showYAxis?: boolean;
     showXAxis?: boolean; // off for sub-lanes that ride under a parent lane
+    // Reserve the y-axis gutter even with the axis hidden, so this lane's plot
+    // area (and playhead) lines up with y-axised lanes in the same column.
+    gutter?: boolean;
     draw?: ((u: uPlot) => void) | null; // renderer pass, drawn under the playhead
     playheadSec?: number | null;
     follow?: boolean; // smooth-center the view on the playhead (while playing)
@@ -150,6 +154,11 @@
     return {
       width: container.clientWidth,
       height,
+      // Fixed horizontal padding on every lane. uPlot's default auto-padding
+      // depends on which axes a lane shows (e.g. +25px right only with a
+      // bottom axis), which skews plot widths — and playhead x positions —
+      // between stacked lanes. Vertical stays auto (no alignment impact).
+      padding: [null, 25, null, 0],
       scales: {
         x: { time: false },
         ...(yRange ? { y: { range: yRange } } : {}),
@@ -158,7 +167,19 @@
       cursor: { drag: { x: false, y: false } },
       axes: [
         showXAxis ? { stroke: "#888", grid, font } : { show: false },
-        showYAxis ? { stroke: "#888", grid, font } : { show: false },
+        showYAxis
+          ? { stroke: "#888", grid, font }
+          : gutter
+            ? // Invisible axis at uPlot's default size: same plot width as a
+              // labeled lane, no marks.
+              {
+                stroke: "transparent",
+                grid: { show: false },
+                ticks: { show: false },
+                font,
+                values: (_u: uPlot, splits: number[]) => splits.map(() => ""),
+              }
+            : { show: false },
       ],
       series,
       legend: { show: false },

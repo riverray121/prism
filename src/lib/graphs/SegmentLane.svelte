@@ -10,6 +10,7 @@
     segments,
     maxTimeSec,
     height = 64,
+    gutter = false,
     playheadSec = null,
     follow = false,
     window: win = null,
@@ -22,6 +23,7 @@
     segments: SegmentFeature["segments"];
     maxTimeSec: number; // full time extent, from the timeline
     height?: number;
+    gutter?: boolean;
     playheadSec?: number | null;
     follow?: boolean;
     window?: Win | null;
@@ -124,6 +126,7 @@
   series={[{}, { show: false }]}
   yRange={[0, 1]}
   showYAxis={false}
+  {gutter}
   draw={drawBands}
   maxTimeSec={maxTimeSec > 0 ? maxTimeSec : 1}
   {height}

@@ -12,6 +12,7 @@
     maxTimeSec,
     color = "#6366f1",
     height = 28,
+    gutter = false,
     playheadSec = null,
     follow = false,
     window: win = null,
@@ -25,6 +26,7 @@
     maxTimeSec: number;
     color?: string;
     height?: number;
+    gutter?: boolean;
     playheadSec?: number | null;
     follow?: boolean;
     window?: Win | null;
@@ -59,14 +61,17 @@
       ctx.lineTo(u.bbox.left + u.bbox.width, mid);
       ctx.stroke();
       // One dot per onset; opacity and radius both track strength so hard
-      // hits read clearly darker and bigger than weak ones.
+      // hits read clearly darker and bigger than weak ones. Radii scale with
+      // lane height so a taller lane gets proportionally bigger dots.
+      const rMin = height * 0.055 * dpr;
+      const rSpan = height * 0.07 * dpr;
       ctx.fillStyle = color;
       for (const onset of list) {
         if (onset.t < min || onset.t > max) continue;
         const x = u.valToPos(onset.t, "x", true);
         ctx.globalAlpha = 0.12 + 0.88 * onset.strength;
         ctx.beginPath();
-        ctx.arc(x, mid, (1.5 + 2 * onset.strength) * dpr, 0, Math.PI * 2);
+        ctx.arc(x, mid, rMin + rSpan * onset.strength, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
@@ -80,6 +85,7 @@
   yRange={[0, 1]}
   showYAxis={false}
   showXAxis={false}
+  {gutter}
   draw={drawDots}
   maxTimeSec={maxTimeSec > 0 ? maxTimeSec : 1}
   {height}

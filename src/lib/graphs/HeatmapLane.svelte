@@ -13,6 +13,7 @@
     frameRateHz,
     height = 160,
     normalize = "per-row",
+    gutter = false,
     playheadSec = null,
     follow = false,
     window: win = null,
@@ -28,6 +29,7 @@
     // per-row: each row scaled to its own range (mfcc/chroma, mixed scales).
     // global: one range for the whole matrix (spectrogram dB — preserves loudness).
     normalize?: "per-row" | "global";
+    gutter?: boolean;
     playheadSec?: number | null;
     follow?: boolean;
     window?: Win | null;
@@ -110,6 +112,7 @@
     series={[{}, { show: false }]}
     yRange={[0, 1]}
     showYAxis={false}
+    {gutter}
     draw={drawHeatmap}
     {maxTimeSec}
     {height}
