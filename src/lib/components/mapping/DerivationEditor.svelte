@@ -1,10 +1,14 @@
 <script lang="ts">
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import EditableName from "$lib/components/EditableName.svelte";
+  import Segmented from "$lib/components/shell/Segmented.svelte";
   import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
   import OnsetDots from "$lib/graphs/OnsetDots.svelte";
   import SegmentLane from "$lib/graphs/SegmentLane.svelte";
   import { deriveEvents, deriveSegments } from "$lib/mapping/derive";
   import { GATE_PULSE_SEC } from "$lib/mapping/evaluate";
   import {
+    derivationLabel,
     favoriteSources,
     resolveFeature,
     sourceLabel,
@@ -21,6 +25,7 @@
     mapping,
     mappingUi,
     removeDerivation,
+    renameDerivation,
     updateDerivation,
   } from "$lib/state/mapping.svelte";
   import {
@@ -132,6 +137,9 @@
     mappingUi.editingDerivation = id;
   }
 
+  // Deleting asks first (cancelable) — a derivation is hand-tuned work.
+  let confirmingDelete = $state(false);
+
   // Audio key for a stem source ("engine::stem[::substem]"), so the audible
   // track can be soloed to what's being thresholded — same keys as Analysis.
   const audioKey = $derived.by(() => {
@@ -231,12 +239,18 @@
 
 <div class="flex flex-col gap-3">
   <div class="flex items-center gap-3">
-    <p class="text-base font-medium">
-      {isNew ? "New derivation" : (existing?.id ?? "")}
-    </p>
+    {#if isNew}
+      <p class="text-base font-medium">New derivation</p>
+    {:else if existing}
+      <EditableName
+        value={derivationLabel(existing)}
+        title="Rename this derivation"
+        onrename={(name) => renameDerivation(existing.id, name)}
+      />
+    {/if}
     {#if !isNew && existing}
       <button
-        onclick={() => removeDerivation(existing.id)}
+        onclick={() => (confirmingDelete = true)}
         title="Delete this derivation (programs referencing it are muted)"
         class="ml-auto rounded border border-edge px-2 py-0.5 text-xs text-danger hover:bg-danger hover:text-surface"
       >
@@ -244,14 +258,25 @@
       </button>
     {/if}
   </div>
+  {#if confirmingDelete && existing}
+    <ConfirmDialog
+      title={`Delete "${derivationLabel(existing)}"?`}
+      body="Removes this derivation from the mapping. Programs referencing it are muted until rebound."
+      onconfirm={() => removeDerivation(existing.id)}
+      onclose={() => (confirmingDelete = false)}
+    />
+  {/if}
 
-  <div class="flex flex-wrap items-center gap-4 text-sm">
-    <label class="flex items-center gap-2">
-      <span class="text-ink-muted">Source</span>
+  <!-- Controls: one labeled row each (transport-style), so the column of
+       labels reads as a settings list. Cutoff/ceiling bound the considered
+       band — the dots echo their guide-line colors on the source lane. -->
+  <div class="flex max-w-xl flex-col gap-2 text-sm">
+    <div class="flex h-7 items-center gap-3">
+      <span class="w-20 shrink-0 text-ink-muted">Source</span>
       <select
         value={source}
         onchange={(e) => setSource(e.currentTarget.value)}
-        class="rounded border border-edge bg-app px-1.5 py-1 focus:border-accent focus:outline-none"
+        class="min-w-0 flex-1 rounded border border-edge bg-app px-1.5 py-1 focus:border-accent focus:outline-none"
       >
         {#each continuousFavorites as fav (fav.path)}
           <option value={fav.path}>{sourceLabel(fav.path)}</option>
@@ -261,67 +286,59 @@
           <option value={source}>{sourceLabel(source)} (unstarred)</option>
         {/if}
       </select>
-    </label>
-
-    {#if audioKey}
-      <label
-        title="Audio follows this stem while on; off = the full mix"
-        class="flex cursor-pointer select-none items-center gap-2 text-xs text-ink-muted hover:text-ink"
-      >
-        <input
-          type="checkbox"
-          checked={soloed}
-          onchange={() => (soloed ? backToMix() : soloSource(audioKey))}
-          class="sr-only"
-        />
-        <span
-          class="relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors {soloed
-            ? 'bg-accent'
-            : 'bg-edge'}"
+      {#if audioKey}
+        <label
+          title="Audio follows this stem while on; off = the full mix"
+          class="flex cursor-pointer select-none items-center gap-2 text-xs text-ink-muted hover:text-ink"
         >
+          <input
+            type="checkbox"
+            checked={soloed}
+            onchange={() => (soloed ? backToMix() : soloSource(audioKey))}
+            class="sr-only"
+          />
           <span
-            class="absolute h-3 w-3 rounded-full bg-surface transition-transform {soloed
-              ? 'translate-x-[1.125rem]'
-              : 'translate-x-0.5'}"
-          ></span>
-        </span>
-        Solo stem
-      </label>
-    {/if}
-
-    <div class="flex items-center gap-1" role="group" aria-label="Mode">
-      {#each ["segments", "events"] as const as m (m)}
-        <button
-          onclick={() => patchThreshold({ mode: m })}
-          title={m === "events"
-            ? "Peak-pick: one event per distinct hit"
-            : "Hysteresis gate: on/off spans with duration"}
-          class="rounded border px-2 py-0.5 text-xs {mode === m
-            ? 'border-accent text-accent'
-            : 'border-edge text-ink-faint hover:text-ink'}"
-        >
-          {m}
-        </button>
-      {/each}
+            class="relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors {soloed
+              ? 'bg-accent'
+              : 'bg-edge'}"
+          >
+            <span
+              class="absolute h-3 w-3 rounded-full bg-surface transition-transform {soloed
+                ? 'translate-x-[1.125rem]'
+                : 'translate-x-0.5'}"
+            ></span>
+          </span>
+          Play this stem only
+        </label>
+      {/if}
     </div>
 
-    {#if isNew}
-      <button
-        onclick={create}
-        disabled={draft.source === ""}
-        class="rounded bg-accent px-3 py-1 text-sm font-medium text-surface hover:opacity-90 disabled:opacity-50"
-      >
-        Create “{suggestedId()}”
-      </button>
-    {/if}
-  </div>
+    <div class="flex h-7 items-center gap-3 text-xs">
+      <span class="w-20 shrink-0 text-sm text-ink-muted">Mode</span>
+      <Segmented
+        class="w-56"
+        options={[
+          {
+            label: "Segments",
+            active: mode === "segments",
+            onpick: () => patchThreshold({ mode: "segments" }),
+            title: "Hysteresis gate: on/off spans with duration",
+          },
+          {
+            label: "Events",
+            active: mode === "events",
+            onpick: () => patchThreshold({ mode: "events" }),
+            title: "Peak-pick: one event per distinct hit",
+          },
+        ]}
+      />
+    </div>
 
-  <!-- Threshold controls. Cutoff/ceiling bound the considered band (drawn as
-       guide lines on the source lane); sensitivity sets how big a swing
-       starts a new event/segment. -->
-  <div class="flex flex-wrap items-center gap-6 text-sm">
-    <label class="flex min-w-52 flex-1 items-center gap-2">
-      <span class="w-16 text-[#f59e0b]">Cutoff</span>
+    <div class="flex h-7 items-center gap-3">
+      <span class="flex w-20 shrink-0 items-center gap-1.5 text-ink-muted">
+        Cutoff
+        <span class="size-1.5 rounded-full bg-[#f59e0b]"></span>
+      </span>
       <input
         type="range"
         min="0.02"
@@ -337,9 +354,13 @@
       <span class="w-10 text-right tabular-nums text-ink-muted">
         {cutoff.toFixed(2)}
       </span>
-    </label>
-    <label class="flex min-w-52 flex-1 items-center gap-2">
-      <span class="w-16 text-[#ef4444]">Ceiling</span>
+    </div>
+
+    <div class="flex h-7 items-center gap-3">
+      <span class="flex w-20 shrink-0 items-center gap-1.5 text-ink-muted">
+        Ceiling
+        <span class="size-1.5 rounded-full bg-[#ef4444]"></span>
+      </span>
       <input
         type="range"
         min="0.05"
@@ -355,15 +376,16 @@
       <span class="w-10 text-right tabular-nums text-ink-muted">
         {maxBound.toFixed(2)}
       </span>
-    </label>
-    <label
-      class="flex min-w-52 flex-1 items-center gap-2"
+    </div>
+
+    <div
+      class="flex h-7 items-center gap-3"
       title="1 = every qualifying change counts; lower = only bigger swings start a new {mode ===
       'events'
         ? 'event'
         : 'segment'}"
     >
-      <span class="w-16 text-ink-muted">Sensitivity</span>
+      <span class="w-20 shrink-0 text-ink-muted">Sensitivity</span>
       <input
         type="range"
         min="0.05"
@@ -377,7 +399,20 @@
       <span class="w-10 text-right tabular-nums text-ink-muted">
         {sensitivity.toFixed(2)}
       </span>
-    </label>
+    </div>
+
+    {#if isNew}
+      <div class="flex h-9 items-center gap-3">
+        <span class="w-20 shrink-0"></span>
+        <button
+          onclick={create}
+          disabled={draft.source === ""}
+          class="rounded-md bg-accent px-5 py-1.5 text-sm font-medium text-surface hover:opacity-90 disabled:opacity-50"
+        >
+          Create
+        </button>
+      </div>
+    {/if}
   </div>
 
   {#if data}
@@ -434,8 +469,7 @@
     </div>
   {:else if source}
     <p class="text-sm text-danger">
-      Source “{source}” doesn't resolve to a continuous feature on this profile
-      — it may have been removed by a re-analysis.
+      Source unavailable — it may have been removed by re-analysis.
     </p>
   {/if}
 </div>

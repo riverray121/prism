@@ -28,7 +28,6 @@
       <div class="mt-4 flex justify-end gap-2">
         <button
           onclick={onclose}
-          title="Keep the song"
           class="rounded border border-edge px-3 py-1.5 text-sm text-ink-muted hover:text-ink"
         >
           Cancel

@@ -107,6 +107,8 @@ export type ChannelValue = z.infer<typeof ChannelValueSchema>;
 
 export const ProgramSchema = z.object({
   id: z.string().min(1),
+  // User-editable display name; absent falls back to the humanized id.
+  name: z.string().optional(),
   enabled: z.boolean().default(true),
   // partialRecord: a program binds only the channels it uses.
   channels: z.partialRecord(z.enum(CHANNELS), ChannelValueSchema).default({}),
@@ -120,6 +122,8 @@ export type Program = z.infer<typeof ProgramSchema>;
 // consumers, deleted only explicitly.
 export const DerivationSchema = z.object({
   id: z.string().min(1),
+  // User-editable display name; absent falls back to the humanized id.
+  name: z.string().optional(),
   source: z.string(),
   threshold: z.object({
     cutoff: z.number().min(0).max(1).default(0.4),

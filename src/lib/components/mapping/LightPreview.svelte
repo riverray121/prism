@@ -6,6 +6,7 @@
     litMask,
     type ProgramOutput,
   } from "$lib/mapping/evaluate";
+  import { programLabel } from "$lib/mapping/sources";
   import { inspection } from "$lib/state/inspection.svelte";
   import { audition, evaluation, mapping } from "$lib/state/mapping.svelte";
   import { transport } from "$lib/state/transport.svelte";
@@ -38,7 +39,7 @@
       if (output)
         out.push({
           id: p.id,
-          label: p.id,
+          label: programLabel(p),
           output,
           mask: litMask(output.gate, frameCount, frameRateHz),
         });

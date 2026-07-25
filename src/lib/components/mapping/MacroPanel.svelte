@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     favoriteSources,
+    programLabel,
     resolveFeature,
     sourceLabel,
   } from "$lib/mapping/sources";
@@ -100,14 +101,14 @@
           >
             <span class="w-24 truncate font-medium" title={label}>{label}</span>
             {#if scene}
-              {#each programIds as id (id)}
+              {#each doc?.programs ?? [] as p (p.id)}
                 <label class="flex items-center gap-1 text-xs">
                   <input
                     type="checkbox"
-                    checked={scene.programs.includes(id)}
-                    onchange={() => toggleSceneProgram(label, id)}
+                    checked={scene.programs.includes(p.id)}
+                    onchange={() => toggleSceneProgram(label, p.id)}
                   />
-                  {id}
+                  {programLabel(p)}
                 </label>
               {/each}
               <label class="flex items-center gap-1 text-xs">

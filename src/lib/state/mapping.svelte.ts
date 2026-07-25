@@ -172,6 +172,17 @@ export function updateDerivation(
   });
 }
 
+// Set a derivation's display name; empty clears back to the humanized id.
+export function renameDerivation(id: string, name: string): void {
+  touchDoc((doc) => {
+    const d = doc.derivations.find((x) => x.id === id);
+    if (!d) return;
+    const trimmed = name.trim();
+    if (trimmed === "") delete d.name;
+    else d.name = trimmed;
+  });
+}
+
 // Deleting a derivation is always explicit — nothing calls this implicitly
 // (removing a consuming program never cascades here).
 export function removeDerivation(id: string): void {
@@ -201,6 +212,17 @@ export function setProgramEnabled(id: string, enabled: boolean): void {
   touchDoc((doc) => {
     const p = doc.programs.find((x) => x.id === id);
     if (p) p.enabled = enabled;
+  });
+}
+
+// Set a program's display name; empty clears back to the humanized id.
+export function renameProgram(id: string, name: string): void {
+  touchDoc((doc) => {
+    const p = doc.programs.find((x) => x.id === id);
+    if (!p) return;
+    const trimmed = name.trim();
+    if (trimmed === "") delete p.name;
+    else p.name = trimmed;
   });
 }
 

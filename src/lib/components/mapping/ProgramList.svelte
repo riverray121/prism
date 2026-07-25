@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { programLabel } from "$lib/mapping/sources";
   import {
     addProgram,
     editProgram,
@@ -36,9 +37,7 @@
     </button>
   </div>
   {#if programs.length === 0}
-    <p class="text-sm text-ink-faint">
-      None yet. A program binds sources to the light's channels.
-    </p>
+    <p class="text-sm text-ink-faint">None</p>
   {:else}
     <ul class="flex flex-col gap-0.5">
       {#each programs as p (p.id)}
@@ -56,7 +55,7 @@
               ? 'bg-raised text-accent'
               : ''}"
           >
-            <span class="truncate">{p.id}</span>
+            <span class="truncate">{programLabel(p)}</span>
             <span class="shrink-0 text-xs text-ink-faint">
               {Object.keys(p.channels).length} ch
             </span>

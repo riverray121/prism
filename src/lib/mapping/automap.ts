@@ -14,6 +14,15 @@ export interface AutoMapProposal {
   scenes: Record<string, Scene>;
 }
 
+export interface AutoMapOptions {
+  // Brightness reference for energy → brightness bindings:
+  //  - "feature": each source normalizes to its own range, so every program
+  //    reaches full brightness at its own loudest moment.
+  //  - "song": stem sources anchor to the mix's matching feature range, so a
+  //    quiet stem stays proportionally dim within the song.
+  intensity: "feature" | "song";
+}
+
 // Binding choices by feature kind (see the mapping catalog): energy-like →
 // brightness (silent normalize+smooth default), onsets/beats → gate,
 // centroid-like → color_temp, a favorited heatmap → the pixel row.
@@ -38,9 +47,46 @@ function uniqueId(base: string, taken: Set<string>): string {
   return `${base}_${n}`;
 }
 
+// Brightness transform chain per the intensity option. "feature" leaves the
+// chain empty (the evaluator's silent normalize+smooth default, own range).
+// "song" pins normalize to the mix's energy range — the same-named mix
+// feature when present, else mix.rms (stem energy and mix rms share units) —
+// so a stem's brightness scales relative to the whole song.
+function brightnessChain(
+  profile: Profile,
+  path: string,
+  name: string,
+  intensity: AutoMapOptions["intensity"],
+): Program["channels"]["brightness"] {
+  if (intensity === "song") {
+    for (const ref of [`mix.${name}`, "mix.rms"]) {
+      if (ref === path) break; // the mix's own program: own range is the song
+      const mixFeature = resolveFeature(profile, ref);
+      if (mixFeature?.render !== "continuous" || mixFeature.data.length === 0)
+        continue;
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (const v of mixFeature.data) {
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      if (hi <= lo) continue;
+      return {
+        source: path,
+        transform: [
+          { normalize: { min: lo, max: hi, curve: "linear", gamma: 2 } },
+          { smooth: { window_s: 0.08 } },
+        ],
+      };
+    }
+  }
+  return { source: path, transform: [] };
+}
+
 export function autoMap(
   profile: Profile,
   existing: MappingDoc,
+  options: AutoMapOptions = { intensity: "feature" },
 ): AutoMapProposal {
   const proposal: AutoMapProposal = {
     programs: [],
@@ -64,9 +110,13 @@ export function autoMap(
     };
     if (feature.render === "continuous" && ENERGY_RE.test(name)) {
       const channels = group();
-      // Empty transform chain: the evaluator's silent normalize+smooth default.
       if (!channels.brightness)
-        channels.brightness = { source: path, transform: [] };
+        channels.brightness = brightnessChain(
+          profile,
+          path,
+          name,
+          options.intensity,
+        );
     } else if (feature.render === "event" && GATE_RE.test(name)) {
       const channels = group();
       if (!channels.gate) channels.gate = { source: path, transform: [] };

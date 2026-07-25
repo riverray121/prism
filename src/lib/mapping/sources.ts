@@ -1,3 +1,4 @@
+import { humanize } from "$lib/format";
 import type { MixFeature, Profile } from "$lib/ipc/messages";
 
 // Dot-path resolution over the profile — the favorites addressing, shared by
@@ -41,19 +42,27 @@ export function favoriteSources(profile: Profile): FavoriteSource[] {
   return out;
 }
 
-// Short human label for a source path: feature name plus its context.
-// "mix.rms" → "rms (mix)"; "stems.eng.drums.features.drums_energy" →
-// "drums_energy (eng · drums)"; substems add their name to the context.
+// Display name for a program or derivation: the user-set name, else the
+// humanized id.
+export function programLabel(p: { id: string; name?: string }): string {
+  return p.name ?? humanize(p.id);
+}
+export const derivationLabel = programLabel;
+
+// Short human label for a source path: humanized feature name plus its
+// context. "mix.rms" → "RMS (mix)"; "stems.eng.drums.features.drums_energy" →
+// "Drums energy (eng · drums)"; substems add their name to the context.
 export function sourceLabel(path: string): string {
   const parts = path.split(".");
-  if (parts[0] === "mix") return `${parts.slice(1).join(".")} (mix)`;
+  if (parts[0] === "mix") return `${humanize(parts.slice(1).join("."))} (mix)`;
   if (parts[0] === "stems") {
     const name = parts.at(-1) ?? path;
     const context = parts
       .slice(1, -1)
       .filter((p) => p !== "features" && p !== "substems");
-    return `${name} (${context.join(" · ")})`;
+    return `${humanize(name)} (${context.join(" · ")})`;
   }
-  if (parts[0] === "derived") return `${parts.slice(1).join(".")} (derived)`;
+  if (parts[0] === "derived")
+    return `${humanize(parts.slice(1).join("."))} (derived)`;
   return path;
 }

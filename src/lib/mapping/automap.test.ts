@@ -178,4 +178,38 @@ describe("autoMap", () => {
     expect(proposal.scenesFrom).toBeNull();
     expect(proposal.scenes).toEqual({});
   });
+
+  it("song intensity anchors stem brightness to the mix range", () => {
+    const favorites = ["mix.rms", "stems.eng.drums.features.drums_energy"];
+    const proposal = autoMap(makeProfile(favorites), emptyDoc(), {
+      intensity: "song",
+    });
+    const mix = proposal.programs.find((p) => p.id === "auto_mix")!;
+    const drums = proposal.programs.find((p) => p.id === "auto_drums")!;
+    // The mix's own range already is the song: silent default chain.
+    expect(mix.channels.brightness).toEqual({
+      source: "mix.rms",
+      transform: [],
+    });
+    // No mix.drums_energy exists, so the stem anchors to mix.rms's range.
+    expect(drums.channels.brightness).toEqual({
+      source: "stems.eng.drums.features.drums_energy",
+      transform: [
+        { normalize: { min: 0.1, max: 0.9, curve: "linear", gamma: 2 } },
+        { smooth: { window_s: 0.08 } },
+      ],
+    });
+  });
+
+  it("feature intensity (default) keeps the silent default chain", () => {
+    const proposal = autoMap(
+      makeProfile(["stems.eng.drums.features.drums_energy"]),
+      emptyDoc(),
+    );
+    const drums = proposal.programs.find((p) => p.id === "auto_drums")!;
+    expect(drums.channels.brightness).toEqual({
+      source: "stems.eng.drums.features.drums_energy",
+      transform: [],
+    });
+  });
 });

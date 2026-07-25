@@ -1,13 +1,22 @@
 <script lang="ts">
   import { oklchToCss } from "$lib/color";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import EditableName from "$lib/components/EditableName.svelte";
   import TransformEditor from "$lib/components/mapping/TransformEditor.svelte";
-  import { favoriteSources, sourceLabel } from "$lib/mapping/sources";
+  import { humanize } from "$lib/format";
+  import {
+    derivationLabel,
+    favoriteSources,
+    programLabel,
+    sourceLabel,
+  } from "$lib/mapping/sources";
   import type { Channel } from "$lib/mapping/schema";
   import { inspection } from "$lib/state/inspection.svelte";
   import {
     mapping,
     mappingUi,
     removeProgram,
+    renameProgram,
     setProgramChannel,
     setProgramEnabled,
   } from "$lib/state/mapping.svelte";
@@ -44,7 +53,10 @@
       }
     }
     for (const d of mapping.doc?.derivations ?? []) {
-      out.push({ value: `derived.${d.id}`, label: `${d.id} (derived)` });
+      out.push({
+        value: `derived.${d.id}`,
+        label: `${derivationLabel(d)} (derived)`,
+      });
     }
     return out;
   });
@@ -81,6 +93,9 @@
     return typeof v === "number" ? "constant" : "source";
   }
 
+  // Deleting asks first (cancelable) — a program is hand-built work.
+  let confirmingDelete = $state(false);
+
   // Hue slider track: the actual OKLCH wheel the hue channel selects from.
   const HUE_GRADIENT = `linear-gradient(to right, ${Array.from(
     { length: 13 },
@@ -95,7 +110,11 @@
 {#if program}
   <div class="flex flex-col gap-3">
     <div class="flex items-center gap-3">
-      <p class="text-base font-medium">{program.id}</p>
+      <EditableName
+        value={programLabel(program)}
+        title="Rename this program"
+        onrename={(name) => renameProgram(program.id, name)}
+      />
       <label class="flex items-center gap-1.5 text-sm text-ink-muted">
         <input
           type="checkbox"
@@ -106,13 +125,21 @@
         enabled
       </label>
       <button
-        onclick={() => removeProgram(program.id)}
+        onclick={() => (confirmingDelete = true)}
         title="Delete this program (its derivations stay)"
         class="ml-auto rounded border border-edge px-2 py-0.5 text-xs text-danger hover:bg-danger hover:text-surface"
       >
         Delete
       </button>
     </div>
+    {#if confirmingDelete}
+      <ConfirmDialog
+        title={`Delete "${programLabel(program)}"?`}
+        body="Removes this program from the mapping. Its derivations stay available."
+        onconfirm={() => removeProgram(program.id)}
+        onclose={() => (confirmingDelete = false)}
+      />
+    {/if}
 
     <div class="flex flex-col gap-2">
       {#each EDITABLE as channel (channel)}
@@ -123,7 +150,7 @@
           class="flex flex-col gap-1.5 rounded border border-edge bg-surface p-2"
         >
           <div class="flex flex-wrap items-center gap-3 text-sm">
-            <span class="w-24 font-medium">{channel}</span>
+            <span class="w-24 font-medium">{humanize(channel)}</span>
             <select
               value={mode}
               onchange={(e) => setMode(channel, e.currentTarget.value)}

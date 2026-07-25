@@ -6,9 +6,10 @@
   import ProgramEditor from "$lib/components/mapping/ProgramEditor.svelte";
   import ProgramList from "$lib/components/mapping/ProgramList.svelte";
   import SourcesPanel from "$lib/components/mapping/SourcesPanel.svelte";
+  import ResizablePanel from "$lib/components/shell/ResizablePanel.svelte";
   import PixelLane from "$lib/graphs/PixelLane.svelte";
   import RibbonLane from "$lib/graphs/RibbonLane.svelte";
-  import { resolveFeature } from "$lib/mapping/sources";
+  import { programLabel, resolveFeature } from "$lib/mapping/sources";
   import {
     getRawProfile,
     inspection,
@@ -31,6 +32,11 @@
     transport,
     view,
   } from "$lib/state/transport.svelte";
+  import {
+    PANEL_MAX_WIDTH,
+    PANEL_MIN_WIDTH,
+    workspace,
+  } from "$lib/state/workspace.svelte";
 
   // The Mapping tab: author derivations and programs from favorited features
   // and confirm the result against playback. Sources + programs on the left,
@@ -80,13 +86,18 @@
   </div>
 {:else}
   <div class="flex h-full">
-    <aside
-      class="w-72 shrink-0 overflow-y-auto border-r border-edge bg-surface"
+    <ResizablePanel
+      bind:width={workspace.mappingPanelWidth}
+      min={PANEL_MIN_WIDTH}
+      max={PANEL_MAX_WIDTH}
     >
+      <div class="flex h-bar shrink-0 items-center px-3">
+        <span class="text-base font-semibold">Derivations &amp; Programs</span>
+      </div>
       <SourcesPanel />
       <ProgramList />
       <AutoMapButton />
-    </aside>
+    </ResizablePanel>
     <main class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-32">
       <div class="flex items-start gap-4">
         <div class="min-w-0 flex-1">
@@ -96,8 +107,7 @@
             <ProgramEditor />
           {:else}
             <p class="text-sm text-ink-faint">
-              Star features in Analysis, then derive gates and author programs
-              from them here.
+              Select a derivation or program to edit.
             </p>
           {/if}
         </div>
@@ -121,7 +131,7 @@
                     ? 'text-accent'
                     : ''}"
                 >
-                  {program.id}
+                  {programLabel(program)}
                 </button>
                 <button
                   onclick={() =>
