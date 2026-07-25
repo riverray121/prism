@@ -14,18 +14,37 @@
 <header
   class="relative flex h-bar shrink-0 items-stretch border-b border-edge bg-surface"
 >
-  <div class="flex min-w-0 flex-1 items-center gap-2 px-3">
+  <div class="flex min-w-0 flex-1 items-center px-3">
     {#if openSong}
-      <span class="truncate text-sm text-ink" title="Open song">
-        {openSong.title} — {openSong.artist}
-      </span>
-      <button
-        onclick={close}
-        title="Close this song"
-        class="rounded px-2 py-1 text-base leading-none text-ink-faint hover:bg-raised hover:text-ink"
+      <!-- The working song, as a filled chip with a note glyph so it reads as
+           "what's open" at a glance rather than blending into the chrome. -->
+      <div
+        class="flex min-w-0 items-center gap-2 rounded-md bg-raised py-1 pl-2.5 pr-1"
+        title={`Open song: ${openSong.title} — ${openSong.artist}`}
       >
-        ×
-      </button>
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          class="shrink-0 text-accent"
+        >
+          <path
+            d="M9 18.5a3 3 0 1 1-2-2.83V5.6a1 1 0 0 1 .76-.97l9-2.25A1 1 0 0 1 18 3.35v11.32a3 3 0 1 1-2-2.83V7.03l-7 1.75z"
+          />
+        </svg>
+        <span class="truncate text-sm font-semibold text-ink">
+          {openSong.title}
+        </span>
+        <span class="truncate text-sm text-ink-muted">{openSong.artist}</span>
+        <button
+          onclick={close}
+          title="Close this song"
+          class="shrink-0 rounded px-1.5 py-0.5 text-base leading-none text-ink-faint hover:bg-surface hover:text-ink"
+        >
+          ×
+        </button>
+      </div>
     {/if}
   </div>
 

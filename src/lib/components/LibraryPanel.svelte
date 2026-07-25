@@ -1,7 +1,7 @@
 <script lang="ts">
   import { formatTime } from "$lib/format";
   import AnalyzeDialog from "$lib/components/library/AnalyzeDialog.svelte";
-  import ConfirmDialog from "$lib/components/library/ConfirmDialog.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ImportDialog from "$lib/components/library/ImportDialog.svelte";
   import MetadataDialog from "$lib/components/library/MetadataDialog.svelte";
   import { cancelAnalysis, deleteSong } from "$lib/ipc";
@@ -48,17 +48,10 @@
   ] as const;
   let query = $state("");
   let statusFilter = $state<(typeof STATUSES)[number]>("all");
-  let missingMetaOnly = $state(false);
-
-  // Import falls back to "Unknown" when a file carries no artist tag.
-  function missingMeta(song: Song): boolean {
-    return song.artist === "Unknown" || song.artist.trim() === "";
-  }
 
   const visibleSongs = $derived(
     library.songs.filter((song) => {
       if (statusFilter !== "all" && song.status !== statusFilter) return false;
-      if (missingMetaOnly && !missingMeta(song)) return false;
       const q = query.trim().toLowerCase();
       if (q === "") return true;
       return (
@@ -135,13 +128,6 @@
         <option value={s}>{s}</option>
       {/each}
     </select>
-    <label class="flex items-center gap-1">
-      <input type="checkbox" bind:checked={missingMetaOnly} class="size-3" />
-      missing metadata
-    </label>
-    <span class="ml-auto text-ink-faint">
-      {visibleSongs.length}/{library.songs.length}
-    </span>
   </div>
 
   {#if library.lastImportError}
@@ -253,6 +239,20 @@
               </button>
             {/if}
           </div>
+          {#if song.status === "analyzing"}
+            <!-- Whole-analysis progress from the worker (monotonic across stages). -->
+            <div class="flex items-center gap-2 pt-1">
+              <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-raised">
+                <div
+                  class="h-full rounded-full bg-accent transition-[width] duration-300"
+                  style="width: {Math.round((song.progress ?? 0) * 100)}%"
+                ></div>
+              </div>
+              <span class="shrink-0 text-xs tabular-nums text-ink-muted">
+                {Math.round((song.progress ?? 0) * 100)}%
+              </span>
+            </div>
+          {/if}
           {#if song.status === "failed" && song.error_message}
             <p class="truncate text-xs text-danger" title={song.error_message}>
               {song.error_message}
