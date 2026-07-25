@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { tick } from "svelte";
+
   import { chordLabel } from "$lib/chords";
   import Group from "$lib/components/analysis/Group.svelte";
+  import { humanize } from "$lib/format";
   import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
   import EventLane from "$lib/graphs/EventLane.svelte";
   import HeatmapLane from "$lib/graphs/HeatmapLane.svelte";
@@ -69,14 +72,30 @@
 
   // ── Collapse + search state ───────────────────────────────────────────────
 
-  // Sparse overrides over per-group defaults (mix categories open, engines
-  // closed); only toggled groups are recorded.
-  const openOverrides = $state<Record<string, boolean>>({});
-  function isOpen(key: string, dflt: boolean): boolean {
-    return openOverrides[key] ?? dflt;
+  // Groups default to `allOpen` (collapsed on open) with sparse per-group
+  // overrides; expand/collapse-all resets the overrides and flips the base.
+  let allOpen = $state(false);
+  let openOverrides = $state<Record<string, boolean>>({});
+  function isOpen(key: string): boolean {
+    return openOverrides[key] ?? allOpen;
   }
-  function toggle(key: string, dflt: boolean): void {
-    openOverrides[key] = !isOpen(key, dflt);
+  function toggle(key: string): void {
+    openOverrides[key] = !isOpen(key);
+  }
+  // Expanding mounts every lane at once, which takes a beat — the button
+  // disables until the re-render lands so it can't be double-fired.
+  let togglingAll = $state(false);
+  async function toggleAll(): Promise<void> {
+    if (togglingAll) return;
+    togglingAll = true;
+    const open = !allOpen;
+    // Paint the disabled state before the heavy re-render blocks the frame.
+    await new Promise(requestAnimationFrame);
+    openOverrides = {};
+    allOpen = open;
+    await tick(); // the new tree is in the DOM…
+    await new Promise(requestAnimationFrame); // …and painted
+    togglingAll = false;
   }
 
   // Per-lane onset display mode: true = strict maxima; keyed by favorites path.
@@ -93,9 +112,9 @@
   }
 
   // While searching, groups with hits are forced open.
-  function groupOpen(key: string, dflt: boolean, hasHits: boolean): boolean {
+  function groupOpen(key: string, hasHits: boolean): boolean {
     if (q !== "") return hasHits;
-    return isOpen(key, dflt);
+    return isOpen(key);
   }
 
   // ── Presentation helpers ─────────────────────────────────────────────────
@@ -111,12 +130,6 @@
     "#ec4899",
     "#84cc16",
   ];
-
-  // "spectral_centroid" -> "Spectral centroid".
-  function humanize(name: string): string {
-    const s = name.replace(/_/g, " ");
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
 
   function formatScalar(f: ScalarFeature): string {
     if (typeof f.value === "string") return f.value;
@@ -142,9 +155,10 @@
 
 <!-- Play/pause toggle for one audio source key; active while it is audible. -->
 {#snippet playButton(key: string)}
+  <!-- Fixed width: the Play/Pause label swap must not shift the layout. -->
   <button
     onclick={() => playToggle(key)}
-    class="self-start rounded-md border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-raised {transport.playing &&
+    class="w-16 self-start rounded-md border border-accent px-3 py-1 text-center text-xs font-medium text-accent hover:bg-raised {transport.playing &&
     transport.activeKey === key
       ? 'bg-accent text-surface hover:bg-accent'
       : ''}"
@@ -153,16 +167,33 @@
   </button>
 {/snippet}
 
-<!-- Favorite star for one subfeature dot-path; favorites feed the M3 mapping tab. -->
+<!-- Favorite star for one subfeature dot-path; favorites feed the Mapping
+     tab's source palette. An SVG star (filled when starred, outline that
+     previews amber on hover) with a generous hit area, so starring is an
+     obvious affordance rather than a stray glyph. -->
 {#snippet star(favPath: string)}
+  {@const starred = isFavorite(favPath)}
   <button
     onclick={() => toggleFavorite(favPath)}
-    title={isFavorite(favPath) ? "Unfavorite" : "Favorite"}
-    class={isFavorite(favPath)
-      ? "text-amber-400 hover:text-amber-300"
-      : "text-ink-faint hover:text-ink"}
+    title={starred
+      ? "Unstar — remove from Mapping sources"
+      : "Star — use as a source in Mapping"}
+    class="group/star -m-1 shrink-0 rounded p-1 hover:bg-raised"
   >
-    {isFavorite(favPath) ? "★" : "☆"}
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      stroke-width="1.8"
+      stroke-linejoin="round"
+      class={starred
+        ? "fill-amber-400 stroke-amber-400"
+        : "fill-none stroke-ink-faint group-hover/star:stroke-amber-400"}
+    >
+      <path
+        d="M12 3.2l2.8 5.7 6.3.9-4.6 4.4 1.1 6.2L12 17.5l-5.6 2.9 1.1-6.2-4.6-4.4 6.3-.9z"
+      />
+    </svg>
   </button>
 {/snippet}
 
@@ -173,11 +204,30 @@
   i: number,
   favPath: string,
 )}
+  {@const strict =
+    feature.render === "continuous" &&
+    (strictOnsets[favPath] ?? false) &&
+    !!feature.onsets_strict}
   <div>
-    <p class="mb-1.5 flex items-center gap-1.5 text-base text-ink-muted">
+    <p class="mb-2 flex items-center gap-2 text-base">
       {@render star(favPath)}
-      {humanize(name)}
-      <span class="text-sm text-ink-faint">· {detailOf(feature)}</span>
+      <span class="font-medium text-ink">{humanize(name)}</span>
+      <span class="text-sm text-ink-faint">{detailOf(feature)}</span>
+      <!-- Onset-mode toggle lives in the header so the dots lane below keeps
+           the full lane width and stays playhead-aligned with its parent. -->
+      {#if feature.render === "continuous" && feature.onsets_strict}
+        <button
+          onclick={() => (strictOnsets[favPath] = !strict)}
+          title={strict
+            ? "Dense onsets: every qualifying peak — runs of dots trace sustained sounds"
+            : "Strict onsets: prominent maxima only — one dot per distinct hit"}
+          class="ml-auto w-16 shrink-0 rounded border border-edge px-2 py-0.5 text-center text-xs {strict
+            ? 'text-accent'
+            : 'text-ink-faint hover:text-ink'}"
+        >
+          {strict ? "maxima" : "dense"}
+        </button>
+      {/if}
     </p>
     {#if feature.render === "continuous"}
       <ContinuousLane
@@ -196,38 +246,21 @@
         onScrubEnd={scrubEnd}
       />
       {#if feature.onsets?.length}
-        {@const strict =
-          (strictOnsets[favPath] ?? false) && !!feature.onsets_strict}
-        <div class="flex items-center gap-2">
-          <div class="min-w-0 flex-1">
-            <OnsetDots
-              onsets={strict ? (feature.onsets_strict ?? []) : feature.onsets}
-              maxTimeSec={durationSec}
-              color={PALETTE[i % PALETTE.length]}
-              playheadSec={transport.currentTime}
-              follow={transport.playing}
-              window={view.window}
-              followMode={view.followMode}
-              onWindowChange={setViewWindow}
-              onSeek={scrub}
-              onScrubStart={scrubStart}
-              onScrubEnd={scrubEnd}
-            />
-          </div>
-          {#if feature.onsets_strict}
-            <button
-              onclick={() => (strictOnsets[favPath] = !strict)}
-              title={strict
-                ? "Dense onsets: every qualifying peak — runs of dots trace sustained sounds"
-                : "Strict onsets: prominent maxima only — one dot per distinct hit"}
-              class="shrink-0 rounded border border-edge px-2 py-0.5 text-xs {strict
-                ? 'text-accent'
-                : 'text-ink-faint hover:text-ink'}"
-            >
-              {strict ? "maxima" : "dense"}
-            </button>
-          {/if}
-        </div>
+        <OnsetDots
+          onsets={strict ? (feature.onsets_strict ?? []) : feature.onsets}
+          maxTimeSec={durationSec}
+          color={PALETTE[i % PALETTE.length]}
+          height={56}
+          gutter
+          playheadSec={transport.currentTime}
+          follow={transport.playing}
+          window={view.window}
+          followMode={view.followMode}
+          onWindowChange={setViewWindow}
+          onSeek={scrub}
+          onScrubStart={scrubStart}
+          onScrubEnd={scrubEnd}
+        />
       {/if}
     {:else if feature.render === "event"}
       <EventLane
@@ -240,6 +273,7 @@
         onWindowChange={setViewWindow}
         labelFor={name === "chords" ? chordLabel : undefined}
         height={name === "chords" ? 100 : 76}
+        gutter
         onSeek={scrub}
         onScrubStart={scrubStart}
         onScrubEnd={scrubEnd}
@@ -249,6 +283,7 @@
         segments={feature.segments}
         maxTimeSec={durationSec}
         height={76}
+        gutter
         playheadSec={transport.currentTime}
         follow={transport.playing}
         window={view.window}
@@ -263,6 +298,7 @@
         path={sidecarPath(feature.sidecar)}
         {frameRateHz}
         height={190}
+        gutter
         normalize={name === "spectrogram" ? "global" : "per-row"}
         playheadSec={transport.currentTime}
         follow={transport.playing}
@@ -311,32 +347,59 @@
     </div>
   {:else}
     <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-32 pt-3">
-      <div class="flex w-full flex-col gap-1">
-        <div class="mb-2 flex items-center gap-3">
+      <div class="flex w-full flex-col gap-2">
+        <div class="mb-2 flex items-center gap-2">
           <input
             bind:value={query}
             placeholder="Search features…"
             title="Filter features by name, category, engine, or stem"
             class="w-72 rounded border border-edge bg-app px-2 py-1.5 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
           />
-          <!-- The mix's own play control, shown while a stem is soloed — the
-               way back to the full song. -->
-          {#if transport.activeKey !== "mix"}
-            <button
-              onclick={() => playToggle("mix")}
-              class="rounded-md border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-raised"
+          <!-- One toggle for the whole tree. Both labels are stacked in one
+               grid cell (the inactive one invisible), so the button hugs the
+               longer label and never changes size on toggle. -->
+          <button
+            onclick={toggleAll}
+            disabled={togglingAll}
+            title={allOpen ? "Collapse all groups" : "Expand all groups"}
+            class="flex items-center gap-1.5 rounded border border-edge px-2.5 py-1.5 text-xs text-ink-muted hover:text-ink disabled:pointer-events-none disabled:opacity-50"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="transition-transform duration-150 {allOpen
+                ? 'rotate-180'
+                : ''}"
             >
-              ♪ Play mix
-            </button>
-          {/if}
+              <path d="M5 9l7 7 7-7" />
+            </svg>
+            <span class="grid text-left">
+              <span
+                class="col-start-1 row-start-1 {allOpen ? 'invisible' : ''}"
+              >
+                Expand all
+              </span>
+              <span
+                class="col-start-1 row-start-1 {allOpen ? '' : 'invisible'}"
+              >
+                Collapse all
+              </span>
+            </span>
+          </button>
         </div>
         <!-- Scalars: one value each, a labeled grid. -->
         {#if scalars.length > 0 && (q === "" || scalars.some( ([n]) => matches(n), ))}
           <Group
             label="Scalars"
             detail={`${scalars.length}`}
-            open={groupOpen("scalars", true, true)}
-            ontoggle={() => toggle("scalars", true)}
+            open={groupOpen("scalars", true)}
+            ontoggle={() => toggle("scalars")}
           >
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {#each scalars.filter( ([n]) => matches(n), ) as [name, feature] (name)}
@@ -361,8 +424,8 @@
             <Group
               label={humanize(category)}
               detail={`${visible.length}`}
-              open={groupOpen(`mix.${category}`, true, true)}
-              ontoggle={() => toggle(`mix.${category}`, true)}
+              open={groupOpen(`mix.${category}`, true)}
+              ontoggle={() => toggle(`mix.${category}`)}
             >
               {#each visible as [name, feature], i (name)}
                 {@render featureRow(name, feature, i, `mix.${name}`)}
@@ -391,8 +454,8 @@
             <Group
               label={engine}
               detail={`${Object.keys(engineStems).length} stems`}
-              open={groupOpen(`stems.${engine}`, true, engineHasHits)}
-              ontoggle={() => toggle(`stems.${engine}`, true)}
+              open={groupOpen(`stems.${engine}`, engineHasHits)}
+              ontoggle={() => toggle(`stems.${engine}`)}
             >
               {#each Object.entries(engineStems) as [stemName, stemData] (stemName)}
                 {@const stemKey = `${engine}::${stemName}`}
@@ -405,8 +468,8 @@
                   <Group
                     label={stemName}
                     depth={1}
-                    open={groupOpen(stemKey, true, true)}
-                    ontoggle={() => toggle(stemKey, true)}
+                    open={groupOpen(stemKey, true)}
+                    ontoggle={() => toggle(stemKey)}
                   >
                     {@render stemBody(
                       stemKey,
@@ -422,8 +485,8 @@
                     <Group
                       label={`${stemName} · ${subName}`}
                       depth={2}
-                      open={groupOpen(subKey, true, true)}
-                      ontoggle={() => toggle(subKey, true)}
+                      open={groupOpen(subKey, true)}
+                      ontoggle={() => toggle(subKey)}
                     >
                       {@render stemBody(
                         subKey,
