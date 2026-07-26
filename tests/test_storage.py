@@ -45,6 +45,104 @@ def test_write_read_profile_round_trip(library_root):
     assert profile["timeline"]["frame_count"] == 5
 
 
+def test_write_profile_extracts_continuous_to_npy(library_root):
+    (library_root / "songs" / "s1").mkdir()
+    storage.write_profile(
+        _song(),
+        analyzed_at="2026-01-02T00:00:00Z",
+        frame_rate_hz=100.0,
+        frame_count=3,
+        mix={
+            "rms": {"render": "continuous", "data": [0.1, 0.5, 0.2]},
+            "bpm": {"render": "scalar", "value": 120.0},
+        },
+        stems={
+            "eng": {
+                "drums": {
+                    "audio_file": "stems/eng/drums.wav",
+                    "features": {
+                        "energy": {"render": "continuous", "data": [0.0, 1.0]}
+                    },
+                    "substems": {
+                        "kick": {
+                            "audio_file": "stems/eng/drums/kick.wav",
+                            "features": {
+                                "energy": {
+                                    "render": "continuous",
+                                    "data": [0.3, 0.4],
+                                }
+                            },
+                        }
+                    },
+                }
+            }
+        },
+    )
+    profile = storage.read_profile("s1")
+    rms = profile["mix"]["rms"]
+    # Inline data replaced by the sidecar reference + extent.
+    assert "data" not in rms
+    assert rms["sidecar"] == "features/rms.npy"
+    assert rms["frames"] == 3
+    assert rms["data_range"] == [pytest.approx(0.1), pytest.approx(0.5)]
+    loaded = np.load(library_root / "songs" / "s1" / rms["sidecar"])
+    assert loaded.dtype == np.float32
+    assert np.allclose(loaded, [0.1, 0.5, 0.2])
+    # Scalars untouched.
+    assert profile["mix"]["bpm"]["value"] == 120.0
+    # Stem + substem features land in nested feature dirs.
+    stem = profile["stems"]["eng"]["drums"]["features"]["energy"]
+    assert stem["sidecar"] == "features/eng/drums/energy.npy"
+    sub = profile["stems"]["eng"]["drums"]["substems"]["kick"]["features"]["energy"]
+    assert sub["sidecar"] == "features/eng/drums/kick/energy.npy"
+    assert (library_root / "songs" / "s1" / sub["sidecar"]).exists()
+
+
+def test_migrate_profiles_upgrades_inline_data(library_root):
+    import json
+
+    song_dir = library_root / "songs" / "s1"
+    song_dir.mkdir()
+    # A pre-0.4.0 profile with inline continuous arrays at both levels.
+    (song_dir / "profile.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "0.3.0",
+                "song": {"id": "s1"},
+                "mix": {
+                    "rms": {"render": "continuous", "data": [0.2, 0.6]},
+                    "beats": {"render": "event", "events": []},
+                },
+                "stems": {
+                    "eng": {
+                        "bass": {
+                            "audio_file": "stems/eng/bass.wav",
+                            "features": {
+                                "energy": {
+                                    "render": "continuous",
+                                    "data": [0.1, 0.9],
+                                }
+                            },
+                        }
+                    }
+                },
+            }
+        )
+    )
+    assert storage.migrate_profiles() == 1
+    profile = storage.read_profile("s1")
+    assert profile["schema_version"] == storage.SCHEMA_VERSION
+    rms = profile["mix"]["rms"]
+    assert "data" not in rms
+    assert rms["sidecar"] == "features/rms.npy"
+    assert (song_dir / "features" / "rms.npy").exists()
+    stem = profile["stems"]["eng"]["bass"]["features"]["energy"]
+    assert stem["sidecar"] == "features/eng/bass/energy.npy"
+    # Events untouched; a second run is a no-op.
+    assert profile["mix"]["beats"] == {"render": "event", "events": []}
+    assert storage.migrate_profiles() == 0
+
+
 def test_write_profile_rejects_nan(library_root):
     (library_root / "songs" / "s1").mkdir()
     with pytest.raises(ValueError):

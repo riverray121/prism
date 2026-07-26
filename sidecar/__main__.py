@@ -215,6 +215,13 @@ def main() -> None:
         interrupted = library.fail_interrupted(con, "Analysis interrupted")
     if interrupted:
         log.info("marked %d interrupted song(s) as failed", len(interrupted))
+    # Upgrade any pre-0.4.0 profile before serving commands, so the frontend
+    # only ever sees the sidecar-backed format (its loader has no legacy path).
+    migrated = storage.migrate_profiles()
+    if migrated:
+        log.info(
+            "migrated %d profile(s) to schema %s", migrated, storage.SCHEMA_VERSION
+        )
     emit_settings()  # let the UI render the analysis-settings panel on connect
     # Background worker drains the analysis queue while this thread reads stdin.
     threading.Thread(target=worker.run, args=(emit_snapshot,), daemon=True).start()

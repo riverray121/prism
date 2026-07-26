@@ -120,7 +120,9 @@ Every feature entry carries the same metadata fields (`render`, `category`, `sou
 
 ### continuous
 
-Sampled on the implicit 100 Hz timeline. `data` length equals `timeline.frame_count`. No timestamps stored.
+Sampled on the implicit 100 Hz timeline. No timestamps stored.
+
+The sample array lives in a per-feature `.npy` sidecar (float32, 1-D, length `frames`); `data_range` carries the array's `[min, max]` so consumers get the extent without loading. Pre-0.4.0 profiles inlined `data` — the sidecar migrates them at startup (`storage.migrate_profiles`), and the frontend loader accepts only the sidecar form.
 
 ```json
 "rms": {
@@ -129,9 +131,13 @@ Sampled on the implicit 100 Hz timeline. `data` length equals `timeline.frame_co
   "source": "librosa",
   "unit": "normalized",
   "range": [0, 1],
-  "data": [0.12, 0.15, 0.18, /* ... 23452 values ... */]
+  "sidecar": "features/rms.npy",
+  "frames": 23452,
+  "data_range": [0.0, 0.83]
 }
 ```
+
+Sidecar paths: mix features under `features/{name}.npy`; stem features under `features/{engine}/{stem}/{name}.npy`; drum sub-stems add the sub-stem (`features/{engine}/{stem}/{sub}/{name}.npy`).
 
 ML continuous features may add a parallel `confidence` array of equal length (planned — no extractor emits one yet; `pitch_confidence` is a separate feature, not a sibling array, and the zod loader does not model it). WIP features add `"status": "wip"`.
 
@@ -252,7 +258,7 @@ Stem WAVs are referenced from `stems.{engine}.{stem}.audio_file`, same rules app
 - **Minor bumps:** backward-compatible additions — new optional fields, new features in the catalog.
 - **Major bumps:** breaking changes — renamed/removed fields, changed semantics, changed sidecar conventions.
 - Intended: loaders check the major version on load and refuse unknown majors. **Not yet enforced** — the sidecar `read_profile` and the frontend zod loader currently parse `schema_version` as a plain string without a major-version gate. Add the check at the load boundary when schema migrations become real.
-- Current: `0.3.0` (0.2.0 added optional `onsets` on continuous features; 0.3.0 adds the `onsets_strict` sibling).
+- Current: `0.4.0` (0.2.0 added optional `onsets` on continuous features; 0.3.0 adds the `onsets_strict` sibling; 0.4.0 moves continuous `data` to `.npy` sidecars with `sidecar`/`frames`/`data_range`).
 
 ---
 

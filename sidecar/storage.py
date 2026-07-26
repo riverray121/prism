@@ -24,7 +24,9 @@ _PROFILE_LOCK = threading.Lock()
 # Profile JSON schema version (see docs/profile-schema.md).
 # 0.2.0: optional `onsets` on continuous feature envelopes.
 # 0.3.0: optional `onsets_strict` sibling (prominence-filtered maxima).
-SCHEMA_VERSION = "0.3.0"
+# 0.4.0: continuous `data` arrays move to .npy sidecars (`sidecar`/`frames`/
+#        `data_range` replace inline `data`) — profile.json stays kilobytes.
+SCHEMA_VERSION = "0.4.0"
 
 # Repo root is the parent of the ``sidecar`` package directory. Resolved from the
 # module location so the path holds regardless of the process working directory.
@@ -65,6 +67,21 @@ def write_profile(
     ``audio_file`` path and a ``features`` map. Sidecar/audio paths in the profile
     are relative to profile.json itself, so source_file is just the filename.
     """
+    # Inline continuous arrays are what made profile.json tens of MB; every
+    # consumer streams the .npy on demand instead (heatmaps' model).
+    _extract_continuous(mix, song["id"], "features")
+    for engine, engine_stems in (stems or {}).items():
+        for stem_name, entry in engine_stems.items():
+            _extract_continuous(
+                entry["features"], song["id"], f"features/{engine}/{stem_name}"
+            )
+            for sub, sub_entry in entry.get("substems", {}).items():
+                _extract_continuous(
+                    sub_entry["features"],
+                    song["id"],
+                    f"features/{engine}/{stem_name}/{sub}",
+                )
+
     with _PROFILE_LOCK:
         profile = {
             "schema_version": SCHEMA_VERSION,
@@ -89,6 +106,66 @@ def write_profile(
             "favorites": _existing_favorites(song["id"]),
         }
         write_json_atomic(SONGS_DIR / song["id"] / "profile.json", profile)
+
+
+def _extract_continuous(features: dict, song_id: str, prefix: str) -> None:
+    """Move each continuous envelope's data array into a .npy sidecar.
+
+    Replaces ``data`` with ``sidecar`` (path relative to profile.json),
+    ``frames`` (sample count), and ``data_range`` ([min, max] — consumers like
+    auto-map need the extent without loading the array). Derived onset lists
+    stay inline (small). Mutates the envelopes in place.
+    """
+    for name, env in features.items():
+        if env.get("render") != "continuous" or "data" not in env:
+            continue
+        arr = np.asarray(env.pop("data"), dtype=np.float32)
+        rel = f"{prefix}/{name}.npy"
+        path = SONGS_DIR / song_id / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(path, np.ascontiguousarray(arr))
+        env["sidecar"] = rel
+        env["frames"] = int(arr.shape[0])
+        env["data_range"] = (
+            [float(arr.min()), float(arr.max())] if arr.size else [0.0, 0.0]
+        )
+
+
+def migrate_profiles() -> int:
+    """One-time startup upgrade of pre-0.4.0 profiles: extract inline
+    continuous data to .npy sidecars and bump the schema version. Returns how
+    many profiles were migrated. Unreadable profiles are left alone (the read
+    path reports them)."""
+    migrated = 0
+    if not SONGS_DIR.exists():
+        return 0
+    for path in sorted(SONGS_DIR.glob("*/profile.json")):
+        song_id = path.parent.name
+        try:
+            profile = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        if profile.get("schema_version") == SCHEMA_VERSION:
+            continue
+        with _PROFILE_LOCK:
+            _extract_continuous(profile.get("mix", {}), song_id, "features")
+            for engine, engine_stems in profile.get("stems", {}).items():
+                for stem_name, entry in engine_stems.items():
+                    _extract_continuous(
+                        entry.get("features", {}),
+                        song_id,
+                        f"features/{engine}/{stem_name}",
+                    )
+                    for sub, sub_entry in entry.get("substems", {}).items():
+                        _extract_continuous(
+                            sub_entry.get("features", {}),
+                            song_id,
+                            f"features/{engine}/{stem_name}/{sub}",
+                        )
+            profile["schema_version"] = SCHEMA_VERSION
+            write_json_atomic(path, profile)
+        migrated += 1
+    return migrated
 
 
 def _existing_favorites(song_id: str) -> list:
@@ -172,6 +249,7 @@ def cleanup_partial(song_id: str) -> None:
     song_dir = SONGS_DIR / song_id
     shutil.rmtree(song_dir / "stems", ignore_errors=True)
     shutil.rmtree(song_dir / "heatmaps", ignore_errors=True)
+    shutil.rmtree(song_dir / "features", ignore_errors=True)
 
 
 def read_profile(song_id: str) -> dict:
