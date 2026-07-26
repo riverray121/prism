@@ -20,8 +20,10 @@
     backToMix,
     getRawProfile,
     inspection,
+    requestFeatureTrack,
     soloSource,
   } from "$lib/state/inspection.svelte";
+  import { tracks } from "$lib/state/tracks.svelte";
   import {
     addDerivation,
     audition,
@@ -168,10 +170,18 @@
   // full track per input, and the $state proxy would add a trap per sample.
   // (The `profile` read keeps this reactive to profile loads.)
   const data = $derived.by(() => {
+    tracks.version; // raw-profile read — re-run when a streamed sidecar lands
     if (!profile || !source) return null;
     const raw = getRawProfile();
     const feature = raw ? resolveFeature(raw, source) : undefined;
-    return feature?.render === "continuous" ? feature.data : null;
+    return feature?.render === "continuous" ? (feature.data ?? null) : null;
+  });
+  // Stream the source's sidecar when it isn't hydrated yet.
+  $effect(() => {
+    if (!profile || !source) return;
+    const feature = resolveFeature(profile, source);
+    if (feature?.render === "continuous" && !feature.data)
+      requestFeatureTrack(feature);
   });
   const frameRateHz = $derived(profile?.timeline.frame_rate_hz ?? 100);
   const durationSec = $derived(

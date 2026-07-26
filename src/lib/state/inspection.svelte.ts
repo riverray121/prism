@@ -1,7 +1,12 @@
 import { getMapping, getProfile, updateFavorites } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
-import { resolveNode } from "$lib/mapping/sources";
+import { continuousBySidecar, resolveNode } from "$lib/mapping/sources";
 import { resetMappingForSong } from "$lib/state/mapping.svelte";
+import {
+  requestTrack,
+  resetTracks,
+  type StreamableFeature,
+} from "$lib/state/tracks.svelte";
 import {
   resetForSong,
   switchSource,
@@ -40,6 +45,7 @@ export function open(songId: string): void {
   inspection.songDir = null;
   // Silence the previous song immediately; the profile event re-arms playback.
   resetForSong(null, 0);
+  resetTracks();
   resetMappingForSong(songId);
   getProfile(songId);
   getMapping(songId);
@@ -51,6 +57,7 @@ export function close(): void {
   inspection.audioPath = null;
   inspection.songDir = null;
   resetForSong(null, 0);
+  resetTracks();
   resetMappingForSong(null);
 }
 
@@ -92,19 +99,35 @@ export function sidecarPath(rel: string): string {
   return `${inspection.songDir}/${rel}`;
 }
 
+// Start streaming a continuous feature's .npy (no-op when loaded/in flight)
+// — the one place feature → absolute path meets the track loader. Callers
+// pass the proxy envelope; the raw profile's counterpart hydrates alongside
+// it, because the evaluator reads raw and proxy writes never reach it.
+export function requestFeatureTrack(feature: StreamableFeature): void {
+  if (!feature.sidecar || !inspection.songDir) return;
+  const raw = rawProfile
+    ? continuousBySidecar(rawProfile, feature.sidecar)
+    : undefined;
+  requestTrack(feature, sidecarPath(feature.sidecar), raw);
+}
+
 export function isFavorite(path: string): boolean {
   return inspection.profile?.favorites.includes(path) ?? false;
 }
 
 // Star/unstar a subfeature. Optimistic: the in-memory profile updates
 // immediately and the sidecar persists the full list into profile.json.
+// The raw profile mirrors the list — proxy writes never reach it, and
+// auto-map reads favorites from raw.
 export function toggleFavorite(path: string): void {
   const profile = inspection.profile;
   if (!profile || !inspection.songId) return;
-  profile.favorites = profile.favorites.includes(path)
+  const next = profile.favorites.includes(path)
     ? profile.favorites.filter((p) => p !== path)
     : [...profile.favorites, path];
-  void updateFavorites(inspection.songId, profile.favorites);
+  profile.favorites = next;
+  if (rawProfile) rawProfile.favorites = next;
+  void updateFavorites(inspection.songId, next);
 }
 
 // Whether a favorites dot-path still resolves; used to warn on stale

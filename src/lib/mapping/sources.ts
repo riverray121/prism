@@ -1,4 +1,4 @@
-import type { MixFeature, Profile } from "$lib/ipc/messages";
+import type { ContinuousFeature, MixFeature, Profile } from "$lib/ipc/messages";
 
 // Profile addressing: dot-path resolution and source-path shape parsing,
 // shared by the mapping schema, sources panel, and evaluator. Presentation
@@ -40,6 +40,35 @@ export function favoriteSources(profile: Profile): FavoriteSource[] {
     if (feature) out.push({ path, feature });
   }
   return out;
+}
+
+// Find the continuous envelope carrying a given sidecar path. Locates the raw
+// profile's counterpart of a proxy envelope when hydrating tracks: a $state
+// proxy write never reaches the underlying object, so both must be set.
+export function continuousBySidecar(
+  profile: Profile,
+  rel: string,
+): ContinuousFeature | undefined {
+  const scan = (
+    features: Record<string, MixFeature>,
+  ): ContinuousFeature | undefined => {
+    for (const f of Object.values(features))
+      if (f.render === "continuous" && f.sidecar === rel) return f;
+    return undefined;
+  };
+  const hit = scan(profile.mix);
+  if (hit) return hit;
+  for (const engineStems of Object.values(profile.stems)) {
+    for (const stem of Object.values(engineStems)) {
+      const s = scan(stem.features);
+      if (s) return s;
+      for (const sub of Object.values(stem.substems ?? {})) {
+        const s2 = scan(sub.features);
+        if (s2) return s2;
+      }
+    }
+  }
+  return undefined;
 }
 
 // Decoded source path. The positional layout —

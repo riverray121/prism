@@ -11,7 +11,7 @@ export const LOD_BUCKETS = 2048;
 export const LOD_THRESHOLD_POINTS = 8000;
 
 export function decimateMinMax(
-  data: number[],
+  data: ArrayLike<number>,
   frameRateHz: number,
   buckets = LOD_BUCKETS,
 ): [number[], number[]] | null {

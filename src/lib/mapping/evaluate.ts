@@ -111,7 +111,7 @@ function materialize(
     const derivation = doc.derivations.find((d) => d.id === derivedRef[1]);
     if (!derivation) return null;
     const feature = resolveFeature(profile, derivation.source);
-    if (feature?.render !== "continuous") return null;
+    if (feature?.render !== "continuous" || !feature.data) return null;
     const hz = profile.timeline.frame_rate_hz;
     const { cutoff, max, sensitivity } = derivation.threshold;
     if (derivation.threshold.mode === "events") {
@@ -137,7 +137,8 @@ function materialize(
   const feature = resolveFeature(profile, source);
   if (!feature) return null;
   if (feature.render === "continuous")
-    return { kind: "continuous", data: feature.data };
+    // No data yet = sidecar still streaming: unresolved (warn-and-mute).
+    return feature.data ? { kind: "continuous", data: feature.data } : null;
   if (feature.render === "scalar")
     return { kind: "scalar", value: feature.value };
   if (feature.render === "event") {
@@ -682,24 +683,53 @@ function evaluatePixels(
 
 // ── Program evaluation ──────────────────────────────────────────────────────
 
-// Cache key: the program definition, every derivation it references, and
-// which of its heatmap matrices are loaded — anything else unchanged, the
-// previous output is reusable.
+// Cache key: the program definition, every derivation it references, which of
+// its heatmap matrices are loaded, and which continuous sources have hydrated
+// data (0.4.0 sidecars stream in) — anything else unchanged, the previous
+// output is reusable.
 export function programKey(
+  profile: Profile,
   doc: MappingDoc,
   program: Program,
   matrices: Matrices = {},
 ): string {
   const derivedIds: string[] = [];
   const loaded: string[] = [];
+  const hydrated: string[] = [];
+  const noteHydration = (source: string): void => {
+    const parts = source.split(".");
+    if (parts.at(-1)?.startsWith("band_energy")) {
+      // The pixel path gathers every band sibling; key on each one's state.
+      const parent = resolveNode(profile, parts.slice(0, -1).join("."));
+      if (typeof parent !== "object" || parent === null) return;
+      for (const [name, v] of Object.entries(parent)) {
+        const f = v as { render?: string; data?: unknown };
+        if (
+          name.startsWith("band_energy") &&
+          f.render === "continuous" &&
+          f.data
+        )
+          hydrated.push(`${source}::${name}`);
+      }
+      return;
+    }
+    const f = resolveFeature(profile, source);
+    if (f?.render === "continuous" && f.data) hydrated.push(source);
+  };
   for (const value of Object.values(program.channels)) {
     if (typeof value !== "object") continue;
-    if (value.source.startsWith("derived."))
-      derivedIds.push(value.source.slice("derived.".length));
+    if (value.source.startsWith("derived.")) {
+      const id = value.source.slice("derived.".length);
+      derivedIds.push(id);
+      const d = doc.derivations.find((x) => x.id === id);
+      if (d) noteHydration(d.source);
+    } else {
+      noteHydration(value.source);
+    }
     if (matrices[value.source]) loaded.push(value.source);
   }
   const derivations = doc.derivations.filter((d) => derivedIds.includes(d.id));
-  return JSON.stringify({ program, derivations, loaded });
+  return JSON.stringify({ program, derivations, loaded, hydrated });
 }
 
 export function evaluateProgram(
@@ -747,7 +777,12 @@ export function evaluateProgram(
     frameCount,
   );
 
-  return { key: programKey(doc, program, matrices), channels, gate, pixels };
+  return {
+    key: programKey(profile, doc, program, matrices),
+    channels,
+    gate,
+    pixels,
+  };
 }
 
 // Evaluate every enabled program, reusing previous outputs whose key still
@@ -761,7 +796,7 @@ export function evaluateDoc(
   const out: Record<string, ProgramOutput> = {};
   for (const program of doc.programs) {
     if (!program.enabled) continue;
-    const key = programKey(doc, program, matrices);
+    const key = programKey(profile, doc, program, matrices);
     const prev = previous[program.id];
     out[program.id] =
       prev && prev.key === key
@@ -946,7 +981,7 @@ export function applyMacro(
   const out: Record<string, ProgramOutput> = {};
   for (const id of ids) {
     const rawOut = raw[id];
-    const key = `${rawOut.key}§${macroJson}${coupling ? `§${coupling}` : ""}`;
+    const key = `${rawOut.key}§${macroJson}§${master ? "M1" : "M0"}${coupling ? `§${coupling}` : ""}`;
     const prev = previous[id];
     if (prev && prev.key === key) {
       out[id] = prev;

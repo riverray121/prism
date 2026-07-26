@@ -48,7 +48,9 @@ describe("MixFeatureSchema discriminated union", () => {
       category: "amplitude",
       source: "librosa",
       unit: "normalized",
-      data: [0, 1],
+      sidecar: "features/rms.npy",
+      frames: 2,
+      data_range: [0, 1],
     });
     expect(cont.render).toBe("continuous");
   });
@@ -136,7 +138,9 @@ describe("ProfileSchema", () => {
           category: "amplitude",
           source: "librosa",
           unit: "normalized",
-          data: [0, 1],
+          sidecar: "features/good.npy",
+          frames: 2,
+          data_range: [0, 1],
         },
         bad: { render: "unmodeled-mode" },
       },

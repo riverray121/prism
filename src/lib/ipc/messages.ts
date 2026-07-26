@@ -73,7 +73,20 @@ export const ContinuousFeatureSchema = z.object({
   range: z.tuple([z.number(), z.number()]).optional(),
   // Present (="wip") on provisional ML features, e.g. the timbral axes.
   status: z.string().optional(),
-  data: z.array(z.number()),
+  // Hydration slot only — never present on disk. The array streams from the
+  // sidecar on demand (state/tracks) and lands here as a Float32Array;
+  // absent means not loaded yet. (Plain arrays accepted for test fixtures.)
+  data: z
+    .union([
+      z.custom<Float32Array>((v) => v instanceof Float32Array),
+      z.array(z.number()),
+    ])
+    .optional(),
+  // Sidecar path (relative to profile.json), sample count, and the data's
+  // [min, max] so consumers (auto-map) get the extent without loading.
+  sidecar: z.string(),
+  frames: z.number(),
+  data_range: z.tuple([z.number(), z.number()]),
   // Default onset tracks derived at analysis time; absent on older profiles.
   // `onsets` (0.2.0) is dense — runs of dots trace sustained peaks;
   // `onsets_strict` (0.3.0) keeps prominent maxima only.

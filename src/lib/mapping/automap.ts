@@ -2,7 +2,6 @@
 // only. Pure — invoked exclusively by the Generate button, never on song
 // open; hand authoring is the primary flow and a proposal only ever appends.
 
-import { extent } from "$lib/extent";
 import type { Profile } from "$lib/ipc/messages";
 import type { MappingDoc, Program, Scene } from "$lib/mapping/schema";
 import {
@@ -67,12 +66,13 @@ function brightnessChain(
       if (ref === path) break; // the mix's own program: own range is the song
       const mixFeature = resolveFeature(profile, ref);
       if (mixFeature?.render !== "continuous") continue;
-      const e = extent(mixFeature.data);
-      if (!e || e.hi <= e.lo) continue;
+      // The envelope carries the data's extent, so no track load is needed.
+      const [lo, hi] = mixFeature.data_range;
+      if (hi <= lo) continue;
       return {
         source: path,
         transform: [
-          { normalize: { min: e.lo, max: e.hi, curve: "linear", gamma: 2 } },
+          { normalize: { min: lo, max: hi, curve: "linear", gamma: 2 } },
           { smooth: { window_s: 0.08 } },
         ],
       };

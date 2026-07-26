@@ -26,7 +26,7 @@
     onScrubStart,
     onScrubEnd,
   }: {
-    data: number[];
+    data: number[] | Float32Array;
     frameRateHz: number;
     label?: string;
     color?: string;
@@ -47,8 +47,8 @@
 
   // X axis is time in seconds, derived from the frame index (no timestamps stored).
   const fullAligned = $derived.by(() => {
-    const xs = data.map((_, i) => i / frameRateHz);
-    return [xs, data] as [number[], number[]];
+    const xs = Array.from(data, (_, i) => i / frameRateHz);
+    return [xs, data] as uPlot.AlignedData;
   });
   const maxTimeSec = $derived(
     data.length > 1 ? (data.length - 1) / frameRateHz : 1,

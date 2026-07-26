@@ -28,6 +28,9 @@ function makeProfile(favorites: string[]): Profile {
         source: "librosa",
         unit: "normalized",
         data: [0.1, 0.5, 0.9],
+        sidecar: "features/f1.npy",
+        frames: 3,
+        data_range: [0.1, 0.9],
       },
       spectral_centroid: {
         render: "continuous",
@@ -35,6 +38,9 @@ function makeProfile(favorites: string[]): Profile {
         source: "librosa",
         unit: "hz",
         data: [500, 1500, 3000],
+        sidecar: "features/f2.npy",
+        frames: 3,
+        data_range: [500, 3000],
       },
       beats: {
         render: "event",
@@ -72,6 +78,9 @@ function makeProfile(favorites: string[]): Profile {
               source: "librosa",
               unit: "normalized",
               data: [0, 1, 0],
+              sidecar: "features/f3.npy",
+              frames: 3,
+              data_range: [0, 1],
             },
             drums_onsets: {
               render: "event",
