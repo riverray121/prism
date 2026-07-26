@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="src-tauri/icons/icon.png" alt="Prism logo" width="128" />
+</p>
+
 # Prism
 
 A Mac-first desktop dashboard that imports audio files, runs a multi-layer DSP and ML pipeline to extract every viable musical feature, and presents the results as an interactive, time-aligned visualization synced to playback. Each analyzed song produces a machine-readable cue profile and a human-readable inspection view. Built as a Tauri app (Svelte frontend, Rust shell) driving a Python analysis sidecar.
