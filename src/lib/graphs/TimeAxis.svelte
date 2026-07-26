@@ -317,6 +317,7 @@
   // scrolls back into view or its tab is re-shown.
   function repaint(): void {
     if (!chart) return;
+    lastPlayheadPx = null; // force the next playhead tick to paint
     untrack(applyWindow); // setScale short-circuits on equal values…
     chart.redraw(false); // …so always follow with an explicit paint
   }
@@ -389,11 +390,23 @@
     applyWindow();
   });
 
-  // On each playhead move: track it (the emitted window redraws), else redraw.
+  // On each playhead move: track it (the emitted window redraws), else redraw
+  // — but only when the head has moved a whole canvas pixel. Zoomed out, the
+  // head advances a fraction of a pixel per tick, so most ticks are visual
+  // no-ops; skipping them cuts full-lane repaints from tick rate to only the
+  // frames where something actually changes on screen.
+  let lastPlayheadPx: number | null = null;
   $effect(() => {
     playheadSec;
     if (!chart || skipDrawing()) return;
-    if (!trackPlayhead()) chart.redraw(false);
+    if (trackPlayhead()) return; // the emitted window change repaints
+    const px =
+      playheadSec === null
+        ? -1
+        : Math.round(chart.valToPos(playheadSec, "x", true));
+    if (px === lastPlayheadPx) return;
+    lastPlayheadPx = px;
+    chart.redraw(false);
   });
 </script>
 
