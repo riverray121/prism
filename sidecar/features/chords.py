@@ -121,9 +121,10 @@ def compute_chords(y: np.ndarray, sr: int) -> dict:
     if sr != SONG_HZ:
         y = librosa.resample(y, orig_sr=sr, target_sr=SONG_HZ)
 
-    # A signal shorter than one CQT block yields no feature frames; the blocked
-    # CQT would then concatenate an empty list. Report no chords instead.
-    if len(y) < HOP_LENGTH:
+    # The 6-octave CQT's lowest-bin filter needs ~1 s of signal at SONG_HZ;
+    # anything shorter raises inside librosa.cqt. Chords on a sub-2 s clip are
+    # meaningless anyway — report no chords instead of failing the analysis.
+    if len(y) < 2 * SONG_HZ:
         return {
             "render": "event",
             "category": "tonal",

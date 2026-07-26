@@ -11,9 +11,11 @@ shells out to `wget` (absent on stock macOS):
   - the checkpoint is fetched via the project model registry (`models.py`).
 """
 
+import contextlib
 import csv
 import logging
 import shutil
+import sys
 from pathlib import Path
 
 import librosa
@@ -145,8 +147,11 @@ def panns_features(
     checkpoint = models.ensure("panns_cnn14_sed")
 
     y32 = librosa.resample(y, orig_sr=sr, target_sr=PANNS_SR) if sr != PANNS_SR else y
-    sed = SoundEventDetection(checkpoint_path=str(checkpoint), device="cpu")
-    framewise = sed.inference(y32[None, :])[0]  # [frames, 527], 0-1
+    # panns_inference prints (checkpoint path, device) to stdout — which is the
+    # JSON-lines IPC channel. Redirect to stderr, as separation/youtube do.
+    with contextlib.redirect_stdout(sys.stderr):
+        sed = SoundEventDetection(checkpoint_path=str(checkpoint), device="cpu")
+        framewise = sed.inference(y32[None, :])[0]  # [frames, 527], 0-1
 
     # Resample any PANNs-rate track onto the shared timeline.
     src_t = np.linspace(0.0, 1.0, framewise.shape[0])

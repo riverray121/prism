@@ -37,8 +37,7 @@ def test_name_groups_labels_chorus_and_bookends():
     # section names; ends of one-offs become intro/outro.
     groups = np.array([0, 1, 0, 0])
     energies = np.array([0.9, 0.2, 0.9, 0.9])
-    bounds = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
-    names = structure._name_groups(bounds, groups, energies)
+    names = structure._name_groups(groups, energies)
     assert names[0] == "chorus"  # recurring + most energetic
     assert names[1] in ("drop", "breakdown")  # one-off in the middle
 

@@ -9,10 +9,17 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 from uuid import uuid4
 
 import numpy as np
+
+# Serializes profile.json read-modify-writes across threads: the worker rewrites
+# the whole file (write_profile) while the main thread edits favorites/metadata
+# in place. Without this, interleaved read→write pairs let the last rename
+# silently revert the other thread's update.
+_PROFILE_LOCK = threading.Lock()
 
 # Profile JSON schema version (see docs/profile-schema.md).
 # 0.2.0: optional `onsets` on continuous feature envelopes.
@@ -58,29 +65,30 @@ def write_profile(
     ``audio_file`` path and a ``features`` map. Sidecar/audio paths in the profile
     are relative to profile.json itself, so source_file is just the filename.
     """
-    profile = {
-        "schema_version": SCHEMA_VERSION,
-        "song": {
-            "id": song["id"],
-            "title": song["title"],
-            "artist": song["artist"],
-            "duration_sec": song["duration_sec"],
-            "sample_rate": song["sample_rate"],
-            "source_file": Path(song["source_path"]).name,
-            "imported_at": song["imported_at"],
-            "analyzed_at": analyzed_at,
-        },
-        "timeline": {
-            "frame_rate_hz": frame_rate_hz,
-            "frame_count": frame_count,
-        },
-        "mix": mix,
-        "stems": stems or {},
-        # Re-analysis rewrites the profile wholesale; the user's stars survive
-        # it (stale paths are the frontend's warn-only concern).
-        "favorites": _existing_favorites(song["id"]),
-    }
-    write_json_atomic(SONGS_DIR / song["id"] / "profile.json", profile)
+    with _PROFILE_LOCK:
+        profile = {
+            "schema_version": SCHEMA_VERSION,
+            "song": {
+                "id": song["id"],
+                "title": song["title"],
+                "artist": song["artist"],
+                "duration_sec": song["duration_sec"],
+                "sample_rate": song["sample_rate"],
+                "source_file": Path(song["source_path"]).name,
+                "imported_at": song["imported_at"],
+                "analyzed_at": analyzed_at,
+            },
+            "timeline": {
+                "frame_rate_hz": frame_rate_hz,
+                "frame_count": frame_count,
+            },
+            "mix": mix,
+            "stems": stems or {},
+            # Re-analysis rewrites the profile wholesale; the user's stars
+            # survive it (stale paths are the frontend's warn-only concern).
+            "favorites": _existing_favorites(song["id"]),
+        }
+        write_json_atomic(SONGS_DIR / song["id"] / "profile.json", profile)
 
 
 def _existing_favorites(song_id: str) -> list:
@@ -112,9 +120,10 @@ def write_favorites(song_id: str, favorites: list[str]) -> None:
 
     Raises FileNotFoundError when the song has no profile (unanalyzed).
     """
-    profile = read_profile(song_id)
-    profile["favorites"] = favorites
-    write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
+    with _PROFILE_LOCK:
+        profile = read_profile(song_id)
+        profile["favorites"] = favorites
+        write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
 
 
 def heatmap_rel(name: str) -> str:
@@ -172,13 +181,14 @@ def read_profile(song_id: str) -> dict:
 
 def update_profile_metadata(song_id: str, title: str, artist: str) -> None:
     """Mirror a metadata edit into profile.json, when the song is analyzed."""
-    try:
-        profile = read_profile(song_id)
-    except FileNotFoundError:
-        return
-    profile["song"]["title"] = title
-    profile["song"]["artist"] = artist
-    write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
+    with _PROFILE_LOCK:
+        try:
+            profile = read_profile(song_id)
+        except FileNotFoundError:
+            return
+        profile["song"]["title"] = title
+        profile["song"]["artist"] = artist
+        write_json_atomic(SONGS_DIR / song_id / "profile.json", profile)
 
 
 def delete_song_dir(song_id: str) -> None:

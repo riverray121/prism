@@ -227,9 +227,7 @@ def _group(s: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return labels, conf
 
 
-def _name_groups(
-    bounds_sec: np.ndarray, groups: np.ndarray, energies: np.ndarray
-) -> list[str]:
+def _name_groups(groups: np.ndarray, energies: np.ndarray) -> list[str]:
     """Map cluster ids to section names on audio cues.
 
     Recurring groups: the most energetic is the chorus, the rest are verses.
@@ -274,7 +272,7 @@ def _sections_envelope(
             for a, b in zip(bounds_sec[:-1], bounds_sec[1:])
         ]
     )
-    names = _name_groups(bounds_sec, groups, energies)
+    names = _name_groups(groups, energies)
 
     segments = [
         {
