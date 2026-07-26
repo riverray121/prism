@@ -107,16 +107,22 @@ let dirtySongId: string | null = null;
 
 const SAVE_DEBOUNCE_MS = 400;
 
+// The one save path: send the current doc for the dirty song, then clear the
+// dirty mark. Shared by the debounce timer and the explicit flush.
+function commitSave(): void {
+  if (dirtySongId !== null && mapping.doc !== null) {
+    void updateMapping(dirtySongId, $state.snapshot(mapping.doc));
+  }
+  dirtySongId = null;
+}
+
 // Persist the current doc immediately if an edit is pending. Called before
 // retargeting so a quick song switch can't drop the last edits.
 export function flushMappingSave(): void {
   if (saveTimer === null) return;
   clearTimeout(saveTimer);
   saveTimer = null;
-  if (dirtySongId !== null && mapping.doc !== null) {
-    void updateMapping(dirtySongId, $state.snapshot(mapping.doc));
-  }
-  dirtySongId = null;
+  commitSave();
 }
 
 // Retarget to a song (null = closed). The doc stays null until the `mapping`
@@ -131,6 +137,17 @@ export function resetMappingForSong(songId: string | null): void {
   matrices = {};
   loadingMatrices.clear();
   rawOutputs = {};
+}
+
+// Drop the evaluation caches while keeping the doc and editor selection.
+// Needed when the open song's profile is replaced (re-analysis): the cache
+// keys don't include profile identity, so without this the previews keep
+// rendering outputs computed against the old analysis.
+export function resetMappingEvaluation(): void {
+  matrices = {};
+  loadingMatrices.clear();
+  rawOutputs = {};
+  evaluation.outputs = {};
 }
 
 // Apply an inbound `mapping` event; stale responses (user navigated away
@@ -297,9 +314,6 @@ export function touchDoc(mutate: (doc: MappingDoc) => void): void {
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    if (dirtySongId !== null && mapping.doc !== null) {
-      void updateMapping(dirtySongId, $state.snapshot(mapping.doc));
-    }
-    dirtySongId = null;
+    commitSave();
   }, SAVE_DEBOUNCE_MS);
 }

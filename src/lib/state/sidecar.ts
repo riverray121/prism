@@ -6,7 +6,10 @@ import {
   inspection,
   setProfile,
 } from "$lib/state/inspection.svelte";
-import { applyMappingEvent } from "$lib/state/mapping.svelte";
+import {
+  applyMappingEvent,
+  resetMappingEvaluation,
+} from "$lib/state/mapping.svelte";
 import { settings } from "$lib/state/settings.svelte";
 import { resetForSong } from "$lib/state/transport.svelte";
 
@@ -33,6 +36,8 @@ function applySidecarEvent(event: SidecarEvent): void {
       inspection.songDir = event.song_dir;
       // Arm the transport for the newly loaded song (pre-decodes the mix).
       resetForSong(event.audio_path, event.profile.song.duration_sec ?? 0);
+      // A fresh profile invalidates outputs evaluated against the old one.
+      resetMappingEvaluation();
       // Stale favorites (feature removed by a re-analysis) warn, never fail.
       for (const fav of event.profile.favorites) {
         if (!favoriteResolves(event.profile, fav))
