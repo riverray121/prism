@@ -6,10 +6,10 @@
   import { humanize } from "$lib/format";
   import {
     derivationLabel,
-    favoriteSources,
     programLabel,
     sourceLabel,
-  } from "$lib/mapping/sources";
+  } from "$lib/mapping/labels";
+  import { favoriteSources } from "$lib/mapping/sources";
   import type { Channel } from "$lib/mapping/schema";
   import { inspection } from "$lib/state/inspection.svelte";
   import {

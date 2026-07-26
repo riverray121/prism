@@ -7,11 +7,14 @@
   import SegmentLane from "$lib/graphs/SegmentLane.svelte";
   import { deriveEvents, deriveSegments } from "$lib/mapping/derive";
   import { GATE_PULSE_SEC } from "$lib/mapping/evaluate";
+  import { extent } from "$lib/extent";
+  import { uniqueId } from "$lib/mapping/automap";
+  import { derivationLabel, sourceLabel } from "$lib/mapping/labels";
   import {
-    derivationLabel,
+    audioKeyForSource,
     favoriteSources,
+    parseSourcePath,
     resolveFeature,
-    sourceLabel,
   } from "$lib/mapping/sources";
   import {
     backToMix,
@@ -60,6 +63,15 @@
       : [],
   );
 
+  // One home for the threshold defaults: the new-derivation draft and the
+  // display fallbacks for a doc missing fields both read from it.
+  const DEFAULT_THRESHOLD = {
+    cutoff: 0.4,
+    max: 1,
+    sensitivity: 1,
+    mode: "segments",
+  } as const;
+
   // Draft for a new derivation; committed on Create.
   const draft = $state<{
     source: string;
@@ -67,7 +79,7 @@
     max: number;
     sensitivity: number;
     mode: "events" | "segments";
-  }>({ source: "", cutoff: 0.4, max: 1, sensitivity: 1, mode: "segments" });
+  }>({ source: "", ...DEFAULT_THRESHOLD });
   $effect(() => {
     // Default the draft source to the first continuous favorite.
     if (isNew && draft.source === "" && continuousFavorites.length > 0) {
@@ -78,14 +90,20 @@
   // The values the editor and preview actually show.
   const source = $derived(isNew ? draft.source : (existing?.source ?? ""));
   const cutoff = $derived(
-    isNew ? draft.cutoff : (existing?.threshold.cutoff ?? 0.4),
+    isNew
+      ? draft.cutoff
+      : (existing?.threshold.cutoff ?? DEFAULT_THRESHOLD.cutoff),
   );
-  const maxBound = $derived(isNew ? draft.max : (existing?.threshold.max ?? 1));
+  const maxBound = $derived(
+    isNew ? draft.max : (existing?.threshold.max ?? DEFAULT_THRESHOLD.max),
+  );
   const sensitivity = $derived(
-    isNew ? draft.sensitivity : (existing?.threshold.sensitivity ?? 1),
+    isNew
+      ? draft.sensitivity
+      : (existing?.threshold.sensitivity ?? DEFAULT_THRESHOLD.sensitivity),
   );
   const mode = $derived(
-    isNew ? draft.mode : (existing?.threshold.mode ?? "segments"),
+    isNew ? draft.mode : (existing?.threshold.mode ?? DEFAULT_THRESHOLD.mode),
   );
 
   type Threshold = NonNullable<typeof existing>["threshold"];
@@ -106,19 +124,14 @@
   // the doc — a stem's feature is named just "energy", so without the stem
   // prefix every stem's gate would suggest the same id.
   function suggestedId(): string {
-    const parts = source.split(".");
-    let name = parts.at(-1) ?? "derivation";
-    if (parts[0] === "stems") {
-      const context =
-        parts[3] === "substems" ? `${parts[2]}_${parts[4]}` : parts[2];
+    const parsed = parseSourcePath(source);
+    let name = parsed.name || "derivation";
+    if (parsed.root === "stems" && parsed.stem) {
+      const context = parsed.sub ? `${parsed.stem}_${parsed.sub}` : parsed.stem;
       if (!name.startsWith(context)) name = `${context}_${name}`;
     }
     const base = `${name}_${mode === "events" ? "hits" : "gate"}`;
-    const taken = new Set(mapping.doc?.derivations.map((d) => d.id));
-    if (!taken.has(base)) return base;
-    let n = 2;
-    while (taken.has(`${base}_${n}`)) n++;
-    return `${base}_${n}`;
+    return uniqueId(base, new Set(mapping.doc?.derivations.map((d) => d.id)));
   }
 
   function create(): void {
@@ -142,13 +155,7 @@
 
   // Audio key for a stem source ("engine::stem[::substem]"), so the audible
   // track can be soloed to what's being thresholded — same keys as Analysis.
-  const audioKey = $derived.by(() => {
-    const parts = source.split(".");
-    if (parts[0] !== "stems") return null;
-    return parts[3] === "substems"
-      ? `${parts[1]}::${parts[2]}::${parts[4]}`
-      : `${parts[1]}::${parts[2]}`;
-  });
+  const audioKey = $derived(audioKeyForSource(source));
   // Soloed = the stem is the audible source, playing or paused; the button
   // toggles the source only and never starts/stops playback.
   const soloed = $derived(
@@ -194,14 +201,8 @@
   // cutoff/ceiling are fractions of the source's own range).
   const dataRange = $derived.by(() => {
     if (!data) return null;
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (let i = 0; i < data.length; i++) {
-      const v = data[i];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-    return hi > lo ? { lo, hi } : null;
+    const e = extent(data);
+    return e && e.hi > e.lo ? e : null;
   });
   const hlines = $derived.by(() => {
     if (!dataRange) return [];

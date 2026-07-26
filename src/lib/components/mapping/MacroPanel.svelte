@@ -1,10 +1,6 @@
 <script lang="ts">
-  import {
-    favoriteSources,
-    programLabel,
-    resolveFeature,
-    sourceLabel,
-  } from "$lib/mapping/sources";
+  import { programLabel, sourceLabel } from "$lib/mapping/labels";
+  import { favoriteSources, resolveFeature } from "$lib/mapping/sources";
   import { inspection } from "$lib/state/inspection.svelte";
   import {
     mapping,

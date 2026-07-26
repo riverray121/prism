@@ -6,7 +6,7 @@
     litMask,
     type ProgramOutput,
   } from "$lib/mapping/evaluate";
-  import { programLabel } from "$lib/mapping/sources";
+  import { programLabel } from "$lib/mapping/labels";
   import { inspection } from "$lib/state/inspection.svelte";
   import { audition, evaluation, mapping } from "$lib/state/mapping.svelte";
   import { transport } from "$lib/state/transport.svelte";

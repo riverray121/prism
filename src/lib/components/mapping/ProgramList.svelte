@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { programLabel } from "$lib/mapping/sources";
+  import { programLabel } from "$lib/mapping/labels";
   import {
     addProgram,
     editProgram,

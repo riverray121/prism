@@ -1,5 +1,6 @@
 import { getMapping, getProfile, updateFavorites } from "$lib/ipc";
 import type { Profile } from "$lib/ipc/messages";
+import { resolveNode } from "$lib/mapping/sources";
 import { resetMappingForSong } from "$lib/state/mapping.svelte";
 import {
   resetForSong,
@@ -106,13 +107,8 @@ export function toggleFavorite(path: string): void {
   void updateFavorites(inspection.songId, profile.favorites);
 }
 
-// Follow a favorites dot-path through the profile; used to warn on stale
+// Whether a favorites dot-path still resolves; used to warn on stale
 // favorites when a profile loads (a removed feature must not kill the load).
 export function favoriteResolves(profile: Profile, path: string): boolean {
-  let node: unknown = profile;
-  for (const part of path.split(".")) {
-    if (typeof node !== "object" || node === null) return false;
-    node = (node as Record<string, unknown>)[part];
-  }
-  return node !== undefined;
+  return resolveNode(profile, path) !== undefined;
 }

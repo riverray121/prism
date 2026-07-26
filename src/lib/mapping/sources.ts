@@ -1,8 +1,8 @@
-import { humanize } from "$lib/format";
 import type { MixFeature, Profile } from "$lib/ipc/messages";
 
-// Dot-path resolution over the profile — the favorites addressing, shared by
-// the mapping schema, sources panel, and evaluator.
+// Profile addressing: dot-path resolution and source-path shape parsing,
+// shared by the mapping schema, sources panel, and evaluator. Presentation
+// (labels) lives in labels.ts so this module stays headless.
 
 export function resolveNode(profile: Profile, path: string): unknown {
   let node: unknown = profile;
@@ -42,27 +42,40 @@ export function favoriteSources(profile: Profile): FavoriteSource[] {
   return out;
 }
 
-// Display name for a program or derivation: the user-set name, else the
-// humanized id.
-export function programLabel(p: { id: string; name?: string }): string {
-  return p.name ?? humanize(p.id);
+// Decoded source path. The positional layout —
+// "mix.{name}", "derived.{id}",
+// "stems.{engine}.{stem}[.substems.{sub}].features.{name}" — is encoded HERE
+// only; everything else goes through this parser.
+export interface SourcePath {
+  root: "mix" | "stems" | "derived" | "unknown";
+  name: string; // final feature/derivation name
+  engine?: string;
+  stem?: string;
+  sub?: string;
 }
-export const derivationLabel = programLabel;
 
-// Short human label for a source path: humanized feature name plus its
-// context. "mix.rms" → "RMS (mix)"; "stems.eng.drums.features.drums_energy" →
-// "Drums energy (eng · drums)"; substems add their name to the context.
-export function sourceLabel(path: string): string {
+export function parseSourcePath(path: string): SourcePath {
   const parts = path.split(".");
-  if (parts[0] === "mix") return `${humanize(parts.slice(1).join("."))} (mix)`;
-  if (parts[0] === "stems") {
-    const name = parts.at(-1) ?? path;
-    const context = parts
-      .slice(1, -1)
-      .filter((p) => p !== "features" && p !== "substems");
-    return `${humanize(name)} (${context.join(" · ")})`;
-  }
+  if (parts[0] === "mix")
+    return { root: "mix", name: parts.slice(1).join(".") };
   if (parts[0] === "derived")
-    return `${humanize(parts.slice(1).join("."))} (derived)`;
-  return path;
+    return { root: "derived", name: parts.slice(1).join(".") };
+  if (parts[0] === "stems") {
+    return {
+      root: "stems",
+      engine: parts[1],
+      stem: parts[2],
+      sub: parts[3] === "substems" ? parts[4] : undefined,
+      name: parts.at(-1) ?? path,
+    };
+  }
+  return { root: "unknown", name: path };
+}
+
+// Audio key ("engine::stem[::substem]") for a stem source path — the same
+// keys the transport/inspection use to solo a stem. Null for non-stem paths.
+export function audioKeyForSource(path: string): string | null {
+  const p = parseSourcePath(path);
+  if (p.root !== "stems" || !p.engine || !p.stem) return null;
+  return p.sub ? `${p.engine}::${p.stem}::${p.sub}` : `${p.engine}::${p.stem}`;
 }

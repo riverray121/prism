@@ -271,12 +271,12 @@
         window={view.window}
         followMode={view.followMode}
         onWindowChange={setViewWindow}
-        labelFor={name === "chords" ? chordLabel : undefined}
-        height={name === "chords" ? 100 : 76}
-        gutter
         onSeek={scrub}
         onScrubStart={scrubStart}
         onScrubEnd={scrubEnd}
+        labelFor={name === "chords" ? chordLabel : undefined}
+        height={name === "chords" ? 100 : 76}
+        gutter
       />
     {:else if feature.render === "segment"}
       <SegmentLane

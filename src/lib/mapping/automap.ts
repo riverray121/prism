@@ -2,9 +2,14 @@
 // only. Pure — invoked exclusively by the Generate button, never on song
 // open; hand authoring is the primary flow and a proposal only ever appends.
 
+import { extent } from "$lib/extent";
 import type { Profile } from "$lib/ipc/messages";
 import type { MappingDoc, Program, Scene } from "$lib/mapping/schema";
-import { favoriteSources, resolveFeature } from "$lib/mapping/sources";
+import {
+  favoriteSources,
+  parseSourcePath,
+  resolveFeature,
+} from "$lib/mapping/sources";
 
 export interface AutoMapProposal {
   programs: Program[];
@@ -33,14 +38,13 @@ const CENTROID_RE = /centroid/;
 // Group key: which light-ish entity a favorite belongs to — the mix or one
 // stem — so each group becomes one program.
 function groupOf(path: string): string {
-  const parts = path.split(".");
-  if (parts[0] !== "stems") return "mix";
-  // stems.{engine}.{stem}[.substems.{sub}].features.{name}
-  const sub = parts[3] === "substems" ? `_${parts[4]}` : "";
-  return `${parts[2]}${sub}`;
+  const p = parseSourcePath(path);
+  if (p.root !== "stems" || !p.stem) return "mix";
+  return p.sub ? `${p.stem}_${p.sub}` : p.stem;
 }
 
-function uniqueId(base: string, taken: Set<string>): string {
+// Also used by the derivation editor to unique suggested derivation ids.
+export function uniqueId(base: string, taken: Set<string>): string {
   if (!taken.has(base)) return base;
   let n = 2;
   while (taken.has(`${base}_${n}`)) n++;
@@ -62,19 +66,13 @@ function brightnessChain(
     for (const ref of [`mix.${name}`, "mix.rms"]) {
       if (ref === path) break; // the mix's own program: own range is the song
       const mixFeature = resolveFeature(profile, ref);
-      if (mixFeature?.render !== "continuous" || mixFeature.data.length === 0)
-        continue;
-      let lo = Infinity;
-      let hi = -Infinity;
-      for (const v of mixFeature.data) {
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
-      }
-      if (hi <= lo) continue;
+      if (mixFeature?.render !== "continuous") continue;
+      const e = extent(mixFeature.data);
+      if (!e || e.hi <= e.lo) continue;
       return {
         source: path,
         transform: [
-          { normalize: { min: lo, max: hi, curve: "linear", gamma: 2 } },
+          { normalize: { min: e.lo, max: e.hi, curve: "linear", gamma: 2 } },
           { smooth: { window_s: 0.08 } },
         ],
       };

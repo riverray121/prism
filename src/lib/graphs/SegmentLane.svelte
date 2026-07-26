@@ -77,7 +77,7 @@
     const { min, max } = u.scales.x;
     if (min == null || max == null) return;
     const { ctx } = u;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = globalThis.devicePixelRatio || 1;
     const top = u.bbox.top;
     const bottom = u.bbox.top + u.bbox.height;
     const bandTop = top + 4 * dpr;

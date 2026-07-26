@@ -64,6 +64,12 @@ export function setFollowMode(mode: FollowMode): void {
   view.followMode = mode;
 }
 
+// NOTE: every synced lane passes the same 8 sync props (playheadSec, follow,
+// window, followMode + the four callbacks) explicitly at its call site. Do NOT
+// bundle them into a spread object: reading a prop that arrives via a spread
+// re-invokes the whole spread expression, so every lane effect would depend on
+// transport.currentTime and re-run at tick rate — which visibly lags playback.
+
 let ctx: AudioContext | undefined;
 let source: AudioBufferSourceNode | undefined;
 let startCtxTime = 0; // ctx.currentTime when the current source started

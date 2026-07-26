@@ -55,14 +55,14 @@
 </script>
 
 {#if error}
-  <p class="text-xs text-red-500">Failed to load tags: {error}</p>
+  <p class="text-xs text-danger">Failed to load tags: {error}</p>
 {:else if rows.length === 0}
-  <p class="text-xs text-neutral-500">No tags above threshold.</p>
+  <p class="text-xs text-ink-faint">No tags above threshold.</p>
 {:else}
   <div class="flex flex-col gap-4">
     {#each rows as { label, data } (label)}
       <div>
-        <p class="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <p class="mb-1 text-xs text-ink-muted">
           {label}
         </p>
         <ContinuousLane

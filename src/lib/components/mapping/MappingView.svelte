@@ -9,7 +9,8 @@
   import ResizablePanel from "$lib/components/shell/ResizablePanel.svelte";
   import PixelLane from "$lib/graphs/PixelLane.svelte";
   import RibbonLane from "$lib/graphs/RibbonLane.svelte";
-  import { programLabel, resolveFeature } from "$lib/mapping/sources";
+  import { programLabel } from "$lib/mapping/labels";
+  import { resolveFeature } from "$lib/mapping/sources";
   import {
     getRawProfile,
     inspection,

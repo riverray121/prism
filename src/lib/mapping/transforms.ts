@@ -3,6 +3,7 @@
 // Float32Array on the profile's frame grid.
 
 import { oklchToRgb, PALETTES } from "$lib/color";
+import { extent } from "$lib/extent";
 import type { DerivedEvent } from "$lib/mapping/derive";
 
 export interface NormalizeOpts {
@@ -22,15 +23,9 @@ export function applyNormalize(
   let lo = opts.min;
   let hi = opts.max;
   if (lo === null || hi === null) {
-    let dlo = Infinity;
-    let dhi = -Infinity;
-    for (let i = 0; i < n; i++) {
-      const v = data[i];
-      if (v < dlo) dlo = v;
-      if (v > dhi) dhi = v;
-    }
-    lo = lo ?? dlo;
-    hi = hi ?? dhi;
+    const e = extent(data);
+    lo = lo ?? (e ? e.lo : 0);
+    hi = hi ?? (e ? e.hi : 0);
   }
   const range = hi - lo;
   const out = new Float32Array(n);

@@ -4,6 +4,8 @@
 // and peak separation — so cutoff sliders re-derive live over envelopes
 // already in memory with no sidecar round-trip.
 
+import { extent } from "$lib/extent";
+
 export interface DerivedEvent {
   t: number;
   strength: number; // normalized (0–1) peak height
@@ -38,17 +40,11 @@ function releaseLevel(cutoff: number, sensitivity: number): number {
 function normalized(data: ArrayLike<number>): Float64Array | null {
   const n = data.length;
   if (n < 3) return null;
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (let i = 0; i < n; i++) {
-    const v = data[i];
-    if (v < lo) lo = v;
-    if (v > hi) hi = v;
-  }
-  if (!(hi - lo > 0)) return null;
+  const e = extent(data);
+  if (!e || e.hi <= e.lo) return null;
   const out = new Float64Array(n);
-  const range = hi - lo;
-  for (let i = 0; i < n; i++) out[i] = (data[i] - lo) / range;
+  const range = e.hi - e.lo;
+  for (let i = 0; i < n; i++) out[i] = (data[i] - e.lo) / range;
   return out;
 }
 

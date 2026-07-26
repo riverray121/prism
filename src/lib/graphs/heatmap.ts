@@ -21,7 +21,8 @@ export function heatColor(t: number): [number, number, number] {
       return [r0 + (r1 - r0) * f, g0 + (g1 - g0) * f, b0 + (b1 - b0) * f];
     }
   }
-  return [STOPS[STOPS.length - 1][1], 250, 180];
+  const last = STOPS[STOPS.length - 1];
+  return [last[1], last[2], last[3]];
 }
 
 // Render the matrix once into a native-resolution offscreen canvas (cols×rows);

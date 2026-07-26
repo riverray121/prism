@@ -5,6 +5,7 @@
 // the touched program.
 
 import { type Oklch, oklchToRgb, PALETTES } from "$lib/color";
+import { extent } from "$lib/extent";
 import type { Profile } from "$lib/ipc/messages";
 import {
   deriveEvents,
@@ -279,7 +280,7 @@ function evaluateContinuousBinding(
     chain = DEFAULT_BRIGHTNESS_CHAIN;
   }
 
-  let form: Materialized = m;
+  const form: Materialized = m;
   let track: Float32Array | null = null;
   let hueInDegrees = false; // colormap emits degrees; plain 0-1 data scales ×360
 
@@ -465,14 +466,10 @@ function positionIntensity(
   if (feature?.render === "heatmap") {
     const m = matrices[source];
     if (!m) return null; // sidecar not loaded (yet)
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (let i = 0; i < m.data.length; i++) {
-      const v = m.data[i];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-    const span = hi - lo || 1;
+    // Flat matrix: lo is the flat value over span 1, so the output is zeros.
+    const e = extent(m.data);
+    const lo = e ? e.lo : 0;
+    const span = e && e.hi > e.lo ? e.hi - e.lo : 1;
     const out = new Float32Array(frameCount * pixelCount);
     for (let f = 0; f < frameCount; f++) {
       const c = Math.min(m.cols - 1, f);
@@ -720,7 +717,6 @@ export function evaluateProgram(
     Channel,
     number | Binding,
   ][]) {
-    if (value === undefined) continue;
     if (channel === "gate") {
       gate = evaluateGate(profile, doc, value, hz);
     } else if (POINT_CHANNELS.includes(channel)) {

@@ -50,7 +50,7 @@
       const { min, max } = u.scales.x;
       if (min == null || max == null) return;
       const { ctx } = u;
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = globalThis.devicePixelRatio || 1;
       const mid = u.bbox.top + u.bbox.height / 2;
       // Faint baseline the dots sit on.
       ctx.save();

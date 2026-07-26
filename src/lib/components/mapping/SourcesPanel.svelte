@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { derivationLabel, favoriteSources } from "$lib/mapping/sources";
+  import { derivationLabel } from "$lib/mapping/labels";
+  import { favoriteSources } from "$lib/mapping/sources";
   import { inspection } from "$lib/state/inspection.svelte";
   import {
     editDerivation,

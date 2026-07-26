@@ -23,9 +23,8 @@
     children: Snippet;
   } = $props();
 
-  // Header text steps down with nesting so levels are tellable apart.
-  const LABEL_SIZE = ["text-base", "text-sm", "text-sm"];
-  const labelSize = $derived(LABEL_SIZE[Math.min(depth, 2)]);
+  // Top-level headers read larger; nested ones step down one size.
+  const labelSize = $derived(depth === 0 ? "text-base" : "text-sm");
 </script>
 
 <div class="flex flex-col" style:margin-left={`${depth * 1}rem`}>
