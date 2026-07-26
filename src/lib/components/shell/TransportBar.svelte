@@ -6,6 +6,7 @@
     backToMix,
     inspection,
     playToggle,
+    requestFeatureTrack,
   } from "$lib/state/inspection.svelte";
   import {
     scrub,
@@ -24,13 +25,19 @@
   const RATES = [0.25, 0.5, 0.75, 1];
 
   // Song-level lane: RMS if present, else the first continuous mix feature.
-  const overview = $derived.by(() => {
+  // Sidecar-backed data streams in on demand; the lane appears when it lands.
+  const overviewFeature = $derived.by(() => {
     const mix = inspection.profile?.mix;
     if (!mix) return null;
     const rms = mix["rms"];
-    if (rms?.render === "continuous") return rms.data;
+    if (rms?.render === "continuous") return rms;
     const first = Object.values(mix).find((f) => f.render === "continuous");
-    return first && first.render === "continuous" ? first.data : null;
+    return first && first.render === "continuous" ? first : null;
+  });
+  const overview = $derived(overviewFeature?.data ?? null);
+  $effect(() => {
+    if (overviewFeature && !overviewFeature.data)
+      requestFeatureTrack(overviewFeature);
   });
 
   const frameRateHz = $derived(
@@ -48,6 +55,28 @@
     if (mixAudible) return null;
     const [, stem, sub] = transport.activeKey.split("::");
     return sub ? `${humanize(stem)} · ${humanize(sub)}` : humanize(stem);
+  });
+
+  // Space toggles the audible source's play/pause from anywhere — except while
+  // typing in a field, where space belongs to the text. preventDefault stops
+  // both page scroll and a focused button's space activation (no double fire).
+  $effect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      )
+        return;
+      e.preventDefault();
+      playToggle(transport.activeKey);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   });
 </script>
 

@@ -3,6 +3,8 @@
 
   import { chordLabel } from "$lib/chords";
   import Group from "$lib/components/analysis/Group.svelte";
+  import Segmented from "$lib/components/shell/Segmented.svelte";
+  import TrackGate from "$lib/components/TrackGate.svelte";
   import { humanize } from "$lib/format";
   import ContinuousLane from "$lib/graphs/ContinuousLane.svelte";
   import EventLane from "$lib/graphs/EventLane.svelte";
@@ -213,44 +215,56 @@
       {@render star(favPath)}
       <span class="font-medium text-ink">{humanize(name)}</span>
       <span class="text-sm text-ink-faint">{detailOf(feature)}</span>
-      <!-- Onset-mode toggle lives in the header so the dots lane below keeps
-           the full lane width and stays playhead-aligned with its parent. -->
-      {#if feature.render === "continuous" && feature.onsets_strict}
-        <button
-          onclick={() => (strictOnsets[favPath] = !strict)}
-          title={strict
-            ? "Dense onsets: every qualifying peak — runs of dots trace sustained sounds"
-            : "Strict onsets: prominent maxima only — one dot per distinct hit"}
-          class="ml-auto w-16 shrink-0 rounded border border-edge px-2 py-0.5 text-center text-xs {strict
-            ? 'text-accent'
-            : 'text-ink-faint hover:text-ink'}"
-        >
-          {strict ? "maxima" : "dense"}
-        </button>
-      {/if}
     </p>
     {#if feature.render === "continuous"}
-      <ContinuousLane
-        data={feature.data}
-        {frameRateHz}
-        label={name}
-        color={PALETTE[i % PALETTE.length]}
-        height={150}
-        playheadSec={transport.currentTime}
-        follow={transport.playing}
-        window={view.window}
-        followMode={view.followMode}
-        onWindowChange={setViewWindow}
-        onSeek={scrub}
-        onScrubStart={scrubStart}
-        onScrubEnd={scrubEnd}
-      />
+      <TrackGate {feature}>
+        {#snippet children(data)}
+          <ContinuousLane
+            {data}
+            {frameRateHz}
+            label={name}
+            color={PALETTE[i % PALETTE.length]}
+            height={150}
+            playheadSec={transport.currentTime}
+            follow={transport.playing}
+            window={view.window}
+            followMode={view.followMode}
+            onWindowChange={setViewWindow}
+            onSeek={scrub}
+            onScrubStart={scrubStart}
+            onScrubEnd={scrubEnd}
+          />
+        {/snippet}
+      </TrackGate>
       {#if feature.onsets?.length}
+        {#if feature.onsets_strict}
+          <!-- Onset-mode picker, right above the dots lane it controls. -->
+          <div class="mt-1 flex justify-end text-xs">
+            <Segmented
+              class="w-44"
+              options={[
+                {
+                  label: "Dense",
+                  active: !strict,
+                  onpick: () => (strictOnsets[favPath] = false),
+                  title:
+                    "Every qualifying peak — runs of dots trace sustained sounds",
+                },
+                {
+                  label: "Maxima",
+                  active: strict,
+                  onpick: () => (strictOnsets[favPath] = true),
+                  title: "Prominent maxima only — one dot per distinct hit",
+                },
+              ]}
+            />
+          </div>
+        {/if}
         <OnsetDots
           onsets={strict ? (feature.onsets_strict ?? []) : feature.onsets}
           maxTimeSec={durationSec}
           color={PALETTE[i % PALETTE.length]}
-          height={56}
+          height={80}
           gutter
           playheadSec={transport.currentTime}
           follow={transport.playing}

@@ -7,6 +7,7 @@
     type AutoMapOptions,
     type AutoMapProposal,
   } from "$lib/mapping/automap";
+  import { favoriteSources } from "$lib/mapping/sources";
   import type { MappingDoc } from "$lib/mapping/schema";
   import { getRawProfile } from "$lib/state/inspection.svelte";
   import {
@@ -33,7 +34,16 @@
     const doc = $state.snapshot(mapping.doc) as MappingDoc;
     const proposal = autoMap(profile, doc, { intensity });
     if (proposalIsEmpty(proposal)) {
-      note = "Nothing to propose — star features in Analysis first.";
+      // Say which precondition failed: stars are per-song, can go stale
+      // (re-analysis with other engines), or may fit no channel kind.
+      const starred = profile.favorites.length;
+      const usable = favoriteSources(profile).length;
+      note =
+        starred === 0
+          ? "Nothing starred on this song. Star (★) features in Analysis."
+          : usable === 0
+            ? "Starred features no longer exist on this profile (re-analyzed with different engines?). Re-star in Analysis."
+            : "Starred features fit no channel. Star energy, onsets, centroid, or sections.";
       return;
     }
     if (docIsEmpty(doc)) {
