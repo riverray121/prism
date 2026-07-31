@@ -13,8 +13,11 @@
     stopStream,
     streamTick,
   } from "$lib/state/hardware.svelte";
+  import {
+    ensureEvaluationCurrent,
+    evaluation,
+  } from "$lib/state/evaluation.svelte";
   import { inspection } from "$lib/state/inspection.svelte";
-  import { ensureEvaluationCurrent } from "$lib/state/mapping.svelte";
   import { transport } from "$lib/state/transport.svelte";
   import {
     PANEL_MAX_WIDTH,
@@ -55,16 +58,25 @@
 
   // Stream while playing; any exit — pause, stop, tab switch, unmount —
   // runs the cleanup, which blacks out and powers off every streamed hub.
-  // Until the milestone-6 Rust-side sampler, the strip stalls if the window
-  // is minimized during playback (browsers throttle rAF when hidden).
+  // The first tick must go through rAF too: called synchronously it would
+  // run inside the effect's tracking scope, making every state read
+  // (transport.currentTime at 60 Hz) an effect dependency — each tick would
+  // then tear down and restart the stream, hammering the hub with power
+  // toggles and flooding the shell. Until the milestone-6 Rust-side sampler,
+  // the strip stalls if the window is minimized during playback (browsers
+  // throttle rAF when hidden).
   $effect(() => {
     if (!transport.playing) return;
-    let raf = 0;
     const loop = () => {
-      streamTick(transport.currentTime, frameRateHz, frameCount);
+      streamTick(
+        transport.currentTime,
+        frameRateHz,
+        frameCount,
+        evaluation.outputs,
+      );
       raf = requestAnimationFrame(loop);
     };
-    loop();
+    let raf = requestAnimationFrame(loop);
     return () => {
       cancelAnimationFrame(raf);
       stopStream();

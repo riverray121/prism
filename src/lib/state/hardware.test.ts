@@ -36,7 +36,6 @@ import {
 } from "./hardware.svelte";
 import {
   applyMappingEvent,
-  evaluation,
   mapping,
   resetMappingForSong,
   setPatch,
@@ -212,7 +211,7 @@ describe("streaming", () => {
     };
   }
 
-  function openPatchedSong(output: ProgramOutput): void {
+  function openPatchedSong(): void {
     applyRigEvent({
       hubs: [
         benchHub({
@@ -230,7 +229,6 @@ describe("streaming", () => {
         patch: { "a842e39b1c60:0": "pulse" },
       }),
     );
-    evaluation.outputs = { pulse: output };
   }
 
   beforeEach(async () => {
@@ -245,8 +243,8 @@ describe("streaming", () => {
 
   it("a tick sends the playhead's frame to the patched hub", () => {
     const output = pixelOutput();
-    openPatchedSong(output);
-    streamTick(1.0, 100, FRAMES); // frame 100
+    openPatchedSong();
+    streamTick(1.0, 100, FRAMES, { pulse: output }); // frame 100
     expect(ddpSend).toHaveBeenCalledTimes(1);
     const [address, port, data] = ddpSend.mock.calls[0];
     expect(address).toBe("192.168.0.84");
@@ -257,16 +255,19 @@ describe("streaming", () => {
   });
 
   it("the first frame to a hub powers it on, once", () => {
-    openPatchedSong(pixelOutput());
-    streamTick(0, 100, FRAMES);
-    streamTick(0.1, 100, FRAMES);
+    const outputs = { pulse: pixelOutput() };
+    openPatchedSong();
+    streamTick(0, 100, FRAMES, outputs);
+    streamTick(0.1, 100, FRAMES, outputs);
     expect(setHubPower).toHaveBeenCalledTimes(1);
     expect(setHubPower).toHaveBeenCalledWith("192.168.0.84", true);
   });
 
   it("a program without a pixel matrix streams a solid whole-strip frame", () => {
-    openPatchedSong({ key: "k", channels: {}, gate: null, pixels: null });
-    streamTick(0, 100, FRAMES);
+    openPatchedSong();
+    streamTick(0, 100, FRAMES, {
+      pulse: { key: "k", channels: {}, gate: null, pixels: null },
+    });
     const [, , data] = ddpSend.mock.calls[0];
     const payload = data.slice(10);
     expect(payload).toHaveLength(N * 3);
@@ -280,14 +281,14 @@ describe("streaming", () => {
   it("a stale matrix at the wrong pixel count is skipped, not streamed", () => {
     const output = pixelOutput();
     output.pixels!.pixelCount = 60; // evaluation not yet re-run for the patch
-    openPatchedSong(output);
-    streamTick(0, 100, FRAMES);
+    openPatchedSong();
+    streamTick(0, 100, FRAMES, { pulse: output });
     expect(ddpSend).not.toHaveBeenCalled();
   });
 
   it("stop sends one all-zeros frame, then powers the hub off", async () => {
-    openPatchedSong(pixelOutput());
-    streamTick(1.0, 100, FRAMES);
+    openPatchedSong();
+    streamTick(1.0, 100, FRAMES, { pulse: pixelOutput() });
     ddpSend.mockClear();
     stopStream();
     expect(ddpSend).toHaveBeenCalledTimes(1);
@@ -303,8 +304,8 @@ describe("streaming", () => {
   });
 
   it("stop skips hubs that dropped offline mid-run", () => {
-    openPatchedSong(pixelOutput());
-    streamTick(0, 100, FRAMES);
+    openPatchedSong();
+    streamTick(0, 100, FRAMES, { pulse: pixelOutput() });
     markHubOffline("a842e39b1c60");
     ddpSend.mockClear();
     setHubPower.mockClear();

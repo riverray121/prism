@@ -21,7 +21,7 @@ import {
   type GateSegment,
   type ProgramOutput,
 } from "$lib/mapping/evaluate";
-import { evaluation, mapping } from "$lib/state/mapping.svelte";
+import { mapping } from "$lib/state/mapping.svelte";
 
 // Hardware state: the persisted rig (known hubs + named lights), runtime
 // discovery results, and per-hub reachability. Components render this and
@@ -161,18 +161,21 @@ function solidFrame(
 // One streaming tick at playhead time `t`. Sends each live patch target its
 // program's pixel frame (or the solid whole-strip color when the program has
 // no pixel dimension); the first frame to a hub powers it on. Called from the
-// Hardware tab's rAF loop, which reads transport.currentTime in its own tick
-// (hot-path rule: never through props).
+// Hardware tab's rAF loop, which reads transport.currentTime and the
+// evaluated outputs in its own tick (hot-path rule: never through props).
+// `outputs` arrives as an argument so this module never imports the
+// evaluation store (which sits downstream of this one — no import cycles).
 export function streamTick(
   t: number,
   frameRateHz: number,
   frameCount: number,
+  outputs: Record<string, ProgramOutput>,
 ): void {
   const doc = mapping.doc;
   if (!doc || frameCount === 0) return;
   const frame = frameIndexAt(t, frameRateHz, frameCount);
   for (const target of activePatch(doc, hardware.rig.hubs, hardware.online)) {
-    const output = evaluation.outputs[target.program.id];
+    const output = outputs[target.program.id];
     if (!output) continue;
     const N = target.light.pixel_count;
     let packets;

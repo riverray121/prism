@@ -10,14 +10,12 @@
   import PixelLane from "$lib/graphs/PixelLane.svelte";
   import RibbonLane from "$lib/graphs/RibbonLane.svelte";
   import { programLabel } from "$lib/mapping/labels";
-  import { inspection } from "$lib/state/inspection.svelte";
   import {
-    editProgram,
     ensureEvaluationCurrent,
     evaluation,
-    mapping,
-    mappingUi,
-  } from "$lib/state/mapping.svelte";
+  } from "$lib/state/evaluation.svelte";
+  import { inspection } from "$lib/state/inspection.svelte";
+  import { editProgram, mapping, mappingUi } from "$lib/state/mapping.svelte";
   import {
     scrub,
     scrubEnd,

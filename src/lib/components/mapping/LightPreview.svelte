@@ -9,7 +9,8 @@
   } from "$lib/mapping/evaluate";
   import { programLabel } from "$lib/mapping/labels";
   import { inspection } from "$lib/state/inspection.svelte";
-  import { audition, evaluation, mapping } from "$lib/state/mapping.svelte";
+  import { evaluation } from "$lib/state/evaluation.svelte";
+  import { audition, mapping } from "$lib/state/mapping.svelte";
   import { transport } from "$lib/state/transport.svelte";
 
   // The feel check: each program rendered as its own generic light (glowing
@@ -134,15 +135,16 @@
   }
 
   // rAF loop while playing; the cleanup on unmount (or pause) stops it — no
-  // leaked frames when the tab switches away.
+  // leaked frames when the tab switches away. The first tick goes through
+  // rAF so draw()'s state reads stay out of the effect's tracking scope
+  // (a synchronous call would re-run the effect on every playhead tick).
   $effect(() => {
     if (!transport.playing) return;
-    let raf = 0;
     const loop = () => {
       draw();
       raf = requestAnimationFrame(loop);
     };
-    loop();
+    let raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   });
 
