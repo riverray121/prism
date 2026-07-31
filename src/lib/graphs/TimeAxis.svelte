@@ -205,31 +205,47 @@
     return null;
   }
 
-  // Drag-to-scrub and wheel-to-zoom, bound to the plot overlay.
+  // Detach window-level scrub listeners on unmount; a drag in progress when
+  // the lane is destroyed must not leave them behind.
+  let detachScrub: (() => void) | null = null;
+
+  // Drag-to-scrub and wheel-to-zoom, bound to the plot overlay. Scrubbing
+  // uses MOUSE events, not pointer events: this webview environment
+  // demonstrably delivers mousedown/mousemove/mouseup while pointerdown can
+  // fail to reach handlers entirely (mouse events are what every working
+  // control in the app runs on). The drag tracks on window, so it keeps
+  // following the cursor outside the lane — the capture the pointer API
+  // would otherwise provide.
   function attachInteractions(u: uPlot) {
     const over = u.over;
     over.style.cursor = "ew-resize";
     let seeking = false;
 
-    const endScrub = (e: PointerEvent) => {
+    const moveScrub = (e: MouseEvent) => {
+      if (seeking) onSeek?.(clamp(timeAtEvent(u, e), 0, maxX()));
+    };
+    const endScrub = (e: MouseEvent) => {
       if (!seeking) return;
       seeking = false;
-      over.releasePointerCapture(e.pointerId);
+      globalThis.removeEventListener("mousemove", moveScrub);
+      globalThis.removeEventListener("mouseup", endScrub);
       onSeek?.(clamp(timeAtEvent(u, e), 0, maxX()));
       onScrubEnd?.();
     };
+    detachScrub = () => {
+      seeking = false;
+      globalThis.removeEventListener("mousemove", moveScrub);
+      globalThis.removeEventListener("mouseup", endScrub);
+    };
 
-    over.addEventListener("pointerdown", (e) => {
+    over.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
       seeking = true;
-      over.setPointerCapture(e.pointerId);
+      globalThis.addEventListener("mousemove", moveScrub);
+      globalThis.addEventListener("mouseup", endScrub);
       onScrubStart?.();
       onSeek?.(clamp(timeAtEvent(u, e), 0, maxX()));
     });
-    over.addEventListener("pointermove", (e) => {
-      if (seeking) onSeek?.(clamp(timeAtEvent(u, e), 0, maxX()));
-    });
-    over.addEventListener("pointerup", endScrub);
-    over.addEventListener("pointercancel", endScrub);
 
     // Double-click resets the zoom to the full time extent.
     over.addEventListener("dblclick", () => onWindowChange?.(null));
@@ -357,6 +373,8 @@
       ro.disconnect();
       io.disconnect();
       if (emitRaf !== null) cancelAnimationFrame(emitRaf);
+      detachScrub?.();
+      detachScrub = null;
       chart?.destroy();
       chart = undefined;
     };

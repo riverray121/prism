@@ -44,6 +44,30 @@ export function startHealthMonitor(): () => void {
   window.addEventListener("error", onError);
   window.addEventListener("unhandledrejection", onRejection);
 
+  // Mirror console.warn/error into app.log too: the app's own guard rails
+  // (schema drops, failed track loads, muted bindings) report there, and a
+  // closed webview otherwise takes that evidence with it.
+  const origWarn = console.warn.bind(console);
+  const origError = console.error.bind(console);
+  const format = (args: unknown[]) =>
+    args
+      .map((a) =>
+        a instanceof Error
+          ? `${a.message}\n${a.stack ?? ""}`
+          : typeof a === "object"
+            ? JSON.stringify(a)?.slice(0, 500)
+            : String(a),
+      )
+      .join(" ");
+  console.warn = (...args: unknown[]) => {
+    origWarn(...args);
+    forwardError(`console.warn: ${format(args)}`);
+  };
+  console.error = (...args: unknown[]) => {
+    origError(...args);
+    forwardError(`console.error: ${format(args)}`);
+  };
+
   let detach: (() => void) | undefined;
   let stopped = false;
   void (async () => {
@@ -64,6 +88,8 @@ export function startHealthMonitor(): () => void {
     stopped = true;
     window.removeEventListener("error", onError);
     window.removeEventListener("unhandledrejection", onRejection);
+    console.warn = origWarn;
+    console.error = origError;
     detach?.();
     detach = undefined;
   };

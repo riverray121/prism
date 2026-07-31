@@ -26,7 +26,20 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // Files outside the module graph trigger a FULL PAGE RELOAD on change
+      // (Vite's fallback for unimported files), which restarts the app
+      // mid-use. Everything the frontend never imports must be ignored:
+      // docs edits, the sidecar's Python, the library the sidecar writes
+      // into (profile/mapping/rig saves would otherwise reload the app),
+      // and test files (vitest runs them; the app doesn't import them).
+      ignored: [
+        "**/src-tauri/**",
+        "**/docs/**",
+        "**/library/**",
+        "**/sidecar/**",
+        "**/tests/**",
+        "**/*.test.ts",
+      ],
     },
   },
 }));
