@@ -346,6 +346,60 @@ describe("evaluateProgram — pixel dimension", () => {
   });
 });
 
+describe("evaluateProgram — pixelCount argument", () => {
+  const sum = (rgb: Uint8ClampedArray, N: number, f: number, p: number) =>
+    rgb[(f * N + p) * 3] + rgb[(f * N + p) * 3 + 1] + rgb[(f * N + p) * 3 + 2];
+
+  it("spread scales to the strip: full width lights all 300 pixels", () => {
+    const d = doc([
+      { id: "p", channels: { position: { source: "mix.stereo_width" } } },
+    ]);
+    const out = evaluateProgram(profile, d, d.programs[0], {}, 300);
+    const { rgb, pixelCount } = out.pixels!;
+    expect(pixelCount).toBe(300);
+    expect(rgb.length).toBe(FRAMES * 300 * 3);
+    let lit = 0;
+    for (let p = 0; p < 300; p++) if (sum(rgb, 300, 150, p) > 30) lit++;
+    expect(lit).toBeGreaterThanOrEqual(298);
+  });
+
+  it("band zones split the 300-pixel strip proportionally", () => {
+    const d = doc([
+      { id: "p", channels: { position: { source: "mix.band_energy_low" } } },
+    ]);
+    const out = evaluateProgram(profile, d, d.programs[0], {}, 300);
+    const { rgb } = out.pixels!;
+    // First half of the song: low band on → bottom half bright, top dark.
+    expect(sum(rgb, 300, 50, 10)).toBeGreaterThan(sum(rgb, 300, 50, 290) + 100);
+    expect(sum(rgb, 300, 150, 290)).toBeGreaterThan(
+      sum(rgb, 300, 150, 10) + 100,
+    );
+  });
+
+  it("chase phase lands on the proportional pixel at any count", () => {
+    const d = doc([{ id: "p", channels: { brightness: 1, motion: 1 } }]);
+    for (const N of [DEFAULT_PIXELS, 300]) {
+      const out = evaluateProgram(profile, d, d.programs[0], {}, N);
+      const { rgb } = out.pixels!;
+      // t=0.5 s of a 1 cycle/s chase: the head sits mid-strip.
+      expect(sum(rgb, N, 50, Math.floor(N / 2))).toBeGreaterThan(
+        sum(rgb, N, 50, 2) + 100,
+      );
+    }
+  });
+
+  it("the cache key sees the pixel count, so a patch change re-evaluates", () => {
+    const d = doc([{ id: "p", channels: { brightness: 1, motion: 1 } }]);
+    const at60 = evaluateDoc(profile, d, {}, {});
+    const at300 = evaluateDoc(profile, d, at60, {}, 300);
+    expect(at300["p"]).not.toBe(at60["p"]);
+    expect(at300["p"].pixels!.pixelCount).toBe(300);
+    // Unpatching returns to the preview default, again recomputed.
+    const back = evaluateDoc(profile, d, at300, {});
+    expect(back["p"].pixels!.pixelCount).toBe(DEFAULT_PIXELS);
+  });
+});
+
 describe("motionPhase", () => {
   it("chase head advances with phase and wraps the ring", () => {
     const N = 60;

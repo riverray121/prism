@@ -62,6 +62,17 @@ class UpdateMappingCommand(BaseModel):
     doc: dict
 
 
+class GetRigCommand(BaseModel):
+    type: Literal["rig.get"]
+
+
+class UpdateRigCommand(BaseModel):
+    type: Literal["rig.update"]
+    # The full rig doc, replaced wholesale. The frontend owns the schema;
+    # the sidecar only checks it is an object.
+    rig: dict
+
+
 class UpdateSettingsCommand(BaseModel):
     type: Literal["settings.update"]
     # Partial update: each field is applied only if present.
@@ -140,6 +151,12 @@ class MappingEvent(BaseModel):
     # The song's mapping doc; an empty dict when none is saved yet (the
     # frontend's schema defaults expand it to the empty doc).
     doc: dict
+
+
+class RigEvent(BaseModel):
+    type: Literal["rig"] = "rig"
+    # The app-level rig doc; the empty rig when none is saved yet.
+    rig: dict
 
 
 class EngineInfo(BaseModel):

@@ -13,14 +13,20 @@
     openLogs,
     startHealthMonitor,
   } from "$lib/state/health.svelte";
+  import {
+    startHardwareSession,
+    stopHardwareSession,
+  } from "$lib/state/hardware.svelte";
   import { startSidecarSession, stopSidecarSession } from "$lib/state/sidecar";
   import { workspace } from "$lib/state/workspace.svelte";
 
   onMount(() => {
     startSidecarSession();
+    startHardwareSession();
     const stopHealth = startHealthMonitor();
     return () => {
       stopSidecarSession();
+      stopHardwareSession();
       stopHealth();
     };
   });

@@ -6,6 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
 use tauri_plugin_opener::OpenerExt;
 
 mod applog;
+mod hardware;
 
 // Facts gathered at startup for the frontend's health surface.
 struct StartupInfo {
@@ -139,13 +140,19 @@ fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     applog::init();
-    let unclean_exit = applog::startup_unclean_check();
+    // Dev-watcher rebuilds kill the process outright (no catchable signal),
+    // stranding the session marker; in a debug build that is routine, not a
+    // crash, so the banner only ever fires in release. The log line still
+    // records every stale marker either way.
+    let unclean_exit = applog::startup_unclean_check() && !cfg!(debug_assertions);
     applog::install_signal_cleanup();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_http::init())
         .setup(move |app| {
             app.manage(StartupInfo { unclean_exit });
+            hardware::spawn_discovery(app.handle());
             // Spawn the sidecar; on failure surface an error and keep the app running.
             match spawn_sidecar(app.handle()) {
                 Ok(mut child) => {
@@ -173,7 +180,9 @@ pub fn run() {
             send_to_sidecar,
             startup_report,
             log_frontend_error,
-            open_logs
+            open_logs,
+            hardware::ddp_send,
+            hardware::discovery_snapshot
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -12,6 +12,7 @@ from . import (
     logs,
     mapping,
     metadata,
+    rig,
     separation,
     settings,
     storage,
@@ -32,11 +33,13 @@ from .schema import (
     ProfileEvent,
     QueueAddCommand,
     QueueCancelCommand,
+    RigEvent,
     SettingsEvent,
     Song,
     UpdateFavoritesCommand,
     UpdateMappingCommand,
     UpdateMetadataCommand,
+    UpdateRigCommand,
     UpdateSettingsCommand,
 )
 
@@ -192,6 +195,11 @@ def handle(msg: dict) -> None:
     elif msg_type == "mapping.update":
         cmd = UpdateMappingCommand.model_validate(msg)
         mapping.write_mapping(cmd.song_id, cmd.doc)
+    elif msg_type == "rig.get":
+        ipc.emit(RigEvent(rig=rig.read_rig()))
+    elif msg_type == "rig.update":
+        cmd = UpdateRigCommand.model_validate(msg)
+        rig.write_rig(cmd.rig)
     elif msg_type == "settings.get":
         emit_settings()
     elif msg_type == "settings.update":

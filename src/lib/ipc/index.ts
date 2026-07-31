@@ -75,11 +75,40 @@ export function updateFavorites(
   return sendCommand({ type: "favorites.update", song_id: songId, favorites });
 }
 
+// Request the app-level rig (answered by a `rig` event).
+export function getRig(): Promise<void> {
+  return sendCommand({ type: "rig.get" });
+}
+
+// Replace the rig doc wholesale (rig edits are rare; no debounce).
+export function updateRig(rig: object): Promise<void> {
+  return sendCommand({ type: "rig.update", rig });
+}
+
 export function updateSettings(update: {
   engines?: string[];
   drum_subsep?: boolean;
 }): Promise<void> {
   return sendCommand({ type: "settings.update", ...update });
+}
+
+// Send one prebuilt DDP packet to a hub via the Rust shell's UDP socket.
+// Fire-and-forget at frame rate; resolution means the shell sent it.
+export function ddpSend(
+  address: string,
+  port: number,
+  data: number[],
+): Promise<void> {
+  return invoke("ddp_send", { address, port, data });
+}
+
+// Hubs the shell's mDNS browse can currently see, as found events. Pulled
+// once after the discovery listener attaches: resolves usually land before
+// the webview is ready, and mDNS won't re-announce them for hours.
+export function discoverySnapshot(): Promise<
+  { kind: "found" | "lost"; name: string; ip: string | null }[]
+> {
+  return invoke("discovery_snapshot");
 }
 
 // Subscribe to validated sidecar events. Each stdout line is parsed and checked

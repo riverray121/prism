@@ -6,6 +6,7 @@ import {
   inspection,
   setProfile,
 } from "$lib/state/inspection.svelte";
+import { applyRigEvent } from "$lib/state/hardware.svelte";
 import {
   applyMappingEvent,
   resetMappingEvaluation,
@@ -47,6 +48,8 @@ function applySidecarEvent(event: SidecarEvent): void {
   } else if (event.type === "mapping") {
     // Same stale-response guard as the profile event.
     applyMappingEvent(event.song_id, event.doc);
+  } else if (event.type === "rig") {
+    applyRigEvent(event.rig);
   } else if (event.type === "settings") {
     settings.engines = event.engines;
     settings.availableEngines = event.available_engines;

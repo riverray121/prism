@@ -10,23 +10,13 @@
   import PixelLane from "$lib/graphs/PixelLane.svelte";
   import RibbonLane from "$lib/graphs/RibbonLane.svelte";
   import { programLabel } from "$lib/mapping/labels";
-  import { resolveFeature, resolveNode } from "$lib/mapping/sources";
-  import type { MixFeature } from "$lib/ipc/messages";
-  import {
-    getRawProfile,
-    inspection,
-    requestFeatureTrack,
-    sidecarPath,
-  } from "$lib/state/inspection.svelte";
-  import { tracks } from "$lib/state/tracks.svelte";
+  import { inspection } from "$lib/state/inspection.svelte";
   import {
     editProgram,
-    ensureMatrix,
+    ensureEvaluationCurrent,
     evaluation,
     mapping,
     mappingUi,
-    matrixVersion,
-    reevaluate,
   } from "$lib/state/mapping.svelte";
   import {
     scrub,
@@ -48,65 +38,10 @@
 
   const ready = $derived(inspection.profile !== null && mapping.doc !== null);
 
-  // Every continuous source the doc references, streamed on demand (0.4.0
-  // profiles keep arrays in .npy sidecars). Requests go through the proxy
-  // features so hydration is reactive; band sources pull every sibling.
-  function requestSourceTracks(): void {
-    const proxy = inspection.profile;
-    const doc = mapping.doc;
-    if (!proxy || !doc) return;
-    const wanted = new Set<string>();
-    const add = (source: string) => {
-      if (source.startsWith("derived.")) {
-        const d = doc.derivations.find(
-          (x) => x.id === source.slice("derived.".length),
-        );
-        if (d) wanted.add(d.source);
-      } else wanted.add(source);
-    };
-    for (const d of doc.derivations) wanted.add(d.source);
-    for (const p of doc.programs)
-      for (const v of Object.values(p.channels))
-        if (typeof v === "object") add(v.source);
-    if (doc.macro.master) add(doc.macro.master.source);
-    for (const source of wanted) {
-      const parts = source.split(".");
-      if (parts.at(-1)?.startsWith("band_energy")) {
-        const parent = resolveNode(proxy, parts.slice(0, -1).join("."));
-        if (typeof parent !== "object" || parent === null) continue;
-        for (const [name, v] of Object.entries(parent)) {
-          const f = v as MixFeature;
-          if (name.startsWith("band_energy") && f.render === "continuous")
-            requestFeatureTrack(f);
-        }
-        continue;
-      }
-      const f = resolveFeature(proxy, source);
-      if (f?.render === "continuous") requestFeatureTrack(f);
-    }
-  }
-
-  // Re-evaluate on any doc edit, profile (re)load, or sidecar arrival.
-  // reevaluate snapshots the doc (deep dependency); the profile proxy read
-  // makes profile swaps count; matrixVersion/tracks.version tick when a
-  // heatmap matrix or continuous track lands.
+  // Re-evaluate on any doc edit, profile (re)load, or sidecar arrival
+  // (ensureEvaluationCurrent registers the dependencies).
   $effect(() => {
-    inspection.profile;
-    matrixVersion.n;
-    tracks.version;
-    const profile = getRawProfile();
-    // Heatmap position bindings need their .npy matrices; request any missing.
-    if (profile && mapping.doc && inspection.songDir) {
-      for (const p of mapping.doc.programs) {
-        const pos = p.channels.position;
-        if (pos === undefined || typeof pos === "number") continue;
-        const feature = resolveFeature(profile, pos.source);
-        if (feature?.render === "heatmap")
-          ensureMatrix(pos.source, sidecarPath(feature.sidecar));
-      }
-      requestSourceTracks();
-    }
-    reevaluate(profile);
+    ensureEvaluationCurrent();
   });
 
   const frameCount = $derived(inspection.profile?.timeline.frame_count ?? 0);

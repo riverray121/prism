@@ -3,6 +3,7 @@
   import {
     channelColor,
     DEFAULT_PIXELS,
+    frameIndexAt,
     litMask,
     type ProgramOutput,
   } from "$lib/mapping/evaluate";
@@ -105,8 +106,9 @@
     }
     ctx.restore();
 
-    // Pixel row: the program's own matrix, else the swatch mirrored.
-    const N = DEFAULT_PIXELS;
+    // Pixel row: the program's own matrix at whatever resolution it was
+    // evaluated (a patched light's real count), else the swatch mirrored.
+    const N = output.pixels?.pixelCount ?? DEFAULT_PIXELS;
     const rowY = H - 18;
     const cell = W / N;
     for (let p = 0; p < N; p++) {
@@ -124,10 +126,7 @@
   function draw(): void {
     if (frameCount === 0) return;
     const t = transport.currentTime;
-    const frame = Math.max(
-      0,
-      Math.min(frameCount - 1, Math.round(t * frameRateHz)),
-    );
+    const frame = frameIndexAt(t, frameRateHz, frameCount);
     for (const light of lights) {
       const canvas = canvases[light.id];
       if (canvas) drawLight(canvas, light, t, frame);

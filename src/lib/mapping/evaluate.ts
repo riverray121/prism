@@ -377,6 +377,17 @@ function evaluateGate(
   return typeof m.value === "number" && m.value < 0.5 ? [] : null;
 }
 
+// Timeline frame under a playhead time, clamped to the song. Shared by every
+// consumer that samples evaluated tracks against the transport clock (live
+// preview, hardware streamer) so they can never disagree on the frame.
+export function frameIndexAt(
+  t: number,
+  frameRateHz: number,
+  frameCount: number,
+): number {
+  return Math.max(0, Math.min(frameCount - 1, Math.round(t * frameRateHz)));
+}
+
 // Per-frame lit mask from gate segments (null gate = always lit). Shared by
 // the ribbon renderer, the live preview, and the share-mode master.
 export function litMask(
@@ -584,11 +595,12 @@ function evaluatePixels(
   matrices: Matrices,
   hz: number,
   frameCount: number,
+  pixelCount: number,
 ): PixelMatrix | null {
   const posValue = program.channels.position;
   const motValue = program.channels.motion;
   if (posValue === undefined && motValue === undefined) return null;
-  const N = DEFAULT_PIXELS;
+  const N = pixelCount;
 
   let intensity: Float32Array | null = null;
   let palette = "heat";
@@ -684,14 +696,15 @@ function evaluatePixels(
 // ── Program evaluation ──────────────────────────────────────────────────────
 
 // Cache key: the program definition, every derivation it references, which of
-// its heatmap matrices are loaded, and which continuous sources have hydrated
-// data (0.4.0 sidecars stream in) — anything else unchanged, the previous
-// output is reusable.
+// its heatmap matrices are loaded, which continuous sources have hydrated
+// data (0.4.0 sidecars stream in), and the strip resolution — anything else
+// unchanged, the previous output is reusable.
 export function programKey(
   profile: Profile,
   doc: MappingDoc,
   program: Program,
   matrices: Matrices = {},
+  pixelCount: number = DEFAULT_PIXELS,
 ): string {
   const derivedIds: string[] = [];
   const loaded: string[] = [];
@@ -729,7 +742,7 @@ export function programKey(
     if (matrices[value.source]) loaded.push(value.source);
   }
   const derivations = doc.derivations.filter((d) => derivedIds.includes(d.id));
-  return JSON.stringify({ program, derivations, loaded, hydrated });
+  return JSON.stringify({ program, derivations, loaded, hydrated, pixelCount });
 }
 
 export function evaluateProgram(
@@ -737,6 +750,7 @@ export function evaluateProgram(
   doc: MappingDoc,
   program: Program,
   matrices: Matrices = {},
+  pixelCount: number = DEFAULT_PIXELS,
 ): ProgramOutput {
   const hz = profile.timeline.frame_rate_hz;
   const frameCount = profile.timeline.frame_count;
@@ -775,10 +789,11 @@ export function evaluateProgram(
     matrices,
     hz,
     frameCount,
+    pixelCount,
   );
 
   return {
-    key: programKey(profile, doc, program, matrices),
+    key: programKey(profile, doc, program, matrices, pixelCount),
     channels,
     gate,
     pixels,
@@ -786,22 +801,24 @@ export function evaluateProgram(
 }
 
 // Evaluate every enabled program, reusing previous outputs whose key still
-// matches — editing one program re-evaluates only it.
+// matches — editing one program re-evaluates only it. `pixelCount` is the
+// strip resolution (a patched light's real count, or the preview default).
 export function evaluateDoc(
   profile: Profile,
   doc: MappingDoc,
   previous: Record<string, ProgramOutput> = {},
   matrices: Matrices = {},
+  pixelCount: number = DEFAULT_PIXELS,
 ): Record<string, ProgramOutput> {
   const out: Record<string, ProgramOutput> = {};
   for (const program of doc.programs) {
     if (!program.enabled) continue;
-    const key = programKey(profile, doc, program, matrices);
+    const key = programKey(profile, doc, program, matrices, pixelCount);
     const prev = previous[program.id];
     out[program.id] =
       prev && prev.key === key
         ? prev
-        : evaluateProgram(profile, doc, program, matrices);
+        : evaluateProgram(profile, doc, program, matrices, pixelCount);
   }
   return out;
 }

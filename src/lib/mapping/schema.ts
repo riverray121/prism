@@ -179,6 +179,11 @@ export const MappingDocSchema = z.object({
     scenes: {},
     master: null,
   }),
+  // Hardware patch: light id ("{hub mac}:{output index}", see lib/hardware) →
+  // program id. One active program per light. Defaults empty so docs written
+  // before the field existed load unchanged; entries referencing an offline
+  // light or a deleted program warn and mute, never a hard failure.
+  patch: z.record(z.string(), z.string()).default({}),
 });
 export type MappingDoc = z.infer<typeof MappingDocSchema>;
 

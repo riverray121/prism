@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { RigSchema } from "$lib/hardware/wled";
 import { MappingEventSchema } from "$lib/mapping/schema";
 
 // Mirror of the sidecar's pydantic models. Validated at the IPC boundary so a
@@ -254,6 +255,13 @@ export type EngineInfo = z.infer<
   typeof SettingsEventSchema
 >["engine_info"][string];
 
+// The app-level rig (known hubs + named lights). The doc passes through the
+// schema so a corrupt field fails at the IPC boundary.
+export const RigEventSchema = z.object({
+  type: z.literal("rig"),
+  rig: RigSchema,
+});
+
 // All events the sidecar can send on stdout.
 export const SidecarEventSchema = z.discriminatedUnion("type", [
   LibrarySongsEventSchema,
@@ -263,5 +271,6 @@ export const SidecarEventSchema = z.discriminatedUnion("type", [
   ProfileEventSchema,
   SettingsEventSchema,
   MappingEventSchema,
+  RigEventSchema,
 ]);
 export type SidecarEvent = z.infer<typeof SidecarEventSchema>;

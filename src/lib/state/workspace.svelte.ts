@@ -19,7 +19,7 @@ export const TABS: { id: Tab; label: string; blurb: string }[] = [
   {
     id: "hardware",
     label: "Hardware",
-    blurb: "Drive real fixtures — future milestone.",
+    blurb: "Open a song, then patch its programs onto real lights.",
   },
 ];
 
@@ -35,12 +35,14 @@ export const workspace = $state<{
   sidebarExpanded: boolean;
   sidebarWidth: number;
   mappingPanelWidth: number;
+  hardwarePanelWidth: number;
 }>({
   tab: "analysis",
   splitTab: null,
   sidebarExpanded: false,
   sidebarWidth: 384,
   mappingPanelWidth: 288,
+  hardwarePanelWidth: 288,
 });
 
 export function setTab(tab: Tab): void {

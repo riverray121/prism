@@ -1,4 +1,5 @@
 <script lang="ts">
+  import HardwareView from "$lib/components/hardware/HardwareView.svelte";
   import InspectionView from "$lib/components/InspectionView.svelte";
   import MappingView from "$lib/components/mapping/MappingView.svelte";
   import TabStub from "$lib/components/shell/TabStub.svelte";
@@ -24,7 +25,10 @@
   {#if tab === "mapping"}
     <MappingView />
   {/if}
+  {#if tab === "hardware"}
+    <HardwareView />
+  {/if}
 {/if}
-{#if inspection.songId === null || (tab !== "analysis" && tab !== "mapping")}
+{#if inspection.songId === null || tab === "sim"}
   <TabStub title={meta.label} blurb={meta.blurb} />
 {/if}
