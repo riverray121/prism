@@ -1,6 +1,6 @@
 # Ideas Backlog
 
-Unscoped possibilities not yet committed to a milestone — just ideas, no plan attached. Promote an item here into a milestone via `/spec` (see `index.md`) if it's ever committed.
+Ideas and future things to implement. Promote an item into a milestone via `/spec` (see `index.md`) when it's taken up.
 
 ---
 
