@@ -18,16 +18,19 @@
     stopHardwareSession,
   } from "$lib/state/hardware.svelte";
   import { startSidecarSession, stopSidecarSession } from "$lib/state/sidecar";
+  import { startStreamLoop } from "$lib/state/stream.svelte";
   import { workspace } from "$lib/state/workspace.svelte";
 
   onMount(() => {
     startSidecarSession();
     startHardwareSession();
     const stopHealth = startHealthMonitor();
+    const stopStreamLoop = startStreamLoop();
     return () => {
       stopSidecarSession();
       stopHardwareSession();
       stopHealth();
+      stopStreamLoop();
     };
   });
 </script>

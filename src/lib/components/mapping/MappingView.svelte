@@ -10,10 +10,7 @@
   import PixelLane from "$lib/graphs/PixelLane.svelte";
   import RibbonLane from "$lib/graphs/RibbonLane.svelte";
   import { programLabel } from "$lib/mapping/labels";
-  import {
-    ensureEvaluationCurrent,
-    evaluation,
-  } from "$lib/state/evaluation.svelte";
+  import { evaluation } from "$lib/state/evaluation.svelte";
   import { inspection } from "$lib/state/inspection.svelte";
   import { editProgram, mapping, mappingUi } from "$lib/state/mapping.svelte";
   import {
@@ -36,11 +33,8 @@
 
   const ready = $derived(inspection.profile !== null && mapping.doc !== null);
 
-  // Re-evaluate on any doc edit, profile (re)load, or sidecar arrival
-  // (ensureEvaluationCurrent registers the dependencies).
-  $effect(() => {
-    ensureEvaluationCurrent();
-  });
+  // Evaluation refresh is app-lifetime (state/stream.svelte.ts): outputs are
+  // already current whenever a song is open, this tab mounted or not.
 
   const frameCount = $derived(inspection.profile?.timeline.frame_count ?? 0);
   const frameRateHz = $derived(

@@ -10,15 +10,7 @@
     probeAddress,
     scan,
     startScan,
-    stopStream,
-    streamTick,
   } from "$lib/state/hardware.svelte";
-  import {
-    ensureEvaluationCurrent,
-    evaluation,
-  } from "$lib/state/evaluation.svelte";
-  import { inspection } from "$lib/state/inspection.svelte";
-  import { transport } from "$lib/state/transport.svelte";
   import {
     PANEL_MAX_WIDTH,
     PANEL_MIN_WIDTH,
@@ -27,7 +19,9 @@
 
   // The Hardware tab, mirroring the Mapping layout: rig devices in the left
   // panel (saved hubs with live status, hubs found on the network under
-  // Connect new), the open song's patch in the main column.
+  // Connect new), the open song's patch in the main column. Streaming itself
+  // is app-lifetime (state/stream.svelte.ts, hosted by the shell route) so
+  // the strip keeps playing when this tab isn't showing.
 
   // Name drafts for the Connect new flow, keyed by hub MAC.
   let drafts = $state<Record<string, string>>({});
@@ -44,44 +38,6 @@
       if (probe.status === "idle") ipDraft = "";
     });
   }
-
-  // Keep evaluated outputs fresh while this tab is open — the streamer needs
-  // them even when the Mapping tab (the other evaluation host) is closed.
-  $effect(() => {
-    ensureEvaluationCurrent();
-  });
-
-  const frameCount = $derived(inspection.profile?.timeline.frame_count ?? 0);
-  const frameRateHz = $derived(
-    inspection.profile?.timeline.frame_rate_hz ?? 100,
-  );
-
-  // Stream while playing; any exit — pause, stop, tab switch, unmount —
-  // runs the cleanup, which blacks out and powers off every streamed hub.
-  // The first tick must go through rAF too: called synchronously it would
-  // run inside the effect's tracking scope, making every state read
-  // (transport.currentTime at 60 Hz) an effect dependency — each tick would
-  // then tear down and restart the stream, hammering the hub with power
-  // toggles and flooding the shell. Until the milestone-6 Rust-side sampler,
-  // the strip stalls if the window is minimized during playback (browsers
-  // throttle rAF when hidden).
-  $effect(() => {
-    if (!transport.playing) return;
-    const loop = () => {
-      streamTick(
-        transport.currentTime,
-        frameRateHz,
-        frameCount,
-        evaluation.outputs,
-      );
-      raf = requestAnimationFrame(loop);
-    };
-    let raf = requestAnimationFrame(loop);
-    return () => {
-      cancelAnimationFrame(raf);
-      stopStream();
-    };
-  });
 </script>
 
 <div class="flex h-full">
