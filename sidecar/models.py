@@ -78,12 +78,12 @@ def ensure(name: str) -> Path:
     try:
         # The descriptor is owned first: a failed urlopen (DNS, timeout) must
         # not leak the mkstemp fd.
-        with os.fdopen(fd, "wb") as out:
-            with urllib.request.urlopen(
-                entry["url"], timeout=_DOWNLOAD_TIMEOUT
-            ) as resp:
-                while chunk := resp.read(1 << 20):
-                    out.write(chunk)
+        with (
+            os.fdopen(fd, "wb") as out,
+            urllib.request.urlopen(entry["url"], timeout=_DOWNLOAD_TIMEOUT) as resp,
+        ):
+            while chunk := resp.read(1 << 20):
+                out.write(chunk)
         actual = _sha256(tmp)
         if actual != entry["sha256"]:
             raise ValueError(
