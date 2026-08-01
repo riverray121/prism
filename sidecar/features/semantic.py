@@ -21,7 +21,7 @@ from pathlib import Path
 import librosa
 import numpy as np
 
-from .. import models
+from .. import models, storage
 
 log = logging.getLogger("sidecar.features.semantic")
 
@@ -177,7 +177,7 @@ def panns_features(
         "source": "panns",
         "status": "wip",
         "unit": "probability",
-        "sidecar": "heatmaps/sound_tags.npy",
+        "sidecar": storage.heatmap_rel("sound_tags"),
         "labels": [labels[i] for i in row_ix],
         "shape": [len(row_ix), frame_count],
     }

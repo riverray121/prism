@@ -221,7 +221,8 @@ export const ProfileSchema = z.object({
     frame_count: z.number(),
   }),
   mix: FeatureMapSchema,
-  // engine -> stem -> Stem. Absent on pre-M4 profiles, so defaults to empty.
+  // engine -> stem -> Stem. Absent on profiles written before stem
+  // separation, so defaults to empty.
   stems: z.record(z.string(), z.record(z.string(), StemSchema)).default({}),
   // Dot-paths to starred subfeatures (e.g. "mix.beats",
   // "stems.htdemucs_ft.bass.features.pitch"). Absent on older profiles.

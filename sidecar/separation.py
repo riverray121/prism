@@ -4,11 +4,10 @@ A thin wrapper over audio-separator's many backends (Demucs, MDX, RoFormer, …)
 the worker never sees library internals: ``separate(source, out_dir, engine)``
 runs one engine and writes its native stem set as canonical lowercase WAVs
 (``vocals.wav`` …) into ``out_dir``, returning ``{stem: path}``. Model weights
-auto-download into the shared model cache (``models.MODELS_DIR``), matching the
-M3 download-on-first-run pattern.
+download on first run into the shared model cache (``models.MODELS_DIR``).
 
 ``ENGINES`` is the full set of available engines; which ones actually run per song
-is a user setting (see ``library.get_engines``). New engines slot into ``ENGINES``
+is a user setting (see ``settings.get_engines``). New engines slot into ``ENGINES``
 behind this same interface.
 """
 

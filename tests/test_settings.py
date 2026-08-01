@@ -1,19 +1,6 @@
 """Analysis-settings resolution (engines + drum sub-sep) over raw storage."""
 
-import sqlite3
-
-import pytest
-
 from sidecar import library, separation, settings
-
-
-@pytest.fixture
-def con():
-    c = sqlite3.connect(":memory:")
-    c.row_factory = sqlite3.Row
-    c.executescript(library._SCHEMA + library._SETTINGS_SCHEMA)
-    yield c
-    c.close()
 
 
 def test_get_engines_defaults_when_unset(con):

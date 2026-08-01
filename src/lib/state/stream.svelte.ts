@@ -9,8 +9,8 @@ import { transport } from "$lib/state/transport.svelte";
 // App-lifetime hardware streaming, hosted by the shell route rather than any
 // tab: switching to Analysis or Mapping must not stall the strip. Downstream
 // of every store it reads (the state modules stay an acyclic import graph).
-// Until the Rust-side sampler ships, the strip still stalls if the window is
-// minimized during playback (browsers throttle rAF when hidden).
+// Known limit: browsers throttle rAF while the window is hidden, so a
+// minimized window stalls the strip.
 
 export function startStreamLoop(): () => void {
   return $effect.root(() => {

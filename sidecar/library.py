@@ -1,8 +1,8 @@
 """SQLite index of imported songs (``library.db``).
 
-One row per song. Columns mirror the design doc's library index; M1 populates a
-subset (the analysis-progress columns fill in from M2 on). Connections are
-opened per operation so a worker thread can hold its own without sharing state.
+One row per song. The analysis-progress columns are nullable and populated only
+while a song analyzes. Connections are opened per operation so a worker thread
+can hold its own without sharing state.
 """
 
 import json
@@ -43,16 +43,6 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 """
 
-# Columns added after the initial schema. Applied as non-destructive ALTERs so an
-# existing dev DB gains them without a wipe (CREATE TABLE IF NOT EXISTS is a no-op
-# on an existing table, so new columns must be added explicitly).
-_ADDED_COLUMNS = {
-    "current_engine": "TEXT",
-    "current_step": "INTEGER",
-    "total_steps": "INTEGER",
-    "progress": "REAL",
-}
-
 # Nulls every in-progress column. Shared by the terminal transitions so adding a
 # progress column can't leave a stale value at one site.
 _CLEAR_PROGRESS = (
@@ -85,11 +75,6 @@ def connect() -> Iterator[sqlite3.Connection]:
             pass
     con.execute(_SCHEMA)
     con.execute(_SETTINGS_SCHEMA)
-    # Add any columns introduced after the initial schema to an existing table.
-    existing = {row["name"] for row in con.execute("PRAGMA table_info(songs)")}
-    for name, decl in _ADDED_COLUMNS.items():
-        if name not in existing:
-            con.execute(f"ALTER TABLE songs ADD COLUMN {name} {decl}")
     try:
         yield con
         con.commit()
@@ -247,8 +232,8 @@ def fail_interrupted(con: sqlite3.Connection, error_message: str) -> list[str]:
     """Mark any row left 'analyzing' as failed; return the affected song ids.
 
     Called at sidecar startup: a row stuck in 'analyzing' means a prior run crashed
-    or was quit mid-analysis (now common — separation is long-running). Failing it
-    avoids a crash loop and lets the user retry explicitly.
+    or was quit mid-analysis (separation is long-running). Failing it avoids a
+    crash loop and lets the user retry explicitly.
     """
     ids = [
         row["id"]
@@ -303,6 +288,13 @@ def update_metadata(
         "UPDATE songs SET title=?, artist=? WHERE id=?",
         (title, artist, song_id),
     )
+
+
+def get_metadata(con: sqlite3.Connection, song_id: str) -> sqlite3.Row | None:
+    """A song's current title/artist; None when the row is gone (deleted)."""
+    return con.execute(
+        "SELECT title, artist FROM songs WHERE id=?", (song_id,)
+    ).fetchone()
 
 
 def delete_song(con: sqlite3.Connection, song_id: str) -> bool:

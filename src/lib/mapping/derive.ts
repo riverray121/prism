@@ -18,7 +18,7 @@ export interface DerivedSegment {
 }
 
 // Two peaks closer than this collapse into the higher one (sidecar's dense mode).
-export const MIN_SEPARATION_SEC = 0.1;
+const MIN_SEPARATION_SEC = 0.1;
 
 // Optional band/sensitivity refinements on the threshold primitive.
 export interface ThresholdOpts {

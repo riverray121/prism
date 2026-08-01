@@ -129,7 +129,7 @@ export function applyColormap(
 }
 
 // Colormapped RGB per frame — the pixel row consumes full colors, not one
-// component (slice 6).
+// component.
 export function colormapRgb(
   data: ArrayLike<number>,
   palette: string,

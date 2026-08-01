@@ -6,17 +6,6 @@ import pytest
 from sidecar import storage
 
 
-@pytest.fixture
-def library_root(tmp_path, monkeypatch):
-    """Point storage's path globals at a throwaway library tree."""
-    root = tmp_path / "library"
-    songs = root / "songs"
-    songs.mkdir(parents=True)
-    monkeypatch.setattr(storage, "LIBRARY_ROOT", root)
-    monkeypatch.setattr(storage, "SONGS_DIR", songs)
-    return root
-
-
 def _song(song_id="s1"):
     return {
         "id": song_id,

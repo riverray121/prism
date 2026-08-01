@@ -3,20 +3,7 @@
 Runs against an in-memory SQLite built from the real schema — never library.db.
 """
 
-import sqlite3
-
-import pytest
-
 from sidecar import library
-
-
-@pytest.fixture
-def con():
-    c = sqlite3.connect(":memory:")
-    c.row_factory = sqlite3.Row
-    c.executescript(library._SCHEMA + library._SETTINGS_SCHEMA)
-    yield c
-    c.close()
 
 
 def _insert(con, song_id="s1"):

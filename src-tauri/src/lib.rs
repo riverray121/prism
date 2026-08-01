@@ -62,28 +62,32 @@ fn trim_newline(buf: &mut Vec<u8>) {
     }
 }
 
-// Spawn the Python sidecar and forward its stdout/stderr to the frontend as events.
-// Returns the child handle (with stdin still attached) or the spawn error.
-fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
-    // Dev-only: run from source at the repo root (parent of src-tauri).
-    // Bundling will replace this with a frozen binary (deferred to M3+).
-    let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("src-tauri has a parent")
-        .to_path_buf();
-
-    let mut child = Command::new("uv")
+// Spawn the Python sidecar process with all three stdio pipes attached.
+// Runs from source at the repo root; CARGO_MANIFEST_DIR makes the path valid
+// only when launched from a cargo build tree.
+fn spawn_sidecar(repo_root: &std::path::Path) -> std::io::Result<Child> {
+    Command::new("uv")
         .args(["run", "python", "-m", "sidecar"])
-        .current_dir(&repo_root)
+        .current_dir(repo_root)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()?;
+        .spawn()
+}
 
+// Forward the sidecar's stdout/stderr to the frontend as events on background
+// threads. Called only after SidecarProcess is managed, so the reaping path
+// at stdout EOF can always find the child — even when the sidecar dies
+// immediately after spawn.
+fn attach_sidecar_io(
+    app: &AppHandle,
+    stdout: Option<std::process::ChildStdout>,
+    stderr: Option<std::process::ChildStderr>,
+) {
     // Forward sidecar stdout line-by-line to the frontend on a background thread.
     // Reads bytes and decodes lossily so one invalid line does not sever the stream;
     // a read error emits sidecar-error, and EOF emits sidecar-exited with the exit code.
-    if let Some(stdout) = child.stdout.take() {
+    if let Some(stdout) = stdout {
         let app = app.clone();
         std::thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
@@ -114,7 +118,7 @@ fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
     }
 
     // Forward sidecar stderr to the parent log and the frontend for diagnostics.
-    if let Some(stderr) = child.stderr.take() {
+    if let Some(stderr) = stderr {
         let app = app.clone();
         std::thread::spawn(move || {
             let mut reader = BufReader::new(stderr);
@@ -122,7 +126,11 @@ fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
             loop {
                 buf.clear();
                 match reader.read_until(b'\n', &mut buf) {
-                    Ok(0) | Err(_) => break,
+                    Ok(0) => break,
+                    Err(e) => {
+                        applog::log(&format!("sidecar stderr read failed: {e}"));
+                        break;
+                    }
                     Ok(_) => {
                         trim_newline(&mut buf);
                         let line = String::from_utf8_lossy(&buf).into_owned();
@@ -133,8 +141,6 @@ fn spawn_sidecar(app: &AppHandle) -> std::io::Result<Child> {
             }
         });
     }
-
-    Ok(child)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -154,8 +160,14 @@ pub fn run() {
             app.manage(StartupInfo { unclean_exit });
             hardware::spawn_discovery(app.handle());
             // Spawn the sidecar; on failure surface an error and keep the app running.
-            match spawn_sidecar(app.handle()) {
+            let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("src-tauri has a parent")
+                .to_path_buf();
+            match spawn_sidecar(&repo_root) {
                 Ok(mut child) => {
+                    let stdout = child.stdout.take();
+                    let stderr = child.stderr.take();
                     if let Some(stdin) = child.stdin.take() {
                         app.manage(Sidecar {
                             stdin: Mutex::new(stdin),
@@ -163,10 +175,12 @@ pub fn run() {
                     } else {
                         let _ = app.emit("sidecar-error", "sidecar stdin unavailable".to_string());
                     }
-                    // Store the child so the stdout thread can reap it and report its exit code.
+                    // Manage the child before its reader threads exist, so the
+                    // stdout thread's reap can never miss it.
                     app.manage(SidecarProcess {
                         child: Mutex::new(child),
                     });
+                    attach_sidecar_io(app.handle(), stdout, stderr);
                 }
                 Err(e) => {
                     let message = format!("failed to spawn sidecar: {e}");

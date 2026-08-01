@@ -54,7 +54,8 @@
     return [...groups.entries()];
   });
 
-  // Separated stems grouped by engine, then stem (empty on pre-M4 profiles).
+  // Separated stems grouped by engine, then stem (empty when the profile
+  // carries no stems).
   const stems = $derived(
     inspection.profile ? Object.entries(inspection.profile.stems) : [],
   );

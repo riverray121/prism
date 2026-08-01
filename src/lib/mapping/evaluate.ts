@@ -70,8 +70,8 @@ export const GATE_PULSE_SEC = 0.12;
 // Auto-threshold when a continuous source is bound straight to gate.
 const GATE_AUTO_CUTOFF = 0.5;
 
-// Point channels the evaluator renders in this slice; position/motion are the
-// pixel dimension (slice 6).
+// Whole-fixture channels rendered as per-frame tracks; position/motion
+// belong to the pixel dimension (evaluatePixels).
 const POINT_CHANNELS: Channel[] = [
   "brightness",
   "hue",
@@ -699,7 +699,7 @@ function evaluatePixels(
 // its heatmap matrices are loaded, which continuous sources have hydrated
 // data (0.4.0 sidecars stream in), and the strip resolution — anything else
 // unchanged, the previous output is reusable.
-export function programKey(
+function programKey(
   profile: Profile,
   doc: MappingDoc,
   program: Program,

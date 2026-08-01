@@ -6,6 +6,7 @@ dir (deferred). See ``docs/profile-schema.md`` for the full on-disk layout.
 """
 
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -14,6 +15,8 @@ from pathlib import Path
 from uuid import uuid4
 
 import numpy as np
+
+log = logging.getLogger("sidecar")
 
 # Serializes profile.json read-modify-writes across threads: the worker rewrites
 # the whole file (write_profile) while the main thread edits favorites/metadata
@@ -147,23 +150,30 @@ def migrate_profiles() -> int:
             continue
         if profile.get("schema_version") == SCHEMA_VERSION:
             continue
-        with _PROFILE_LOCK:
-            _extract_continuous(profile.get("mix", {}), song_id, "features")
-            for engine, engine_stems in profile.get("stems", {}).items():
-                for stem_name, entry in engine_stems.items():
-                    _extract_continuous(
-                        entry.get("features", {}),
-                        song_id,
-                        f"features/{engine}/{stem_name}",
-                    )
-                    for sub, sub_entry in entry.get("substems", {}).items():
+        # One structurally drifted profile (stems as a list, a non-dict stem
+        # entry) must not take down startup for every song — skip it, as with
+        # unreadable files above.
+        try:
+            with _PROFILE_LOCK:
+                _extract_continuous(profile.get("mix", {}), song_id, "features")
+                for engine, engine_stems in profile.get("stems", {}).items():
+                    for stem_name, entry in engine_stems.items():
                         _extract_continuous(
-                            sub_entry.get("features", {}),
+                            entry.get("features", {}),
                             song_id,
-                            f"features/{engine}/{stem_name}/{sub}",
+                            f"features/{engine}/{stem_name}",
                         )
-            profile["schema_version"] = SCHEMA_VERSION
-            write_json_atomic(path, profile)
+                        for sub, sub_entry in entry.get("substems", {}).items():
+                            _extract_continuous(
+                                sub_entry.get("features", {}),
+                                song_id,
+                                f"features/{engine}/{stem_name}/{sub}",
+                            )
+                profile["schema_version"] = SCHEMA_VERSION
+                write_json_atomic(path, profile)
+        except Exception:
+            log.exception("profile migration failed for %s", song_id)
+            continue
         migrated += 1
     return migrated
 
@@ -187,6 +197,10 @@ def write_json_atomic(path: Path, obj: dict) -> None:
     try:
         with os.fdopen(fd, "w") as out:
             out.write(text)
+            # Reach the disk before the rename, so a power loss can't leave a
+            # truncated file behind the atomic replace.
+            out.flush()
+            os.fsync(out.fileno())
         tmp.replace(path)
     finally:
         tmp.unlink(missing_ok=True)

@@ -9,7 +9,7 @@ import { loadNpy } from "$lib/npy";
 // that can't observe the proxy write.
 export const tracks = $state({ version: 0 });
 
-const loading = new Set<string>();
+let loading = new Set<string>();
 
 export interface StreamableFeature {
   data?: ArrayLike<number>;
@@ -25,7 +25,11 @@ export function requestTrack(
 ): void {
   const rel = feature.sidecar;
   if (!rel || feature.data || loading.has(rel)) return;
-  loading.add(rel);
+  // Bookkeeping stays with the set captured at entry: relative paths repeat
+  // across songs, so a load outliving a song switch must not delete the next
+  // song's in-flight marker.
+  const target = loading;
+  target.add(rel);
   void loadNpy(absPath)
     .then((npy) => {
       feature.data = npy.data;
@@ -33,13 +37,13 @@ export function requestTrack(
       tracks.version++;
     })
     .catch((e) => console.warn("track load failed", rel, e))
-    .finally(() => loading.delete(rel));
+    .finally(() => target.delete(rel));
 }
 
 // Song switch: loaded data leaves with the old profile object; only the
-// in-flight bookkeeping needs clearing (a late arrival hydrates a dead
+// in-flight bookkeeping needs replacing (a late arrival hydrates a dead
 // envelope, harmlessly).
 export function resetTracks(): void {
-  loading.clear();
+  loading = new Set();
   tracks.version++;
 }

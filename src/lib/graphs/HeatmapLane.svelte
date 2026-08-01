@@ -53,9 +53,11 @@
     [0, 0],
   ] as [number[], number[]]);
 
-  // Load + parse the sidecar whenever the path changes.
+  // Load + parse the sidecar whenever the path (or normalize mode) changes.
   $effect(() => {
     const p = path;
+    // Read before the await so the effect tracks it.
+    const norm = normalize;
     matrix = null;
     offscreen = null;
     let cancelled = false;
@@ -63,7 +65,7 @@
       try {
         const m = await loadNpy(p);
         if (cancelled) return;
-        offscreen = buildHeatmapCanvas(m, normalize);
+        offscreen = buildHeatmapCanvas(m, norm);
         matrix = m;
       } catch (e) {
         if (!cancelled) console.error("heatmap load failed", p, e);

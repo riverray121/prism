@@ -2,6 +2,7 @@ import json
 import logging
 import shutil
 import sys
+import tempfile
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,6 +31,7 @@ from .schema import (
     ImportYoutubeCommand,
     LibrarySongsEvent,
     MappingEvent,
+    GetRigCommand,
     ProfileEvent,
     QueueAddCommand,
     QueueCancelCommand,
@@ -102,18 +104,18 @@ def import_youtube(url: str) -> None:
     command loop would freeze every other interaction. ipc.emit is lock-guarded,
     so emitting from here is safe.
     """
-    tmp: Path | None = None
+    # The temp dir is owned here, not by the download, so a failed download
+    # (bot check, missing ffmpeg) can't orphan it.
+    tmp = Path(tempfile.mkdtemp(prefix="prism-yt-"))
     ipc.emit(ImportStartedEvent(path=url))
     try:
-        audio = youtube.download(url)
-        tmp = audio.parent
+        audio = youtube.download(url, dest_dir=tmp)
         import_one(str(audio))
     except Exception as exc:
         log.exception("youtube import failed: %s", url)
         ipc.emit(ImportFailedEvent(path=url, error=str(exc)))
     finally:
-        if tmp is not None:
-            shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(tmp, ignore_errors=True)
         ipc.emit(ImportFinishedEvent(path=url))
     emit_snapshot()
 
@@ -194,6 +196,7 @@ def handle(msg: dict) -> None:
         cmd = UpdateMappingCommand.model_validate(msg)
         mapping.write_mapping(cmd.song_id, cmd.doc)
     elif msg_type == "rig.get":
+        GetRigCommand.model_validate(msg)
         ipc.emit(RigEvent(rig=rig.read_rig()))
     elif msg_type == "rig.update":
         cmd = UpdateRigCommand.model_validate(msg)
@@ -215,8 +218,8 @@ def handle(msg: dict) -> None:
 def main() -> None:
     log.info("sidecar started")
     # Any row left 'analyzing' is from a run that crashed or was quit mid-analysis
-    # (now common — separation is long-running). Fail it so it isn't retried in a
-    # loop; the user can re-queue explicitly.
+    # (separation is long-running). Fail it so it isn't retried in a loop; the
+    # user can re-queue explicitly.
     with library.connect() as con:
         interrupted = library.fail_interrupted(con, "Analysis interrupted")
     if interrupted:

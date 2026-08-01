@@ -35,7 +35,9 @@ pub fn init() {
         }
     }
     if let Ok(f) = OpenOptions::new().create(true).append(true).open(&path) {
-        *FILE.lock().unwrap() = Some(f);
+        if let Ok(mut guard) = FILE.lock() {
+            *guard = Some(f);
+        }
     }
     // A panic must reach the file before unwinding takes the app down.
     let previous = std::panic::take_hook();

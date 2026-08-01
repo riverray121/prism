@@ -257,7 +257,6 @@ export function setRate(rate: number): void {
   transport.currentTime = positionNow();
   stopSource();
   startSource(transport.currentTime);
-  startRate = rate;
 }
 
 // Switch the audible source without disturbing the playhead: seamless swap

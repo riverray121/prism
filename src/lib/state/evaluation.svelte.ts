@@ -39,26 +39,31 @@ export const evaluation = $state<{
 // Loaded on demand (loadNpy is async; the evaluator is synchronous); the
 // version counter is the reactive signal that a load landed.
 let matrices: Matrices = {};
-const loadingMatrices = new Set<string>();
-export const matrixVersion = $state({ n: 0 });
+let loadingMatrices = new Set<string>();
+const matrixVersion = $state({ n: 0 });
 
-export function ensureMatrix(source: string, absPath: string): void {
+function ensureMatrix(source: string, absPath: string): void {
   if (matrices[source] || loadingMatrices.has(source)) return;
-  loadingMatrices.add(source);
+  // Writes land in the containers captured at entry: source paths repeat
+  // across songs, so a load outliving a song switch must not populate (or
+  // un-mark) the next song's caches.
+  const targetMatrices = matrices;
+  const targetLoading = loadingMatrices;
+  targetLoading.add(source);
   void loadNpy(absPath)
     .then((npy) => {
-      matrices[source] = {
+      targetMatrices[source] = {
         rows: npy.shape[0],
         cols: npy.shape[1],
         data: npy.data,
       };
-      matrixVersion.n++;
+      if (targetMatrices === matrices) matrixVersion.n++;
     })
     .catch((e) => {
       console.warn("pixel matrix load failed", source, e);
     })
     .finally(() => {
-      loadingMatrices.delete(source);
+      targetLoading.delete(source);
     });
 }
 
@@ -78,9 +83,13 @@ function invalidateIfStale(profile: Profile | null): void {
   if (mapping.songId === cachedSongId && profile === cachedProfile) return;
   cachedSongId = mapping.songId;
   cachedProfile = profile;
+  // Fresh containers (not clears): loads still in flight hold the old ones.
   matrices = {};
-  loadingMatrices.clear();
+  loadingMatrices = new Set();
   rawOutputs = {};
+  // applyMacro's reuse cache keys on the doc, not profile identity — stale
+  // finals sized for the old timeline must not survive the switch.
+  evaluation.outputs = {};
 }
 
 // Re-render every enabled program against the current profile. Runs inside a

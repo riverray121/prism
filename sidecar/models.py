@@ -76,10 +76,14 @@ def ensure(name: str) -> Path:
     fd, tmp_name = tempfile.mkstemp(dir=MODELS_DIR, suffix=".part")
     tmp = Path(tmp_name)
     try:
-        resp_ctx = urllib.request.urlopen(entry["url"], timeout=_DOWNLOAD_TIMEOUT)
-        with os.fdopen(fd, "wb") as out, resp_ctx as resp:
-            while chunk := resp.read(1 << 20):
-                out.write(chunk)
+        # The descriptor is owned first: a failed urlopen (DNS, timeout) must
+        # not leak the mkstemp fd.
+        with os.fdopen(fd, "wb") as out:
+            with urllib.request.urlopen(
+                entry["url"], timeout=_DOWNLOAD_TIMEOUT
+            ) as resp:
+                while chunk := resp.read(1 << 20):
+                    out.write(chunk)
         actual = _sha256(tmp)
         if actual != entry["sha256"]:
             raise ValueError(

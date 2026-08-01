@@ -9,13 +9,15 @@ use tauri::{AppHandle, Emitter, Manager, State};
 const WLED_SERVICE: &str = "_wled._tcp.local.";
 
 // One unbound UDP socket for every DDP send; binding per packet at 60 Hz
-// would churn file descriptors for nothing.
+// would churn file descriptors for nothing. Only a successful bind is
+// cached — a failed bind (network down at first send) must stay retryable.
 fn socket() -> Result<&'static UdpSocket, String> {
-    static SOCKET: OnceLock<Option<UdpSocket>> = OnceLock::new();
-    SOCKET
-        .get_or_init(|| UdpSocket::bind("0.0.0.0:0").ok())
-        .as_ref()
-        .ok_or_else(|| "failed to bind UDP socket".to_string())
+    static SOCKET: OnceLock<UdpSocket> = OnceLock::new();
+    if let Some(s) = SOCKET.get() {
+        return Ok(s);
+    }
+    let bound = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+    Ok(SOCKET.get_or_init(|| bound))
 }
 
 // Send one prebuilt DDP packet (header + payload, assembled frontend-side)
@@ -53,7 +55,11 @@ pub struct DiscoveryState {
 // arrives as events.
 #[tauri::command]
 pub fn discovery_snapshot(state: State<DiscoveryState>) -> Vec<DiscoveryEvent> {
-    let found = state.found.lock().expect("discovery map poisoned");
+    // A poisoned lock still holds valid data (writers only insert/remove).
+    let found = state
+        .found
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     found
         .iter()
         .map(|(name, ip)| DiscoveryEvent {
@@ -89,7 +95,14 @@ pub fn spawn_discovery(app: &AppHandle) {
             match event {
                 mdns_sd::ServiceEvent::ServiceResolved(info) => {
                     let name = info.get_fullname().to_string();
-                    let ip = info.get_addresses().iter().next().map(|a| a.to_string());
+                    // IPv4 only, lowest address: the frontend dials the hub
+                    // over plain HTTP, and a dual-stack hub's set order is
+                    // arbitrary — the pick must not flip between announcements.
+                    let ip = info
+                        .get_addresses_v4()
+                        .into_iter()
+                        .min()
+                        .map(|a| a.to_string());
                     crate::applog::log(&format!("mdns found {name} at {ip:?}"));
                     if let Ok(mut found) = app.state::<DiscoveryState>().found.lock() {
                         found.insert(name.clone(), ip.clone());

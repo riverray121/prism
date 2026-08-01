@@ -2,19 +2,7 @@
 
 import json
 
-import pytest
-
 from sidecar import rig, storage
-
-
-@pytest.fixture
-def library_root(tmp_path, monkeypatch):
-    """Point storage's path globals at a throwaway library tree."""
-    root = tmp_path / "library"
-    root.mkdir()
-    monkeypatch.setattr(storage, "LIBRARY_ROOT", root)
-    return root
-
 
 RIG = {
     "hubs": [
@@ -40,7 +28,8 @@ def test_read_missing_returns_empty_rig(library_root):
 def test_write_is_atomic(library_root):
     rig.write_rig(RIG)
     # No temp files left behind by the atomic rename.
-    assert sorted(p.name for p in library_root.iterdir()) == ["rig.json"]
+    assert not list(library_root.glob("*.tmp"))
+    assert (library_root / "rig.json").exists()
 
 
 def test_write_creates_library_dir(tmp_path, monkeypatch):

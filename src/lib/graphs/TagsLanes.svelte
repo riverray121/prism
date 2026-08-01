@@ -44,13 +44,24 @@
     const labelList = labels;
     error = null;
     rows = [];
+    // A stale load (path/labels changed, or unmount) must not overwrite the
+    // replacement's rows.
+    let cancelled = false;
     (async () => {
       try {
-        rows = presentRows(await loadNpy(url), labelList, PRESENT_THRESHOLD);
+        const loaded = presentRows(
+          await loadNpy(url),
+          labelList,
+          PRESENT_THRESHOLD,
+        );
+        if (!cancelled) rows = loaded;
       } catch (e) {
-        error = e instanceof Error ? e.message : String(e);
+        if (!cancelled) error = e instanceof Error ? e.message : String(e);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   });
 </script>
 
