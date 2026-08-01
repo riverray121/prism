@@ -12,6 +12,8 @@ Cells are beat-spans when the beat grid is usable, else a fixed-length grid, so
 the SSM stays small (~hundreds of cells) regardless of song length.
 """
 
+import itertools
+
 import librosa
 import numpy as np
 import scipy.ndimage
@@ -53,7 +55,7 @@ def _grid_times(duration: float, beat_times: list[float]) -> np.ndarray:
     if len(beat_times) >= 32:
         inner = [t for t in beat_times if 0.5 < t < duration - 0.5]
         return np.array([0.0, *inner, duration])
-    n = max(2, int(round(duration / CELL_SEC)))
+    n = max(2, round(duration / CELL_SEC))
     return np.linspace(0.0, duration, n + 1)
 
 
@@ -217,7 +219,7 @@ def _group(s: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     basis = evecs[:, :k]
     # One embedding vector per segment: mean over its cells, unit-normalized.
     seg_vecs = np.array(
-        [basis[a:b].mean(axis=0) for a, b in zip(bounds[:-1], bounds[1:])]
+        [basis[a:b].mean(axis=0) for a, b in itertools.pairwise(bounds)]
     )
     seg_vecs = librosa.util.normalize(seg_vecs, axis=1, norm=2)
 
@@ -269,7 +271,7 @@ def _sections_envelope(
     energies = np.array(
         [
             float(rms[(rms_times >= a) & (rms_times < b)].mean()) if b > a else 0.0
-            for a, b in zip(bounds_sec[:-1], bounds_sec[1:])
+            for a, b in itertools.pairwise(bounds_sec)
         ]
     )
     names = _name_groups(groups, energies)
@@ -282,7 +284,7 @@ def _sections_envelope(
             "group": chr(ord("A") + int(groups[i])),
             "confidence": float(conf[i]),
         }
-        for i, (a, b) in enumerate(zip(bounds_sec[:-1], bounds_sec[1:]))
+        for i, (a, b) in enumerate(itertools.pairwise(bounds_sec))
     ]
     # A single span means no structure was found; an honest single segment.
     if len(segments) == 1:

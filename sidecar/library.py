@@ -7,8 +7,8 @@ opened per operation so a worker thread can hold its own without sharing state.
 
 import json
 import sqlite3
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from . import storage
 

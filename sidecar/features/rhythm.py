@@ -74,7 +74,7 @@ def rhythmic_density(y: np.ndarray, sr: int, hop: int) -> dict:
     frame_rate = sr / hop
     train = np.zeros(len(onset_env))
     train[onset_frames] = 1.0
-    win = max(1, int(round(DENSITY_WINDOW_SEC * frame_rate)))
+    win = max(1, round(DENSITY_WINDOW_SEC * frame_rate))
     # mean-over-window * frame_rate = count-over-window / window_seconds.
     density = uniform_filter1d(train, size=win) * frame_rate
     return {

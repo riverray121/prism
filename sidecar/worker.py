@@ -16,7 +16,7 @@ import gc
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import librosa
 import numpy as np
@@ -172,7 +172,7 @@ _HEATMAP_META = {
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _claim_next() -> dict | None:

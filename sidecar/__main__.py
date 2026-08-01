@@ -3,7 +3,7 @@ import logging
 import shutil
 import sys
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from . import (
@@ -90,7 +90,7 @@ def import_one(path_str: str) -> None:
             duration_sec=meta.duration_sec,
             sample_rate=meta.sample_rate,
             source_path=source_path,
-            imported_at=datetime.now(timezone.utc).isoformat(),
+            imported_at=datetime.now(UTC).isoformat(),
         )
     log.info("imported %s as %s", source.name, song_id)
 
@@ -138,9 +138,7 @@ def handle(msg: dict) -> None:
     elif msg_type == "queue.add":
         cmd = QueueAddCommand.model_validate(msg)
         with library.connect() as con:
-            library.mark_queued(
-                con, cmd.song_ids, datetime.now(timezone.utc).isoformat()
-            )
+            library.mark_queued(con, cmd.song_ids, datetime.now(UTC).isoformat())
         emit_snapshot()  # reflect 'queued'; the worker picks up from here
     elif msg_type == "queue.cancel":
         cmd = QueueCancelCommand.model_validate(msg)
