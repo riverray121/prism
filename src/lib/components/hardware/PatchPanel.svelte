@@ -27,7 +27,7 @@
     program: Program | null;
     entry: LightEntry | null;
     linked: boolean;
-    // Patched to a program that no longer exists: muted, never a failure.
+    // Patched to a program missing from the doc: muted, never a failure.
     dangling: boolean;
   }
 

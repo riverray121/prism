@@ -25,8 +25,23 @@ export const RigHubSchema = z.object({
 });
 export type RigHub = z.infer<typeof RigHubSchema>;
 
+// One bound for everything that touches the light delay: the schema, the
+// setter's clamp, and the UI nudge all share it.
+export const MAX_LIGHT_DELAY_MS = 500;
+
 export const RigSchema = z.object({
   hubs: z.array(RigHubSchema).default([]),
+  // Light-delay calibration: the streamer samples the show this many ms
+  // behind the playhead, absorbing the constant lights-lead-audio sources
+  // (centered smoothing/analysis frames, audio output latency). Absent on
+  // older rigs; readers fall back to the default. An out-of-range or
+  // malformed hand-edit falls back rather than failing the whole rig parse.
+  latency_ms: z
+    .number()
+    .min(0)
+    .max(MAX_LIGHT_DELAY_MS)
+    .optional()
+    .catch(undefined),
 });
 export type Rig = z.infer<typeof RigSchema>;
 

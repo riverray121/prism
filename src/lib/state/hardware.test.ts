@@ -30,6 +30,7 @@ import {
   probe,
   probeAddress,
   scan,
+  setLatency,
   startScan,
   stopStream,
   streamTick,
@@ -211,13 +212,14 @@ describe("streaming", () => {
     };
   }
 
-  function openPatchedSong(): void {
+  function openPatchedSong(latencyMs = 0): void {
     applyRigEvent({
       hubs: [
         benchHub({
           lights: [{ id: "a842e39b1c60:0", name: "Strip", pixel_count: N }],
         }),
       ],
+      latency_ms: latencyMs,
     });
     hardware.online["a842e39b1c60"] = true;
     resetMappingForSong("s1");
@@ -252,6 +254,39 @@ describe("streaming", () => {
     expect(data.slice(10)).toEqual([
       ...output.pixels!.rgb.slice(100 * N * 3, 101 * N * 3),
     ]);
+  });
+
+  it("sampling sits behind the playhead by the calibrated light delay", () => {
+    const output = pixelOutput();
+    openPatchedSong(100);
+    streamTick(1.0, 100, FRAMES, { pulse: output }); // frame 100 - 10 = 90
+    const [, , data] = ddpSend.mock.calls[0];
+    expect(data.slice(10)).toEqual([
+      ...output.pixels!.rgb.slice(90 * N * 3, 91 * N * 3),
+    ]);
+  });
+
+  it("an absent latency field falls back to the default delay", () => {
+    const output = pixelOutput();
+    openPatchedSong();
+    delete hardware.rig.latency_ms;
+    streamTick(1.0, 100, FRAMES, { pulse: output }); // frame 100 - 6 = 94
+    const [, , data] = ddpSend.mock.calls[0];
+    expect(data.slice(10)).toEqual([
+      ...output.pixels!.rgb.slice(94 * N * 3, 95 * N * 3),
+    ]);
+  });
+
+  it("setLatency clamps and persists through the rig", () => {
+    openPatchedSong();
+    updateRig.mockClear();
+    setLatency(72.4);
+    expect(hardware.rig.latency_ms).toBe(72);
+    setLatency(-50);
+    expect(hardware.rig.latency_ms).toBe(0);
+    setLatency(9999);
+    expect(hardware.rig.latency_ms).toBe(500);
+    expect(updateRig).toHaveBeenCalledTimes(3);
   });
 
   it("the first frame to a hub powers it on, once", () => {
@@ -291,7 +326,9 @@ describe("streaming", () => {
     streamTick(1.0, 100, FRAMES, { pulse: pixelOutput() });
     ddpSend.mockClear();
     stopStream();
-    expect(ddpSend).toHaveBeenCalledTimes(1);
+    // The blackout chains off the hub's power-on promise, so it lands a tick
+    // after the call.
+    await vi.waitFor(() => expect(ddpSend).toHaveBeenCalledTimes(1));
     const [, , data] = ddpSend.mock.calls[0];
     expect(data.slice(10)).toEqual(new Array(N * 3).fill(0));
     await vi.waitFor(() => {

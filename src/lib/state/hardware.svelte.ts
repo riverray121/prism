@@ -10,6 +10,7 @@ import { activePatch } from "$lib/hardware/patch";
 import {
   emptyRig,
   fetchHub,
+  MAX_LIGHT_DELAY_MS,
   setHubPower,
   type Rig,
   type RigHub,
@@ -109,6 +110,26 @@ function persistRig(): void {
   void updateRig($state.snapshot(hardware.rig));
 }
 
+// ── Light-delay calibration ─────────────────────────────────────────────────
+// The show is sampled this far behind the playhead so the strip lines up
+// with what the ear hears. The default covers the stack of constant leads:
+// the centered smoothing window (~40 ms), centered analysis frames
+// (~10-25 ms), and audio output latency on built-in speakers (~10-25 ms).
+
+const DEFAULT_LATENCY_MS = 60;
+
+export function rigLatencyMs(): number {
+  return hardware.rig.latency_ms ?? DEFAULT_LATENCY_MS;
+}
+
+export function setLatency(ms: number): void {
+  hardware.rig.latency_ms = Math.max(
+    0,
+    Math.min(MAX_LIGHT_DELAY_MS, Math.round(ms)),
+  );
+  persistRig();
+}
+
 // ── Streaming ───────────────────────────────────────────────────────────────
 // The Hardware tab hosts a rAF loop while the transport plays; each tick
 // samples the evaluated outputs at the playhead and sends one DDP frame per
@@ -116,9 +137,13 @@ function persistRig(): void {
 // sends one all-zeros frame (the strip otherwise holds the last frame), then
 // powers the hub off so it never falls back to its own saved look.
 
-// Hubs sent frames this play run: MAC → address and largest frame sent, so
-// the stop sequence knows where blackout and power-off go.
-const streamed = new Map<string, { ip: string; pixels: number }>();
+// Hubs sent frames this play run: MAC → address, largest frame sent, and the
+// power-on request, so the stop sequence knows where blackout and power-off
+// go — and never lets a power-off overtake a still-in-flight power-on.
+const streamed = new Map<
+  string,
+  { ip: string; pixels: number; powered: Promise<void> }
+>();
 
 // Gate strength at one instant (null gate = always lit).
 function gateStrengthAt(gate: GateSegment[] | null, t: number): number {
@@ -173,7 +198,10 @@ export function streamTick(
 ): void {
   const doc = mapping.doc;
   if (!doc || frameCount === 0) return;
-  const frame = frameIndexAt(t, frameRateHz, frameCount);
+  // Sample behind the playhead by the calibrated light delay, so the strip
+  // matches the audio the ear hears rather than the processing clock.
+  const ts = Math.max(0, t - rigLatencyMs() / 1000);
+  const frame = frameIndexAt(ts, frameRateHz, frameCount);
   for (const target of activePatch(doc, hardware.rig.hubs, hardware.online)) {
     const output = outputs[target.program.id];
     if (!output) continue;
@@ -186,16 +214,16 @@ export function streamTick(
       packets = ddpFramePackets(output.pixels, frame);
     } else {
       packets = ddpFramePackets(
-        { pixelCount: N, rgb: solidFrame(output, N, t, frame) },
+        { pixelCount: N, rgb: solidFrame(output, N, ts, frame) },
         0,
       );
     }
     const known = streamed.get(target.hub.mac);
     if (!known) {
-      streamed.set(target.hub.mac, { ip: target.hub.ip, pixels: N });
-      void setHubPower(target.hub.ip, true).catch((e) =>
-        console.warn("hub power on failed", target.hub.ip, e),
-      );
+      const powered = setHubPower(target.hub.ip, true).catch((e) => {
+        console.warn("hub power on failed", target.hub.ip, e);
+      });
+      streamed.set(target.hub.mac, { ip: target.hub.ip, pixels: N, powered });
     } else if (N > known.pixels) {
       known.pixels = N;
     }
@@ -209,12 +237,16 @@ export function streamTick(
 // order (the blackout lands while realtime mode is still live). Unreachable
 // hubs are skipped — nothing to darken.
 export function stopStream(): void {
-  for (const [mac, { ip, pixels }] of streamed) {
+  for (const [mac, { ip, pixels, powered }] of streamed) {
     if (hardware.online[mac] === false) continue;
-    const blackout = ddpBlackoutPackets(pixels).map((p) =>
-      ddpSend(ip, DDP_PORT, Array.from(p)),
-    );
-    void Promise.all(blackout)
+    void powered
+      .then(() =>
+        Promise.all(
+          ddpBlackoutPackets(pixels).map((p) =>
+            ddpSend(ip, DDP_PORT, Array.from(p)),
+          ),
+        ),
+      )
       .then(() => setHubPower(ip, false))
       .catch((e) => console.warn("hub stop sequence failed", ip, e));
   }
@@ -237,8 +269,10 @@ export function startScan(): void {
   }, SCAN_WINDOW_MS);
   // Hubs the shell resolved before the listener attached (usually all of
   // them — resolves beat webview startup) arrive via the snapshot.
+  const gen = generation;
   void discoverySnapshot()
     .then((events) => {
+      if (gen !== generation) return; // superseded by stop or a newer start
       for (const { kind, name, ip } of events) {
         if (kind === "found" && ip) void handleFound(name, ip);
       }
@@ -275,8 +309,12 @@ export async function probeAddress(ip: string): Promise<void> {
 async function handleFound(name: string, ip: string): Promise<void> {
   if (probing.has(ip)) return;
   probing.add(ip);
+  const gen = generation;
   try {
     const hub = await fetchHub(ip);
+    // A fetch outliving the session (stop, or a newer start) must not write
+    // into the replacement session's state or rewrite the rig.
+    if (gen !== generation) return;
     macByMdnsName.set(name, hub.mac);
     applyHubSeen(hub);
   } catch (e) {

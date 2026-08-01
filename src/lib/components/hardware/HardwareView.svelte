@@ -8,7 +8,9 @@
     hardware,
     probe,
     probeAddress,
+    rigLatencyMs,
     scan,
+    setLatency,
     startScan,
   } from "$lib/state/hardware.svelte";
   import {
@@ -201,6 +203,37 @@
       {:else if probe.status === "failed"}
         <p class="mt-1 text-xs text-danger">No hub at {probe.ip}.</p>
       {/if}
+    </section>
+
+    <section class="p-3 pt-0">
+      <p
+        class="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-faint"
+      >
+        Sync
+      </p>
+      <div
+        class="flex items-center justify-between gap-2 text-sm"
+        title="Lights sample this far behind the playhead, so the strip matches what you hear"
+      >
+        <span class="text-ink-muted">Light delay</span>
+        <div class="flex items-center gap-1.5">
+          <button
+            onclick={() => setLatency(rigLatencyMs() - 10)}
+            class="flex size-5 items-center justify-center rounded border border-edge text-ink-muted hover:text-ink"
+          >
+            −
+          </button>
+          <span class="w-14 text-center tabular-nums">
+            {rigLatencyMs()} ms
+          </span>
+          <button
+            onclick={() => setLatency(rigLatencyMs() + 10)}
+            class="flex size-5 items-center justify-center rounded border border-edge text-ink-muted hover:text-ink"
+          >
+            +
+          </button>
+        </div>
+      </div>
     </section>
   </ResizablePanel>
 
