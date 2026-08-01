@@ -122,6 +122,22 @@ describe("discovery merge", () => {
     applyHubSeen(benchHub());
     expect(updateRig).not.toHaveBeenCalled();
   });
+
+  it("a hub discovered before the rig loads leaves Connect new once known", () => {
+    hardware.rigLoaded = false;
+    applyHubSeen(benchHub());
+    expect(hardware.discovered).toHaveLength(1);
+    applyRigEvent({ hubs: [benchHub({ name: "Desk hub" })] });
+    expect(hardware.discovered).toHaveLength(0);
+    expect(hardware.rig.hubs[0].name).toBe("Desk hub");
+  });
+
+  it("nothing persists before the saved rig has loaded", () => {
+    hardware.rigLoaded = false;
+    applyHubSeen(benchHub());
+    connectHub("a842e39b1c60", "Desk hub");
+    expect(updateRig).not.toHaveBeenCalled();
+  });
 });
 
 describe("connect and forget", () => {

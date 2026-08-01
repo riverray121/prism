@@ -394,10 +394,18 @@ def _process(song: dict, on_change: Callable[[], None]) -> None:
         analyzed_at = _now()
         # The profile must carry the row's current title/artist, not the
         # claim-time snapshot: metadata can be edited while analysis runs.
-        with library.connect() as con:
-            current = library.get_metadata(con, song_id)
-        if current is not None:
-            song = {**song, "title": current["title"], "artist": current["artist"]}
+        # Best-effort — a read failure must not fail a finished analysis.
+        try:
+            with library.connect() as con:
+                current = library.get_metadata(con, song_id)
+            if current is not None:
+                song = {
+                    **song,
+                    "title": current["title"],
+                    "artist": current["artist"],
+                }
+        except Exception:
+            log.exception("metadata refresh failed; keeping claim-time values")
         storage.write_profile(
             song,
             analyzed_at=analyzed_at,

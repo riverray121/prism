@@ -50,6 +50,12 @@ const probing = new Set<string>();
 export function applyRigEvent(rig: Rig): void {
   hardware.rig = rig;
   hardware.rigLoaded = true;
+  // Discovery can resolve a hub before the saved rig arrives, parking it
+  // under Connect new; once the rig shows it as known, the stale discovered
+  // entry must not linger beside it.
+  hardware.discovered = hardware.discovered.filter(
+    (h) => !rig.hubs.some((known) => known.mac === h.mac),
+  );
 }
 
 // Merge a hub whose config was just read off the device. Known hubs (by MAC)
@@ -107,6 +113,10 @@ export function forgetHub(mac: string): void {
 }
 
 function persistRig(): void {
+  // Never write before the saved rig has loaded: a persist racing the rig
+  // event would replace rig.json (saved hubs, light delay) with the
+  // placeholder empty rig.
+  if (!hardware.rigLoaded) return;
   void updateRig($state.snapshot(hardware.rig));
 }
 
