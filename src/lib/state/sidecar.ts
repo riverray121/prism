@@ -17,6 +17,7 @@ import { resetForSong } from "$lib/state/transport.svelte";
 function applySidecarEvent(event: SidecarEvent): void {
   if (event.type === "library.songs") {
     library.songs = event.songs;
+    library.loaded = true;
   } else if (event.type === "library.import_failed") {
     console.error("import failed", event.path, event.error);
     library.lastImportError = { path: event.path, error: event.error };

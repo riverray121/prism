@@ -140,7 +140,9 @@
   {/if}
 
   <div class="flex flex-col overflow-hidden rounded-md border border-edge">
-    {#if visibleSongs.length === 0}
+    {#if !library.loaded}
+      <p class="p-4 text-sm text-ink-faint">Loading…</p>
+    {:else if visibleSongs.length === 0}
       <p class="p-4 text-sm text-ink-faint">
         {library.songs.length === 0 ? "No songs imported yet." : "No matches."}
       </p>
