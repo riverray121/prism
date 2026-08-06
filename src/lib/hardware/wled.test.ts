@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseHub, RigSchema } from "./wled";
+import { lightLabel, parseHub, RigSchema } from "./wled";
 
 // Payload shapes per the WLED JSON API (bench hub: ESP32, WLED 16.x, one
 // 300-px WS2812B output). Only the fields Prism reads, plus the surrounding
@@ -44,7 +44,7 @@ describe("parseHub", () => {
       mac: "a842e39b1c60",
       name: "WLED",
       ip: "192.168.0.84",
-      lights: [{ id: "a842e39b1c60:0", name: "WLED", pixel_count: 300 }],
+      lights: [{ id: "a842e39b1c60:0", pixel_count: 300, start: 0 }],
     });
   });
 
@@ -62,8 +62,8 @@ describe("parseHub", () => {
     };
     const hub = parseHub("10.0.0.2", INFO, cfg);
     expect(hub.lights).toEqual([
-      { id: "a842e39b1c60:0", name: "Output 1", pixel_count: 300 },
-      { id: "a842e39b1c60:1", name: "Output 2", pixel_count: 120 },
+      { id: "a842e39b1c60:0", pixel_count: 300, start: 0 },
+      { id: "a842e39b1c60:1", pixel_count: 120, start: 300 },
     ]);
   });
 
@@ -74,5 +74,38 @@ describe("parseHub", () => {
   it("parsed hubs satisfy the rig schema", () => {
     const hub = parseHub("192.168.0.84", INFO, CFG);
     expect(RigSchema.parse({ hubs: [hub] })).toEqual({ hubs: [hub] });
+  });
+});
+
+describe("light names", () => {
+  const light = { id: "a842e39b1c60:2", pixel_count: 300, start: 600 };
+
+  it("labels fall back to the positional default from the light id", () => {
+    expect(lightLabel(light)).toBe("Output 3");
+    expect(lightLabel({ ...light, name: "Tube left" })).toBe("Tube left");
+  });
+
+  it("loading a rig drops stored default names, keeping real renames", () => {
+    // Docs written before names became rename-only stored a name for every
+    // light: the hub's device name (single output) or "Output N".
+    const rig = RigSchema.parse({
+      hubs: [
+        {
+          mac: "a842e39b1c60",
+          name: "WLED",
+          ip: "192.168.0.84",
+          lights: [
+            { id: "a842e39b1c60:0", name: "WLED", pixel_count: 300 },
+            { id: "a842e39b1c60:1", name: "Output 2", pixel_count: 300 },
+            { id: "a842e39b1c60:2", name: "Tube left", pixel_count: 272 },
+          ],
+        },
+      ],
+    });
+    expect(rig.hubs[0].lights.map((l) => l.name)).toEqual([
+      undefined,
+      undefined,
+      "Tube left",
+    ]);
   });
 });

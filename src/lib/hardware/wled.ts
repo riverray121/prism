@@ -10,20 +10,49 @@ import { z } from "zod";
 
 export const RigLightSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  // Present only when the user renamed the light; absent means "display the
+  // positional default" (lightLabel). The device never supplies names.
+  name: z.string().optional(),
   pixel_count: z.number().int().positive(),
+  // First pixel of this output in the hub's global address space. DDP frames
+  // for the light land at byte offset `start * 3`; a rig doc saved before
+  // this field existed reads as 0 and is corrected on the next hub fetch.
+  start: z.number().int().nonnegative().default(0),
 });
 export type RigLight = z.infer<typeof RigLightSchema>;
 
-export const RigHubSchema = z.object({
-  mac: z.string(),
-  // User-chosen hub name (from the Connect new flow).
-  name: z.string(),
-  // Last-known address; refreshed whenever discovery resolves the hub.
-  ip: z.string(),
-  lights: z.array(RigLightSchema).default([]),
-});
+export const RigHubSchema = z
+  .object({
+    mac: z.string(),
+    // User-chosen hub name (from the Connect new flow).
+    name: z.string(),
+    // Last-known address; refreshed whenever discovery resolves the hub.
+    ip: z.string(),
+    lights: z.array(RigLightSchema).default([]),
+  })
+  // Migration for docs written when every light stored a name: the old
+  // defaults ("Output N", or the hub's name for a then-single output) become
+  // absent, leaving only genuine renames stored.
+  .transform((hub) => ({
+    ...hub,
+    lights: hub.lights.map((l) =>
+      l.name !== undefined &&
+      (l.name === hub.name || /^Output \d+$/.test(l.name))
+        ? { ...l, name: undefined }
+        : l,
+    ),
+  }));
 export type RigHub = z.infer<typeof RigHubSchema>;
+
+// A light's positional default name, read from the output index in its id.
+export function lightDefaultLabel(lightId: string): string {
+  return `Output ${Number(lightId.split(":")[1]) + 1}`;
+}
+
+// A light's display name: the user-chosen name when set, else the default.
+export function lightLabel(light: RigLight): string {
+  return light.name ?? lightDefaultLabel(light.id);
+}
 
 // One bound for everything that touches the light delay: the schema, the
 // setter's clamp, and the UI nudge all share it.
@@ -69,8 +98,8 @@ const WledCfgSchema = z.object({
   }),
 });
 
-// A connected hub as read from the device: rig-shaped, with default light
-// names ready for the user to rename.
+// A connected hub as read from the device: rig-shaped, lights unnamed (the
+// device only reports outputs; names are the user's).
 export function parseHub(ip: string, info: unknown, cfg: unknown): RigHub {
   const parsedInfo = WledInfoSchema.parse(info);
   const mac = parsedInfo.mac.toLowerCase();
@@ -81,8 +110,8 @@ export function parseHub(ip: string, info: unknown, cfg: unknown): RigHub {
     ip,
     lights: outputs.map((o, i) => ({
       id: `${mac}:${i}`,
-      name: outputs.length === 1 ? parsedInfo.name : `Output ${i + 1}`,
       pixel_count: o.len,
+      start: o.start,
     })),
   };
 }

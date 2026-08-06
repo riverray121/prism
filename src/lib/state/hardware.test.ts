@@ -29,6 +29,7 @@ import {
   markHubOffline,
   probe,
   probeAddress,
+  renameLight,
   scan,
   setLatency,
   startScan,
@@ -52,7 +53,9 @@ function benchHub(overrides: Partial<RigHub> = {}): RigHub {
     mac: "a842e39b1c60",
     name: "WLED",
     ip: "192.168.0.84",
-    lights: [{ id: "a842e39b1c60:0", name: "Strip", pixel_count: 300 }],
+    lights: [
+      { id: "a842e39b1c60:0", name: "Strip", pixel_count: 300, start: 0 },
+    ],
     ...overrides,
   };
 }
@@ -105,14 +108,14 @@ describe("discovery merge", () => {
     applyHubSeen(
       benchHub({
         lights: [
-          { id: "a842e39b1c60:0", name: "WLED", pixel_count: 450 },
-          { id: "a842e39b1c60:1", name: "Output 2", pixel_count: 120 },
+          { id: "a842e39b1c60:0", pixel_count: 450, start: 0 },
+          { id: "a842e39b1c60:1", pixel_count: 120, start: 450 },
         ],
       }),
     );
     expect(hardware.rig.hubs[0].lights).toEqual([
-      { id: "a842e39b1c60:0", name: "Strip", pixel_count: 450 },
-      { id: "a842e39b1c60:1", name: "Output 2", pixel_count: 120 },
+      { id: "a842e39b1c60:0", name: "Strip", pixel_count: 450, start: 0 },
+      { id: "a842e39b1c60:1", pixel_count: 120, start: 450 },
     ]);
     expect(updateRig).toHaveBeenCalledTimes(1);
   });
@@ -155,6 +158,23 @@ describe("connect and forget", () => {
     forgetHub("a842e39b1c60");
     expect(hardware.rig.hubs).toHaveLength(0);
     expect(hardware.discovered).toHaveLength(1);
+    expect(updateRig).toHaveBeenCalledTimes(2);
+  });
+
+  it("rename stores a trimmed name; blank or the default clears it", () => {
+    applyHubSeen(benchHub());
+    connectHub("a842e39b1c60", "Desk hub");
+    updateRig.mockClear();
+    renameLight("a842e39b1c60:0", "  Tube left  ");
+    expect(hardware.rig.hubs[0].lights[0].name).toBe("Tube left");
+    expect(updateRig).toHaveBeenCalledTimes(1);
+    renameLight("a842e39b1c60:0", "Tube left");
+    expect(updateRig).toHaveBeenCalledTimes(1);
+    renameLight("a842e39b1c60:0", "   ");
+    expect(hardware.rig.hubs[0].lights[0].name).toBeUndefined();
+    expect(updateRig).toHaveBeenCalledTimes(2);
+    renameLight("a842e39b1c60:0", "Output 1");
+    expect(hardware.rig.hubs[0].lights[0].name).toBeUndefined();
     expect(updateRig).toHaveBeenCalledTimes(2);
   });
 
@@ -232,7 +252,9 @@ describe("streaming", () => {
     applyRigEvent({
       hubs: [
         benchHub({
-          lights: [{ id: "a842e39b1c60:0", name: "Strip", pixel_count: N }],
+          lights: [
+            { id: "a842e39b1c60:0", name: "Strip", pixel_count: N, start: 0 },
+          ],
         }),
       ],
       latency_ms: latencyMs,
@@ -327,6 +349,45 @@ describe("streaming", () => {
     for (let p = 1; p < N; p++) {
       expect(payload.slice(p * 3, p * 3 + 3)).toEqual(payload.slice(0, 3));
     }
+  });
+
+  it("a light past the buffer's start streams at its bus offset; stop blacks out the full span", async () => {
+    const output = pixelOutput();
+    openPatchedSong();
+    // Re-rig as a two-output hub with the patched program on the second bus.
+    applyRigEvent({
+      hubs: [
+        benchHub({
+          lights: [
+            { id: "a842e39b1c60:0", name: "Strip", pixel_count: 8, start: 0 },
+            { id: "a842e39b1c60:1", name: "Neon", pixel_count: N, start: 8 },
+          ],
+        }),
+      ],
+      latency_ms: 0,
+    });
+    applyMappingEvent(
+      "s1",
+      MappingDocSchema.parse({
+        song_id: "s1",
+        programs: [{ id: "pulse" }],
+        patch: { "a842e39b1c60:1": "pulse" },
+      }),
+    );
+    streamTick(1.0, 100, FRAMES, { pulse: output });
+    const [, , data] = ddpSend.mock.calls[0];
+    // DDP data offset (header bytes 4-7) = start pixel 8 × 3 bytes.
+    expect(data.slice(4, 8)).toEqual([0, 0, 0, 24]);
+    expect(data.slice(10)).toEqual([
+      ...output.pixels!.rgb.slice(100 * N * 3, 101 * N * 3),
+    ]);
+    ddpSend.mockClear();
+    stopStream();
+    // Blackout runs from the buffer's start to the end of the farthest light.
+    await vi.waitFor(() => expect(ddpSend).toHaveBeenCalledTimes(1));
+    expect(ddpSend.mock.calls[0][2].slice(10)).toEqual(
+      new Array((8 + N) * 3).fill(0),
+    );
   });
 
   it("a stale matrix at the wrong pixel count is skipped, not streamed", () => {

@@ -10,6 +10,7 @@ import { activePatch } from "$lib/hardware/patch";
 import {
   emptyRig,
   fetchHub,
+  lightDefaultLabel,
   MAX_LIGHT_DELAY_MS,
   setHubPower,
   type Rig,
@@ -67,7 +68,9 @@ export function applyHubSeen(hub: RigHub): void {
   if (known) {
     const lights = hub.lights.map((light) => {
       const existing = known.lights.find((l) => l.id === light.id);
-      return existing ? { ...light, name: existing.name } : light;
+      return existing?.name === undefined
+        ? light
+        : { ...light, name: existing.name };
     });
     const changed =
       known.ip !== hub.ip ||
@@ -112,6 +115,26 @@ export function forgetHub(mac: string): void {
   }
 }
 
+// Rename a light. The name survives light-config refreshes (applyHubSeen
+// carries names over by light id); a blank name, or the light's own default,
+// clears the rename so the light tracks its positional default again.
+export function renameLight(lightId: string, name: string): void {
+  const trimmed = name.trim();
+  for (const hub of hardware.rig.hubs) {
+    const light = hub.lights.find((l) => l.id === lightId);
+    if (!light) continue;
+    const next =
+      trimmed === "" || trimmed === lightDefaultLabel(lightId)
+        ? undefined
+        : trimmed;
+    if (light.name !== next) {
+      light.name = next;
+      persistRig();
+    }
+    return;
+  }
+}
+
 function persistRig(): void {
   // Never write before the saved rig has loaded: a persist racing the rig
   // event would replace rig.json (saved hubs, light delay) with the
@@ -147,9 +170,10 @@ export function setLatency(ms: number): void {
 // sends one all-zeros frame (the strip otherwise holds the last frame), then
 // powers the hub off so it never falls back to its own saved look.
 
-// Hubs sent frames this play run: MAC → address, largest frame sent, and the
-// power-on request, so the stop sequence knows where blackout and power-off
-// go — and never lets a power-off overtake a still-in-flight power-on.
+// Hubs sent frames this play run: MAC → address, streamed pixel span (from
+// buffer start to the end of the farthest light lit), and the power-on
+// request, so the stop sequence knows where blackout and power-off go — and
+// never lets a power-off overtake a still-in-flight power-on.
 const streamed = new Map<
   string,
   { ip: string; pixels: number; powered: Promise<void> }
@@ -216,26 +240,35 @@ export function streamTick(
     const output = outputs[target.program.id];
     if (!output) continue;
     const N = target.light.pixel_count;
+    // A light's frames land at its bus's position in the hub's DDP buffer,
+    // which concatenates every output.
+    const base = target.light.start * 3;
     let packets;
     if (output.pixels) {
       // A mismatched matrix is a stale evaluation (patch just changed);
       // skip rather than light the wrong pixels — next tick catches up.
       if (output.pixels.pixelCount !== N) continue;
-      packets = ddpFramePackets(output.pixels, frame);
+      packets = ddpFramePackets(output.pixels, frame, base);
     } else {
       packets = ddpFramePackets(
         { pixelCount: N, rgb: solidFrame(output, N, ts, frame) },
         0,
+        base,
       );
     }
+    const span = target.light.start + N;
     const known = streamed.get(target.hub.mac);
     if (!known) {
       const powered = setHubPower(target.hub.ip, true).catch((e) => {
         console.warn("hub power on failed", target.hub.ip, e);
       });
-      streamed.set(target.hub.mac, { ip: target.hub.ip, pixels: N, powered });
-    } else if (N > known.pixels) {
-      known.pixels = N;
+      streamed.set(target.hub.mac, {
+        ip: target.hub.ip,
+        pixels: span,
+        powered,
+      });
+    } else if (span > known.pixels) {
+      known.pixels = span;
     }
     for (const p of packets) {
       void ddpSend(target.hub.ip, DDP_PORT, Array.from(p)).catch(() => {});

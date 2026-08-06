@@ -8,11 +8,13 @@
     hardware,
     probe,
     probeAddress,
+    renameLight,
     rigLatencyMs,
     scan,
     setLatency,
     startScan,
   } from "$lib/state/hardware.svelte";
+  import { lightLabel } from "$lib/hardware/wled";
   import {
     PANEL_MAX_WIDTH,
     PANEL_MIN_WIDTH,
@@ -29,6 +31,19 @@
   let drafts = $state<Record<string, string>>({});
   // Address draft for the manual Add-by-IP fallback.
   let ipDraft = $state("");
+  // Inline light rename: the light being edited and its draft name.
+  let editingLight = $state<string | null>(null);
+  let lightDraft = $state("");
+
+  function startRename(lightId: string, current: string): void {
+    editingLight = lightId;
+    lightDraft = current;
+  }
+
+  function commitRename(): void {
+    if (editingLight !== null) renameLight(editingLight, lightDraft);
+    editingLight = null;
+  }
 
   function connect(mac: string, fallback: string): void {
     connectHub(mac, drafts[mac] ?? fallback);
@@ -91,7 +106,28 @@
               <ul class="mt-0.5 flex flex-col">
                 {#each hub.lights as light (light.id)}
                   <li class="flex items-baseline gap-2 pl-4 text-sm">
-                    <span class="truncate">{light.name}</span>
+                    {#if editingLight === light.id}
+                      <!-- svelte-ignore a11y_autofocus -->
+                      <input
+                        type="text"
+                        autofocus
+                        bind:value={lightDraft}
+                        onblur={commitRename}
+                        onkeydown={(e) => {
+                          if (e.key === "Enter") commitRename();
+                          else if (e.key === "Escape") editingLight = null;
+                        }}
+                        class="min-w-0 flex-1 rounded border border-edge bg-app px-1 py-0 text-sm text-ink focus:border-accent focus:outline-none"
+                      />
+                    {:else}
+                      <button
+                        onclick={() => startRename(light.id, lightLabel(light))}
+                        title="Rename this light (leave blank to reset)"
+                        class="truncate text-left hover:text-accent"
+                      >
+                        {lightLabel(light)}
+                      </button>
+                    {/if}
                     <span class="shrink-0 text-xs text-ink-faint">
                       {light.pixel_count} px
                     </span>

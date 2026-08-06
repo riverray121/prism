@@ -49,6 +49,25 @@ describe("ddpFramePackets", () => {
     expect(packets[0].length + packets[1].length).toBe(20 + 1800);
   });
 
+  it("places frames at a base offset (a bus past the buffer's start)", () => {
+    const m = matrix();
+    const [pkt] = ddpFramePackets(m, 1, 900);
+    expect([...pkt.slice(4, 8)]).toEqual([0, 0, 0x03, 0x84]);
+    expect([...pkt.slice(10)]).toEqual([...m.rgb.slice(1 * 4 * 3, 2 * 4 * 3)]);
+  });
+
+  it("split frames resume from the base offset", () => {
+    const m: PixelMatrix = {
+      pixelCount: 600,
+      rgb: new Uint8ClampedArray(600 * 3).fill(7),
+    };
+    const packets = ddpFramePackets(m, 0, 900);
+    expect(packets.length).toBe(2);
+    // 900 and 900 + 1440 = 2340, big-endian.
+    expect([...packets[0].slice(4, 8)]).toEqual([0, 0, 0x03, 0x84]);
+    expect([...packets[1].slice(4, 8)]).toEqual([0, 0, 0x09, 0x24]);
+  });
+
   it("blackout packets carry only zero bytes at the strip's length", () => {
     const packets = ddpBlackoutPackets(300);
     expect(packets.length).toBe(1);

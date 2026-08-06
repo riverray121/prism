@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { RigHub, RigLight } from "$lib/hardware/wled";
+  import { lightLabel, type RigHub, type RigLight } from "$lib/hardware/wled";
   import { programLabel } from "$lib/mapping/labels";
   import type { Program } from "$lib/mapping/schema";
   import { hardware } from "$lib/state/hardware.svelte";
@@ -136,7 +136,7 @@
               : 'border-edge bg-surface'} hover:bg-raised"
           >
             <span class="truncate {online ? '' : 'text-ink-faint'}">
-              {row.entry.light.name}
+              {lightLabel(row.entry.light)}
             </span>
             <span class="shrink-0 text-xs text-ink-faint">
               {row.entry.light.pixel_count} px{online

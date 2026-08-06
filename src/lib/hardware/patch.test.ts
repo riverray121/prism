@@ -9,7 +9,7 @@ const HUB: RigHub = {
   mac: "a842e39b1c60",
   name: "Desk hub",
   ip: "192.168.0.84",
-  lights: [{ id: "a842e39b1c60:0", name: "Strip", pixel_count: 300 }],
+  lights: [{ id: "a842e39b1c60:0", name: "Strip", pixel_count: 300, start: 0 }],
 };
 
 function doc(patch: Record<string, string> = {}): MappingDoc {
