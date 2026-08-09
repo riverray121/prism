@@ -7,7 +7,7 @@
 //! an unclean death.
 
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -52,8 +52,13 @@ pub fn init() {
 }
 
 /// Append one timestamped line to `app.log`, mirrored to stderr for dev.
+///
+/// Stderr write failures are ignored rather than panicking (as `eprintln!`
+/// would): stderr is a broken pipe once whatever launched the app is gone,
+/// and this is the function the panic hook calls to record a panic — a panic
+/// raised here would be a panic inside the panic handler, which aborts.
 pub fn log(line: &str) {
-    eprintln!("[app] {line}");
+    let _ = writeln!(io::stderr(), "[app] {line}");
     if let Ok(mut guard) = FILE.lock() {
         if let Some(f) = guard.as_mut() {
             let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
