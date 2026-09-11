@@ -15,7 +15,7 @@ First working rig, assembled 2026-07-26; grown to five outputs 2026-08-01. Prove
 
 ## WLED node
 
-- Network: `653BWiFi` (2.4 GHz); IP `192.168.0.95` (DHCP — may change; re-find via mDNS or sweep `/json/info` on 192.168.0.x)
+- Network: `Argo` (2.4 GHz); fixed DHCP lease `192.168.8.95` on the GL-MT3000 (host entry `tv-leds`, MAC 1c:c3:ab:bb:c8:5c). Node name "TV LEDs".
 - LED config: five buses, type WS281x GRB, one per output:
 
 | Bus | GPIO | Fixture                          | Pixels | Start | Current limit |
@@ -65,7 +65,12 @@ Constraints:
 
 ## Home Assistant
 
-The node is in Home Assistant through the core WLED integration (host 192.168.0.95, device and entity named "TV LEDs"): `light.tv_leds` (on/off, brightness, color; off drops the PSU relay through WLED), `select.tv_leds_preset` (presets by name). The WLED node's own name is also "TV LEDs".
+The node is in Home Assistant through the core WLED integration (host 192.168.8.95, device and entity named "TV LEDs"): `light.tv_leds` (on/off, brightness, color; off drops the PSU relay through WLED), `select.tv_leds_preset` (presets by name). The WLED node's own name is also "TV LEDs".
+
+- Voice: `light.tv_leds` is exposed to Assist with aliases "TV lights", "TV LED", "TV backlight", "living room LEDs".
+- Automations (UI-managed, created through the config API):
+  - `tv_leds_schedule` — 07:00 select preset "Day ambient" and turn on; 02:00 turn off.
+  - `tv_leds_welcome_home` — when `person.elijah` goes not_home → home and the light is off: preset "Day ambient" on, 20 min delay, then off unless the schedule automation fired within those 20 min.
 
 ## Saved looks (WLED presets on the node)
 
