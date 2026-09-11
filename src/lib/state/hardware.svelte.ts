@@ -12,6 +12,7 @@ import {
   fetchHub,
   lightDefaultLabel,
   MAX_LIGHT_DELAY_MS,
+  getHubPower,
   setHubPower,
   type Rig,
   type RigHub,
@@ -166,17 +167,19 @@ export function setLatency(ms: number): void {
 // ── Streaming ───────────────────────────────────────────────────────────────
 // The Hardware tab hosts a rAF loop while the transport plays; each tick
 // samples the evaluated outputs at the playhead and sends one DDP frame per
-// patched light. Stopped/paused means the strip is off — the stop sequence
-// sends one all-zeros frame (the strip otherwise holds the last frame), then
-// powers the hub off so it never falls back to its own saved look.
+// patched light. Stopping restores each hub to the state it had before the
+// run: a hub that was on is left to its realtime timeout (its own look comes
+// back), a hub that was off gets one all-zeros frame (the strip otherwise
+// holds the last frame) and is powered off again.
 
 // Hubs sent frames this play run: MAC → address, streamed pixel span (from
 // buffer start to the end of the farthest light lit), and the power-on
-// request, so the stop sequence knows where blackout and power-off go — and
-// never lets a power-off overtake a still-in-flight power-on.
+// request resolving to whether the hub was already on, so the stop sequence
+// knows where blackout and power-off go — and never lets a power-off overtake
+// a still-in-flight power-on.
 const streamed = new Map<
   string,
-  { ip: string; pixels: number; powered: Promise<void> }
+  { ip: string; pixels: number; powered: Promise<boolean> }
 >();
 
 // Gate strength at one instant (null gate = always lit).
@@ -259,9 +262,17 @@ export function streamTick(
     const span = target.light.start + N;
     const known = streamed.get(target.hub.mac);
     if (!known) {
-      const powered = setHubPower(target.hub.ip, true).catch((e) => {
-        console.warn("hub power on failed", target.hub.ip, e);
-      });
+      // Read the prior state first so the stop sequence can restore it. An
+      // unreadable state counts as off: the run then ends dark, as before.
+      const powered = getHubPower(target.hub.ip)
+        .catch(() => false)
+        .then((wasOn) =>
+          setHubPower(target.hub.ip, true)
+            .catch((e) => {
+              console.warn("hub power on failed", target.hub.ip, e);
+            })
+            .then(() => wasOn),
+        );
       streamed.set(target.hub.mac, {
         ip: target.hub.ip,
         pixels: span,
@@ -276,21 +287,22 @@ export function streamTick(
   }
 }
 
-// End a play run: blackout then power off every hub that got frames, in that
-// order (the blackout lands while realtime mode is still live). Unreachable
-// hubs are skipped — nothing to darken.
+// End a play run: every hub that got frames goes back to its prior state.
+// A hub that was on just stops receiving; a hub that was off gets a blackout
+// then power off, in that order (the blackout lands while realtime mode is
+// still live). Unreachable hubs are skipped — nothing to restore.
 export function stopStream(): void {
   for (const [mac, { ip, pixels, powered }] of streamed) {
     if (hardware.online[mac] === false) continue;
     void powered
-      .then(() =>
-        Promise.all(
+      .then((wasOn) => {
+        if (wasOn) return;
+        return Promise.all(
           ddpBlackoutPackets(pixels).map((p) =>
             ddpSend(ip, DDP_PORT, Array.from(p)),
           ),
-        ),
-      )
-      .then(() => setHubPower(ip, false))
+        ).then(() => setHubPower(ip, false));
+      })
       .catch((e) => console.warn("hub stop sequence failed", ip, e));
   }
   streamed.clear();

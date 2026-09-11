@@ -116,10 +116,15 @@ export function parseHub(ip: string, info: unknown, cfg: unknown): RigHub {
   };
 }
 
-// Set a hub's power state over its JSON API. Off keeps WLED from falling
-// back to its own saved look when the stream stops; on restores output for
-// the next stream. Network failures propagate — callers decide whether an
-// unreachable hub matters.
+// Read a hub's power state over its JSON API. Network failures propagate.
+export async function getHubPower(ip: string): Promise<boolean> {
+  const res = await fetch(`http://${ip}/json/state`, { connectTimeout: 4000 });
+  if (!res.ok) throw new Error(`/json/state: HTTP ${res.status}`);
+  return z.object({ on: z.boolean() }).parse(await res.json()).on;
+}
+
+// Set a hub's power state over its JSON API. Network failures propagate —
+// callers decide whether an unreachable hub matters.
 export async function setHubPower(ip: string, on: boolean): Promise<void> {
   const res = await fetch(`http://${ip}/json/state`, {
     method: "POST",

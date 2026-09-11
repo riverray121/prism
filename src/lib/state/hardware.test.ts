@@ -11,6 +11,7 @@ vi.mock("$lib/ipc", () => ({
 vi.mock("$lib/hardware/wled", async (importOriginal) => ({
   ...(await importOriginal<typeof import("$lib/hardware/wled")>()),
   fetchHub: vi.fn(),
+  getHubPower: vi.fn(() => Promise.resolve(false)),
   setHubPower: vi.fn(() => Promise.resolve()),
 }));
 
@@ -46,6 +47,7 @@ import {
 const updateRig = vi.mocked(ipc.updateRig);
 const ddpSend = vi.mocked(ipc.ddpSend);
 const setHubPower = vi.mocked(wled.setHubPower);
+const getHubPower = vi.mocked(wled.getHubPower);
 const fetchHub = vi.mocked(wled.fetchHub);
 
 function benchHub(overrides: Partial<RigHub> = {}): RigHub {
@@ -279,6 +281,8 @@ describe("streaming", () => {
     await Promise.resolve();
     ddpSend.mockClear();
     setHubPower.mockClear();
+    getHubPower.mockReset();
+    getHubPower.mockResolvedValue(false);
   });
 
   it("a tick sends the playhead's frame to the patched hub", () => {
@@ -327,12 +331,13 @@ describe("streaming", () => {
     expect(updateRig).toHaveBeenCalledTimes(3);
   });
 
-  it("the first frame to a hub powers it on, once", () => {
+  it("the first frame to a hub reads its state and powers it on, once", async () => {
     const outputs = { pulse: pixelOutput() };
     openPatchedSong();
     streamTick(0, 100, FRAMES, outputs);
     streamTick(0.1, 100, FRAMES, outputs);
-    expect(setHubPower).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(setHubPower).toHaveBeenCalledTimes(1));
+    expect(getHubPower).toHaveBeenCalledTimes(1);
     expect(setHubPower).toHaveBeenCalledWith("192.168.0.84", true);
   });
 
@@ -398,7 +403,7 @@ describe("streaming", () => {
     expect(ddpSend).not.toHaveBeenCalled();
   });
 
-  it("stop sends one all-zeros frame, then powers the hub off", async () => {
+  it("stop sends one all-zeros frame, then powers off a hub that was off", async () => {
     openPatchedSong();
     streamTick(1.0, 100, FRAMES, { pulse: pixelOutput() });
     ddpSend.mockClear();
@@ -415,6 +420,33 @@ describe("streaming", () => {
     expect(ddpSend.mock.invocationCallOrder[0]).toBeLessThan(
       setHubPower.mock.invocationCallOrder[1],
     );
+  });
+
+  it("stop leaves a hub that was on alone: no blackout, no power write", async () => {
+    getHubPower.mockResolvedValue(true);
+    openPatchedSong();
+    streamTick(1.0, 100, FRAMES, { pulse: pixelOutput() });
+    await vi.waitFor(() =>
+      expect(setHubPower).toHaveBeenCalledWith("192.168.0.84", true),
+    );
+    ddpSend.mockClear();
+    setHubPower.mockClear();
+    stopStream();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ddpSend).not.toHaveBeenCalled();
+    expect(setHubPower).not.toHaveBeenCalled();
+  });
+
+  it("an unreadable prior state counts as off", async () => {
+    getHubPower.mockRejectedValue(new Error("timeout"));
+    openPatchedSong();
+    streamTick(1.0, 100, FRAMES, { pulse: pixelOutput() });
+    stopStream();
+    await vi.waitFor(() => {
+      expect(setHubPower).toHaveBeenCalledWith("192.168.0.84", false);
+    });
   });
 
   it("stop skips hubs that dropped offline mid-run", () => {
