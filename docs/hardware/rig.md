@@ -4,17 +4,18 @@ First working rig, assembled 2026-07-26; grown to five outputs 2026-08-01. Prove
 
 ## Parts
 
-| Part       | Detail                                                                                             |
-| ---------- | -------------------------------------------------------------------------------------------------- |
-| Controller | ESP32-WROOM DevKitC (38-pin, micro-USB), WLED 16.0.1                                               |
-| Strips     | 3× WS2812B 5V, 300 px each (first confirmed by last-pixel probe), on reels                         |
-| Tubes      | 2× 幻彩 addressable neon flex, DC5V, 3 m (diffused; 269–272 px by end-probe, buses set to 272)     |
-| PSU        | Mean Well LRS-350-5 (5 V 60 A); 115 V input selector; 2-wire cord, chassis not earthed             |
-| Wiring     | Strip red→+V, white→−V; ESP GND→−V (common ground); ESP GPIO→JST green (data); breadboard + Dupont |
+| Part       | Detail                                                                                                                                 |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Controller | ESP32-WROOM DevKitC (38-pin), WLED 16.0.1; powered over micro-USB from a wall adapter, never from the PSU (the PSU is relay-switched)  |
+| Relay      | SSR-40DA solid-state relay on the PSU's live input, driven from ESP GPIO 23 through a PN2222A transistor (see PSU relay)               |
+| Strips     | 3× WS2812B 5V, 300 px each (first confirmed by last-pixel probe), on reels                                                             |
+| Tubes      | 2× 幻彩 addressable neon flex, DC5V, 3 m (diffused; 269–272 px by end-probe, buses set to 272)                                         |
+| PSU        | Mean Well LRS-350-5 (5 V 60 A); 115 V input selector; 3-wire cord, wall ground to the FG terminal                                      |
+| Wiring     | Strip red→+V via an inline ATC/ATO blade fuse per strip, white→−V; ESP GND→−V (common ground); data: JST green→terminal block→ESP GPIO |
 
 ## WLED node
 
-- Network: `653BWiFi` (2.4 GHz); IP `192.168.0.84` (DHCP — may change; re-find via mDNS or router)
+- Network: `653BWiFi` (2.4 GHz); IP `192.168.0.95` (DHCP — may change; re-find via mDNS or sweep `/json/info` on 192.168.0.x)
 - LED config: five buses, type WS281x GRB, one per output:
 
 | Bus | GPIO | Fixture | Pixels | Start | Current limit |
@@ -25,10 +26,33 @@ First working rig, assembled 2026-07-26; grown to five outputs 2026-08-01. Prove
 | 3   | 19   | strip   | 300    | 872   | 8 A           |
 | 4   | 21   | tube    | 272    | 1172  | 8 A           |
 
-Per-bus limits are 8 A each (40 A worst case against the 60 A PSU) until inline fuses are in; raise them after fusing. Safe spare output pins if the rig grows: 22, 23, 25, 26, 27, 32, 33. Never 34–39 (input-only), 0/2/5/12/15 (strapping), 6–11 (flash), 1/3 (UART).
+Per-bus limits are 8 A each (40 A worst case against the 60 A PSU). Each strip's +V feed carries a 15 A blade fuse in an inline holder placed close to the PSU +V terminal; the fuse rating must not exceed the feed wire's rating (15 A needs 16 AWG or thicker, 18 AWG takes 10 A). Blade fuses have no polarity. GPIO 23 is the PSU relay pin. Safe spare output pins if the rig grows: 22, 25, 26, 27, 32, 33. Never 34–39 (input-only), 0/2/5/12/15 (strapping), 6–11 (flash), 1/3 (UART).
 
-- Realtime inputs available for Prism: DDP (preferred), sACN/E1.31, Art-Net; UDP port 21324 (WLED notifier), DDP 4048
+- Realtime inputs available for Prism: DDP (preferred), sACN/E1.31, Art-Net; UDP port 21324 (WLED notifier), DDP 4048. On stop Prism restores the hub's prior power state: a hub that was on falls back to its own look after the realtime timeout (Config → Sync Interfaces → Realtime, set 1 s), a hub that was off is blacked out and powered off.
 - Flashing/provisioning workspace: `~/Dev/hardware/prism-lights/` (esptool venv, WLED binaries, `improv_provision.py` for serial Wi-Fi setup)
+
+## PSU relay
+
+WLED switches the PSU's mains input through the SSR so the rig is fully dark and unpowered whenever the strip is off. WLED drives the relay pin high when the strip is on and low about 0.6 s after it goes off (setting: `hw.relay.pin` 23, `rev` false, `odrain` false in `/json/cfg`). Prism powers the hub on before streaming and off on stop, so the PSU follows playback with no app changes.
+
+Control side (low voltage):
+
+| From               | To                           |
+| ------------------ | ---------------------------- |
+| ESP `5V` pin       | SSR terminal 3 (+)           |
+| SSR terminal 4 (−) | PN2222A collector            |
+| PN2222A emitter    | ESP `GND`                    |
+| ESP `GPIO 23`      | 1 kΩ resistor → PN2222A base |
+
+PN2222A (TO-92, flat face toward you, legs down): E B C left to right.
+
+Mains side (cord unplugged while wiring): black (live) → SSR terminal 1, SSR terminal 2 → PSU `L`; white (neutral) → PSU `N`; green (ground) → PSU `FG`. Only the live wire passes through the relay. SSR terminals 1 and 2 carry mains; keep them inside the box. Mount the SSR on metal or a small heatsink.
+
+Constraints:
+
+- The ESP cannot be powered from the PSU it switches; the relay would never close again after an off. USB from an always-on adapter is the ESP's supply.
+- ESP `GND` → PSU `−V` is mandatory even with the ESP on USB. It is the data reference for every output; without it every strip shows random flashing.
+- The relay pin is only written on a power-state transition. After changing the pin in config, cycle WLED off and on once.
 
 ## Flash procedure (fresh ESP32)
 
@@ -45,9 +69,10 @@ Per-bus limits are 8 A each (40 A worst case against the 60 A PSU) until inline 
 ## Cautions
 
 - Don't run sustained bright white while the strip is coiled on the reel (heat).
-- Data links are Dupont jumpers and contact-critical: a strip that holds a frozen color latched one good frame and then lost data — reseat its jumper at both ends. The ESP's 3.3 V data level is marginal against 5 V-powered WS281x inputs (threshold ≈ 0.7 × VDD); if a strip flickers or freezes with good contact, the fix is a 74AHCT125 level shifter or trimming the PSU toward 4.7 V (V-ADJ pot at the output terminals).
-- PSU terminals are exposed mains; case or terminal cover before this leaves the desk.
-- Second reel + neon flex need power runs from the same PSU; add inline fuses when the rig grows.
+- Data links are contact-critical: a strip that holds a frozen color latched one good frame and then lost data — check its terminal block landing and the JST at both ends. A dark output with a good controller config is a wiring fault on that GPIO path (verified by swapping bus pin assignments in WLED: a dead pin stays dark under any bus). The ESP's 3.3 V data level is marginal against 5 V-powered WS281x inputs (threshold ≈ 0.7 × VDD); if a strip flickers or freezes with good contact, the fix is a 5 V level shifter (two 74HCT04N inverters in series per line) or trimming the PSU toward 4.7 V (V-ADJ pot at the output terminals).
+- PSU terminals are exposed mains; keep the lid on.
+- Every fixture power run comes off the same PSU; each gets its own fused +V feed.
+- Random flashing on every output at once is a missing or bad ESP `GND` → PSU `−V` wire, not a data-pin fault.
 
 ## Next
 
