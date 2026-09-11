@@ -122,7 +122,7 @@ def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
         SELECT s.id, s.title, s.artist, s.duration_sec, s.sample_rate,
                s.source_path, s.status, s.imported_at, s.analyzed_at,
                s.current_stage, s.current_engine, s.current_step, s.total_steps,
-               s.progress, s.error_message, l.request_id
+               s.progress, s.error_message, l.request_id, l.published_at
         FROM songs s
         LEFT JOIN companion_links l ON l.song_id = s.id
         ORDER BY s.imported_at

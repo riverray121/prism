@@ -8,6 +8,7 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - Slice 2 — Requested section: `companion_links` table (song_id, request_id, external, published_at; `request_id` joined into the songs listing), `companion.import` command (YouTube `ytsearch1:` for artist + title, import under the request's metadata, link row, import events keyed `request:{id}`), companion state `requests`/`refreshRequests`/`importRequest`/`rejectRequest`, `RequestedSection` above the song list.
 - Slice 3 — Restore on stop: `getHubPower` reads `/json/state` before the power-on; `stopStream` blacks out and powers off only hubs that were off, hubs that were on are left to WLED's realtime timeout. Bench check pending user run.
 - Slice 4 — Publish: `companion/bundle.ts` (`showLights`, `renderShowFrames` per distinct pixel count via `evaluateDoc` + `applyMacro`, `buildManifest`), `hardware/frame.ts` (solid-frame math shared with the streamer), `show.rs` (`write_show_frames` raw-body invoke, `clear_show_frames`), `sidecar/companion.py` (`pack`: manifest + audio + frames + project mirror minus stems/show, `upload` PUT, request PATCH to published), `companion.publish` command and `companion.publish_result` event, Publish button in the top bar with stage labels. Bench publish to prism-player pending user run.
+- Slice 5 — Shows section and pull: `companion.pull` command (`companion.download` + `restore`: audio to `source.<ext>`, `project/` replaces profile, sidecars and mapping, row created or marked analyzed, link restored from the manifest's `request_id`), `published_at` in the songs listing, `pullableShows` (missing locally, or newer on the companion than the local publish), `ShowsSection` with a replace confirmation. Bench pull pending user run.
 
 ## Todo
 
@@ -15,7 +16,7 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - [x] Slice 2 — Requested section
 - [x] Slice 3 — Restore on stop
 - [x] Slice 4 — Publish
-- [ ] Slice 5 — Shows section and pull
+- [x] Slice 5 — Shows section and pull
 
 ## Notes
 

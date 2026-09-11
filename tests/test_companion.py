@@ -2,6 +2,7 @@
 
 import io
 import json
+import shutil
 import zipfile
 
 import pytest
@@ -106,6 +107,59 @@ def test_publish_without_companion_fails(song, monkeypatch, con):
     monkeypatch.setattr(library, "connect", lambda: _ctx(con))
     with pytest.raises(RuntimeError, match="no companion"):
         companion.publish("s1", MANIFEST)
+
+
+def test_restore_into_empty_library(song, tmp_path, monkeypatch, con):
+    monkeypatch.setattr(library, "connect", lambda: _ctx(con))
+    monkeypatch.setattr(
+        companion.metadata,
+        "extract",
+        lambda path: type("M", (), {"duration_sec": 1.5, "sample_rate": 48000})(),
+    )
+    bundle = tmp_path / "show.zip"
+    companion.pack(
+        "s1", {**MANIFEST, "request_id": "r1", "external": {"k": "v"}}, bundle
+    )
+    shutil.rmtree(song.parent / "s1")
+    manifest = companion.restore("s1", bundle)
+    assert manifest["title"] == "t"
+    restored = song.parent / "s1"
+    assert (restored / "source.flac").read_bytes() == b"AUDIO"
+    assert (restored / "features" / "a.npy").read_bytes() == b"NPY"
+    assert (restored / "mapping" / "mapping.json").exists()
+    assert not (restored / "stems").exists()
+    assert not (restored / "show").exists()
+    row = {r["id"]: r for r in library.list_songs(con)}["s1"]
+    assert row["status"] == "analyzed"
+    assert row["duration_sec"] == 1.5
+    assert row["request_id"] == "r1"
+    assert row["published_at"] is not None
+
+
+def test_restore_over_existing_song_replaces_project(song, tmp_path, monkeypatch, con):
+    monkeypatch.setattr(library, "connect", lambda: _ctx(con))
+    library.insert_song(
+        con,
+        song_id="s1",
+        title="old",
+        artist="old",
+        duration_sec=None,
+        sample_rate=None,
+        source_path="songs/s1/source.flac",
+        imported_at="now",
+    )
+    (song / "profile.json").write_text('{"v": 1}')
+    bundle = tmp_path / "show.zip"
+    companion.pack("s1", MANIFEST, bundle)
+    (song / "profile.json").write_text('{"v": 2}')
+    (song / "features" / "stale.npy").write_bytes(b"OLD")
+    companion.restore("s1", bundle)
+    assert (song / "profile.json").read_text() == '{"v": 1}'
+    assert not (song / "features" / "stale.npy").exists()
+    assert (song / "stems" / "e" / "drums.flac").exists()
+    row = {r["id"]: r for r in library.list_songs(con)}["s1"]
+    assert row["title"] == "old"
+    assert row["status"] == "analyzed"
 
 
 class _ctx:

@@ -8,7 +8,10 @@ import {
 } from "$lib/state/inspection.svelte";
 import { applyRigEvent } from "$lib/state/hardware.svelte";
 import { applyMappingEvent } from "$lib/state/mapping.svelte";
-import { applyPublishResult } from "$lib/state/companion.svelte";
+import {
+  applyPublishResult,
+  applyPullResult,
+} from "$lib/state/companion.svelte";
 import { settings } from "$lib/state/settings.svelte";
 import { resetForSong } from "$lib/state/transport.svelte";
 
@@ -51,6 +54,8 @@ function applySidecarEvent(event: SidecarEvent): void {
     applyRigEvent(event.rig);
   } else if (event.type === "companion.publish_result") {
     applyPublishResult(event.song_id, event.ok, event.error);
+  } else if (event.type === "companion.pull_result") {
+    applyPullResult(event.show_id, event.ok, event.error);
   } else if (event.type === "settings") {
     settings.engines = event.engines;
     settings.availableEngines = event.available_engines;

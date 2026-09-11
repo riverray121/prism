@@ -4,27 +4,41 @@ vi.mock("$lib/companion/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("$lib/companion/client")>()),
   getInfo: vi.fn(),
   listRequests: vi.fn(() => Promise.resolve([])),
+  listShows: vi.fn(() => Promise.resolve([])),
   patchRequest: vi.fn(),
 }));
 vi.mock("$lib/ipc", () => ({
   importRequest: vi.fn(() => Promise.resolve()),
+  pullShow: vi.fn(() => Promise.resolve()),
+  publishShow: vi.fn(() => Promise.resolve()),
+  writeShowFrames: vi.fn(() => Promise.resolve()),
+  clearShowFrames: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@tauri-apps/api/app", () => ({
+  getVersion: vi.fn(() => Promise.resolve("0.1.0")),
 }));
 
 import * as client from "$lib/companion/client";
 import * as ipc from "$lib/ipc";
+import { library } from "$lib/state/library.svelte";
 import { settings } from "$lib/state/settings.svelte";
 
 import {
+  applyPullResult,
   checkConnection,
   companion,
   endpoint,
   importRequest,
+  pull,
+  pullableShows,
+  pulling,
   refreshRequests,
   rejectRequest,
 } from "./companion.svelte";
 
 const getInfo = vi.mocked(client.getInfo);
 const listRequests = vi.mocked(client.listRequests);
+const listShows = vi.mocked(client.listShows);
 const patchRequest = vi.mocked(client.patchRequest);
 
 const open = {
@@ -40,7 +54,12 @@ beforeEach(() => {
   getInfo.mockReset();
   listRequests.mockReset();
   listRequests.mockResolvedValue([]);
+  listShows.mockReset();
+  listShows.mockResolvedValue([]);
   patchRequest.mockReset();
+  library.songs = [];
+  pulling.showId = null;
+  pulling.error = null;
   vi.mocked(ipc.importRequest).mockClear();
   companion.requests = [];
   settings.companionUrl = "";
@@ -163,5 +182,63 @@ describe("requests", () => {
     settings.companionUrl = "";
     await checkConnection();
     expect(companion.requests).toEqual([]);
+  });
+});
+
+describe("shows", () => {
+  const show = {
+    id: "s1",
+    title: "Dior",
+    artist: "Joji",
+    duration_s: 200,
+    frame_rate_hz: 40,
+    light_count: 2,
+    updated_at: "2026-09-11T12:00:00Z",
+  };
+  const song = {
+    id: "s1",
+    title: "Dior",
+    artist: "Joji",
+    duration_sec: 200,
+    sample_rate: 48000,
+    source_path: "songs/s1/source.flac",
+    status: "analyzed",
+    imported_at: "x",
+    analyzed_at: null,
+    current_stage: null,
+    current_engine: null,
+    current_step: null,
+    total_steps: null,
+    progress: null,
+    error_message: null,
+    request_id: null,
+    published_at: null,
+  };
+
+  beforeEach(async () => {
+    settings.companionUrl = "http://pi:8760";
+    getInfo.mockResolvedValue({ name: "p", version: "0", api: 1 });
+    listShows.mockResolvedValue([show]);
+    await checkConnection();
+  });
+
+  it("lists a show missing from the library as pullable", () => {
+    expect(pullableShows()).toEqual([{ show, local: false }]);
+  });
+
+  it("lists a local song only when the companion copy is newer", () => {
+    library.songs = [{ ...song, published_at: "2026-09-11T11:00:00Z" }];
+    expect(pullableShows()).toEqual([{ show, local: true }]);
+    library.songs = [{ ...song, published_at: "2026-09-11T12:00:00Z" }];
+    expect(pullableShows()).toEqual([]);
+  });
+
+  it("pull sends the command and clears on the result", async () => {
+    await pull("s1");
+    expect(ipc.pullShow).toHaveBeenCalledWith("s1");
+    expect(pulling.showId).toBe("s1");
+    applyPullResult("s1", false, "boom");
+    expect(pulling.showId).toBeNull();
+    expect(pulling.error).toBe("boom");
   });
 });

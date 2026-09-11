@@ -32,6 +32,8 @@ export const SongSchema = z.object({
   error_message: z.string().nullable().default(null),
   // Companion request this song was imported for; null for ordinary imports.
   request_id: z.string().nullable().default(null),
+  // When the song was last published to the companion; null if never.
+  published_at: z.string().nullable().default(null),
 });
 export type Song = z.infer<typeof SongSchema>;
 
@@ -278,9 +280,19 @@ export const CompanionPublishResultEventSchema = z.object({
   show: z.record(z.string(), z.unknown()).nullable().default(null),
 });
 
+// Outcome of a companion pull: the show's project is in the library on
+// success (a songs snapshot follows), a user-facing message on failure.
+export const CompanionPullResultEventSchema = z.object({
+  type: z.literal("companion.pull_result"),
+  show_id: z.string(),
+  ok: z.boolean(),
+  error: z.string().nullable().default(null),
+});
+
 // All events the sidecar can send on stdout.
 export const SidecarEventSchema = z.discriminatedUnion("type", [
   CompanionPublishResultEventSchema,
+  CompanionPullResultEventSchema,
   LibrarySongsEventSchema,
   ImportFailedEventSchema,
   ImportStartedEventSchema,

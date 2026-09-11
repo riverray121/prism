@@ -56,6 +56,12 @@ export function clearShowFrames(songId: string): Promise<void> {
   return invoke("clear_show_frames", { songId });
 }
 
+// Download a published show and restore its project into the library under
+// the show id; the result arrives as a companion.pull_result event.
+export function pullShow(showId: string): Promise<void> {
+  return sendCommand({ type: "companion.pull", show_id: showId });
+}
+
 // Pack songs/{id} plus its show frames into a bundle and upload it to the
 // companion; the result arrives as a companion.publish_result event.
 export function publishShow(songId: string, manifest: object): Promise<void> {

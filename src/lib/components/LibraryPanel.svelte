@@ -5,6 +5,7 @@
   import ImportDialog from "$lib/components/library/ImportDialog.svelte";
   import MetadataDialog from "$lib/components/library/MetadataDialog.svelte";
   import RequestedSection from "$lib/components/library/RequestedSection.svelte";
+  import ShowsSection from "$lib/components/library/ShowsSection.svelte";
   import { cancelAnalysis, deleteSong } from "$lib/ipc";
   import type { Song } from "$lib/ipc/messages";
   import { library } from "$lib/state/library.svelte";
@@ -141,6 +142,7 @@
   {/if}
 
   <RequestedSection />
+  <ShowsSection />
 
   <div class="flex flex-col overflow-hidden rounded-md border border-edge">
     {#if !library.loaded}

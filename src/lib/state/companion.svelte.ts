@@ -3,10 +3,12 @@ import {
   CompanionError,
   getInfo,
   listRequests,
+  listShows,
   patchRequest,
   type CompanionInfo,
   type CompanionRequest,
   type Endpoint,
+  type ShowSummary,
 } from "$lib/companion/client";
 import { getVersion } from "@tauri-apps/api/app";
 
@@ -19,13 +21,14 @@ import {
   clearShowFrames,
   importRequest as sendImportRequest,
   publishShow,
+  pullShow,
   writeShowFrames,
 } from "$lib/ipc";
 import type { MappingDoc } from "$lib/mapping/schema";
 import { currentMatrices } from "$lib/state/evaluation.svelte";
 import { hardware, rigLatencyMs } from "$lib/state/hardware.svelte";
 import { getRawProfile, inspection } from "$lib/state/inspection.svelte";
-import { songById } from "$lib/state/library.svelte";
+import { library, songById } from "$lib/state/library.svelte";
 import { mapping } from "$lib/state/mapping.svelte";
 import { settings } from "$lib/state/settings.svelte";
 
@@ -48,7 +51,9 @@ export const companion = $state<{
   // Open requests from the last refresh, newest first. Requests in any other
   // status are not kept: the UI only offers open ones.
   requests: CompanionRequest[];
-}>({ status: "off", info: null, error: null, requests: [] });
+  // Every published show from the last refresh.
+  shows: ShowSummary[];
+}>({ status: "off", info: null, error: null, requests: [], shows: [] });
 
 const RETRY_MS = 60_000;
 
@@ -69,6 +74,7 @@ export async function checkConnection(): Promise<void> {
     companion.info = null;
     companion.error = null;
     companion.requests = [];
+    companion.shows = [];
     return;
   }
   companion.status = "connecting";
@@ -85,6 +91,7 @@ export async function checkConnection(): Promise<void> {
     companion.info = info;
     companion.error = null;
     await refreshRequests();
+    await refreshShows();
   } catch (e) {
     if (gen !== checkGeneration) return;
     companion.info = null;
@@ -109,6 +116,56 @@ export async function refreshRequests(): Promise<void> {
   } catch (e) {
     console.warn("companion requests refresh failed", e);
   }
+}
+
+export async function refreshShows(): Promise<void> {
+  const target = endpoint();
+  if (target === null || companion.status !== "connected") return;
+  try {
+    companion.shows = await listShows(target);
+  } catch (e) {
+    console.warn("companion shows refresh failed", e);
+  }
+}
+
+// Shows worth pulling: not in the library, or published from elsewhere after
+// this library's last publish of the same song.
+export function pullableShows(): { show: ShowSummary; local: boolean }[] {
+  const out: { show: ShowSummary; local: boolean }[] = [];
+  for (const show of companion.shows) {
+    const song = library.songs.find((s) => s.id === show.id);
+    if (!song) {
+      out.push({ show, local: false });
+    } else if (
+      song.published_at === null ||
+      Date.parse(show.updated_at) > Date.parse(song.published_at) + 1000
+    ) {
+      out.push({ show, local: true });
+    }
+  }
+  return out;
+}
+
+export const pulling = $state<{
+  showId: string | null;
+  error: string | null;
+}>({ showId: null, error: null });
+
+export async function pull(showId: string): Promise<void> {
+  if (pulling.showId !== null || endpoint() === null) return;
+  pulling.showId = showId;
+  pulling.error = null;
+  await pullShow(showId);
+}
+
+export function applyPullResult(
+  showId: string,
+  ok: boolean,
+  error: string | null,
+): void {
+  if (pulling.showId !== showId) return;
+  pulling.showId = null;
+  pulling.error = ok ? null : (error ?? "pull failed");
 }
 
 // Start the import for a request and mark it analyzing. The request leaves
@@ -212,7 +269,10 @@ export function applyPublishResult(
   if (publishing.songId !== songId) return;
   publishing.stage = ok ? "done" : "failed";
   publishing.error = ok ? null : (error ?? "publish failed");
-  if (ok) void refreshRequests();
+  if (ok) {
+    void refreshRequests();
+    void refreshShows();
+  }
 }
 
 // Session: re-check whenever the configured endpoint changes, and every

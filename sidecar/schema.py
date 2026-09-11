@@ -34,6 +34,21 @@ class CompanionPublishResultEvent(BaseModel):
     show: dict | None = None
 
 
+class CompanionPullCommand(BaseModel):
+    """Download a published show and restore its project into the library
+    under the show id, replacing any local copy."""
+
+    type: Literal["companion.pull"]
+    show_id: str
+
+
+class CompanionPullResultEvent(BaseModel):
+    type: Literal["companion.pull_result"] = "companion.pull_result"
+    show_id: str
+    ok: bool
+    error: str | None = None
+
+
 class CompanionImportCommand(BaseModel):
     """Import a companion request: YouTube search for the artist and title,
     then the normal import with the request's metadata and a link row."""
@@ -143,6 +158,8 @@ class Song(BaseModel):
     error_message: str | None = None
     # Companion request this song was imported for (docs/companion-api.md).
     request_id: str | None = None
+    # When the song was last published to the companion; null if never.
+    published_at: str | None = None
 
 
 class LibrarySongsEvent(BaseModel):

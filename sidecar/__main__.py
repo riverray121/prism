@@ -25,6 +25,8 @@ from .schema import (
     CompanionImportCommand,
     CompanionPublishCommand,
     CompanionPublishResultEvent,
+    CompanionPullCommand,
+    CompanionPullResultEvent,
     DeleteSongCommand,
     GetMappingCommand,
     GetProfileCommand,
@@ -146,6 +148,19 @@ def publish_show(cmd: CompanionPublishCommand) -> None:
         )
 
 
+def pull_show(cmd: CompanionPullCommand) -> None:
+    """Download and restore on a worker thread; the library snapshot follows."""
+    try:
+        companion.pull(cmd.show_id)
+        ipc.emit(CompanionPullResultEvent(show_id=cmd.show_id, ok=True))
+    except Exception as exc:
+        log.exception("pull failed: %s", cmd.show_id)
+        ipc.emit(
+            CompanionPullResultEvent(show_id=cmd.show_id, ok=False, error=str(exc))
+        )
+    emit_snapshot()
+
+
 def import_youtube(url: str) -> None:
     """Download a URL's audio then run the normal import; emits its own events.
 
@@ -187,6 +202,9 @@ def handle(msg: dict) -> None:
     elif msg_type == "companion.publish":
         cmd = CompanionPublishCommand.model_validate(msg)
         threading.Thread(target=publish_show, args=(cmd,), daemon=True).start()
+    elif msg_type == "companion.pull":
+        cmd = CompanionPullCommand.model_validate(msg)
+        threading.Thread(target=pull_show, args=(cmd,), daemon=True).start()
     elif msg_type == "companion.import":
         cmd = CompanionImportCommand.model_validate(msg)
         threading.Thread(target=import_request, args=(cmd,), daemon=True).start()
