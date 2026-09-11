@@ -189,8 +189,11 @@ describe("applySidecarEvent", () => {
         mel_band_roformer: { label: "Roformer", drums: false },
       },
       drum_subsep: true,
+      companion_url: "http://192.168.8.2:8760",
+      companion_token: "tok",
     });
     expect(settings.engines).toEqual(["htdemucs_ft"]);
+    expect(settings.companionUrl).toBe("http://192.168.8.2:8760");
     expect(settings.availableEngines).toEqual([
       "htdemucs_ft",
       "mel_band_roformer",

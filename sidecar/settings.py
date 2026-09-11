@@ -1,4 +1,4 @@
-"""Analysis-settings resolution: selected engines + drum sub-separation.
+"""Settings resolution: selected engines, drum sub-separation, companion connection.
 
 The one place raw persisted values (library.py's JSON key-value store) meet the
 available engine set: defaults, validation, and canonical ordering live here,
@@ -39,3 +39,22 @@ def get_drum_subsep(con: sqlite3.Connection) -> bool:
 
 def set_drum_subsep(con: sqlite3.Connection, on: bool) -> None:
     library.set_setting(con, "drum_subsep", bool(on))
+
+
+def get_companion(con: sqlite3.Connection) -> tuple[str, str]:
+    """Companion server base URL and bearer token; empty strings when unset."""
+    url = library.get_setting(con, "companion_url", "")
+    token = library.get_setting(con, "companion_token", "")
+    return (
+        url if isinstance(url, str) else "",
+        token if isinstance(token, str) else "",
+    )
+
+
+def set_companion(con: sqlite3.Connection, url: str | None, token: str | None) -> None:
+    """Persist either companion field; ``None`` leaves that field unchanged.
+    The URL is stored without a trailing slash so paths join cleanly."""
+    if url is not None:
+        library.set_setting(con, "companion_url", url.strip().rstrip("/"))
+    if token is not None:
+        library.set_setting(con, "companion_token", token.strip())

@@ -53,6 +53,8 @@ function applySidecarEvent(event: SidecarEvent): void {
     settings.availableEngines = event.available_engines;
     settings.engineInfo = event.engine_info;
     settings.drumSubsep = event.drum_subsep;
+    settings.companionUrl = event.companion_url;
+    settings.companionToken = event.companion_token;
     settings.loaded = true;
   }
 }

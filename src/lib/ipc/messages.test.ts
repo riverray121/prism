@@ -102,6 +102,8 @@ describe("SidecarEventSchema discriminated union", () => {
       available_engines: ["htdemucs_ft"],
       engine_info: { htdemucs_ft: { label: "Demucs", drums: true } },
       drum_subsep: false,
+      companion_url: "",
+      companion_token: "",
     });
     expect(ev.type).toBe("settings");
   });

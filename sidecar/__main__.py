@@ -64,16 +64,19 @@ def emit_snapshot() -> None:
 
 
 def emit_settings() -> None:
-    """Emit the current analysis settings (engines + drum sub-separation)."""
+    """Emit the current settings (engines, drum sub-separation, companion)."""
     with library.connect() as con:
         engines = settings.get_engines(con)
         drum_subsep = settings.get_drum_subsep(con)
+        companion_url, companion_token = settings.get_companion(con)
     ipc.emit(
         SettingsEvent(
             engines=engines,
             available_engines=list(separation.ENGINES),
             engine_info=separation.ENGINE_INFO,
             drum_subsep=drum_subsep,
+            companion_url=companion_url,
+            companion_token=companion_token,
         )
     )
 
@@ -210,6 +213,8 @@ def handle(msg: dict) -> None:
                 settings.set_engines(con, cmd.engines)
             if cmd.drum_subsep is not None:
                 settings.set_drum_subsep(con, cmd.drum_subsep)
+            if cmd.companion_url is not None or cmd.companion_token is not None:
+                settings.set_companion(con, cmd.companion_url, cmd.companion_token)
         emit_settings()
     else:
         log.warning("unknown command: %r", msg)

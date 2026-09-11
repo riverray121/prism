@@ -251,6 +251,9 @@ export const SettingsEventSchema = z.object({
     z.object({ label: z.string(), drums: z.boolean() }),
   ),
   drum_subsep: z.boolean(),
+  // Companion server base URL and bearer token; empty strings when unset.
+  companion_url: z.string(),
+  companion_token: z.string(),
 });
 export type EngineInfo = z.infer<
   typeof SettingsEventSchema

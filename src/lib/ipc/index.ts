@@ -88,6 +88,8 @@ export function updateRig(rig: object): Promise<void> {
 export function updateSettings(update: {
   engines?: string[];
   drum_subsep?: boolean;
+  companion_url?: string;
+  companion_token?: string;
 }): Promise<void> {
   return sendCommand({ type: "settings.update", ...update });
 }

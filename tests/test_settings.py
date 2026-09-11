@@ -35,3 +35,20 @@ def test_drum_subsep_round_trip_defaults_false(con):
 
 def test_engine_info_covers_every_engine():
     assert set(separation.ENGINE_INFO) == set(separation.ENGINES)
+
+
+def test_companion_defaults_to_empty(con):
+    assert settings.get_companion(con) == ("", "")
+
+
+def test_set_companion_strips_and_drops_trailing_slash(con):
+    settings.set_companion(con, " http://192.168.8.2:8760/ ", " tok ")
+    assert settings.get_companion(con) == ("http://192.168.8.2:8760", "tok")
+
+
+def test_set_companion_none_leaves_field_unchanged(con):
+    settings.set_companion(con, "http://a:1", "t1")
+    settings.set_companion(con, None, "t2")
+    assert settings.get_companion(con) == ("http://a:1", "t2")
+    settings.set_companion(con, "", None)
+    assert settings.get_companion(con) == ("", "t2")

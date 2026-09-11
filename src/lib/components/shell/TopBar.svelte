@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CompanionDialog from "$lib/components/CompanionDialog.svelte";
+  import { companion } from "$lib/state/companion.svelte";
   import { close, inspection } from "$lib/state/inspection.svelte";
   import { songById } from "$lib/state/library.svelte";
   import {
@@ -9,6 +11,7 @@
   } from "$lib/state/workspace.svelte";
 
   const openSong = $derived(songById(inspection.songId));
+  let companionOpen = $state(false);
 </script>
 
 <header
@@ -69,6 +72,23 @@
 
   <div class="flex items-center px-2">
     <button
+      onclick={() => (companionOpen = true)}
+      title="Companion"
+      class="relative rounded px-3 py-1.5 text-xl leading-none text-ink-muted hover:bg-raised hover:text-ink"
+    >
+      ⇄
+      {#if companion.status !== "off"}
+        <span
+          class="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full {companion.status ===
+          'connected'
+            ? 'bg-accent'
+            : companion.status === 'connecting'
+              ? 'bg-ink-faint'
+              : 'bg-danger'}"
+        ></span>
+      {/if}
+    </button>
+    <button
       onclick={toggleSplit}
       title={workspace.splitTab === null ? "Split view" : "Close split view"}
       class="rounded px-3 py-1.5 text-xl leading-none {workspace.splitTab !==
@@ -80,3 +100,7 @@
     </button>
   </div>
 </header>
+
+{#if companionOpen}
+  <CompanionDialog onclose={() => (companionOpen = false)} />
+{/if}

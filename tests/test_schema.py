@@ -55,10 +55,13 @@ def test_settings_event_round_trips():
         available_engines=["htdemucs_ft"],
         engine_info={"htdemucs_ft": {"label": "Demucs", "drums": True}},
         drum_subsep=True,
+        companion_url="http://192.168.8.2:8760",
+        companion_token="tok",
     )
     dumped = json.loads(ev.model_dump_json())
     assert dumped["type"] == "settings"
     assert dumped["drum_subsep"] is True
+    assert dumped["companion_url"] == "http://192.168.8.2:8760"
 
 
 def test_delete_and_import_lifecycle_models():

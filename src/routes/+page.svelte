@@ -14,6 +14,10 @@
     startHealthMonitor,
   } from "$lib/state/health.svelte";
   import {
+    startCompanionSession,
+    stopCompanionSession,
+  } from "$lib/state/companion.svelte";
+  import {
     startHardwareSession,
     stopHardwareSession,
   } from "$lib/state/hardware.svelte";
@@ -24,11 +28,13 @@
   onMount(() => {
     startSidecarSession();
     startHardwareSession();
+    startCompanionSession();
     const stopHealth = startHealthMonitor();
     const stopStreamLoop = startStreamLoop();
     return () => {
       stopSidecarSession();
       stopHardwareSession();
+      stopCompanionSession();
       stopHealth();
       stopStreamLoop();
     };

@@ -80,6 +80,9 @@ class UpdateSettingsCommand(BaseModel):
     engines: list[str] | None = None
     # Whether to sub-separate drums stems into kick/snare/etc.
     drum_subsep: bool | None = None
+    # Companion server base URL (empty disconnects) and bearer token.
+    companion_url: str | None = None
+    companion_token: str | None = None
 
 
 # Sidecar -> frontend events.
@@ -176,3 +179,6 @@ class SettingsEvent(BaseModel):
     engine_info: dict[str, EngineInfo]
     # Whether drums stems are sub-separated into kick/snare/etc.
     drum_subsep: bool
+    # Companion server base URL and bearer token; empty when no companion is set.
+    companion_url: str
+    companion_token: str
