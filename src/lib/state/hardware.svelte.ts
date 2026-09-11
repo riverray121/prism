@@ -1,11 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
 
-import { oklchToRgb } from "$lib/color";
 import {
   DDP_PORT,
   ddpBlackoutPackets,
   ddpFramePackets,
 } from "$lib/hardware/ddp";
+import { solidFrame } from "$lib/hardware/frame";
 import { activePatch } from "$lib/hardware/patch";
 import {
   emptyRig,
@@ -18,12 +18,7 @@ import {
   type RigHub,
 } from "$lib/hardware/wled";
 import { ddpSend, discoverySnapshot, getRig, updateRig } from "$lib/ipc";
-import {
-  channelColor,
-  frameIndexAt,
-  type GateSegment,
-  type ProgramOutput,
-} from "$lib/mapping/evaluate";
+import { frameIndexAt, type ProgramOutput } from "$lib/mapping/evaluate";
 import { mapping } from "$lib/state/mapping.svelte";
 
 // Hardware state: the persisted rig (known hubs + named lights), runtime
@@ -181,44 +176,6 @@ const streamed = new Map<
   string,
   { ip: string; pixels: number; powered: Promise<boolean> }
 >();
-
-// Gate strength at one instant (null gate = always lit).
-function gateStrengthAt(gate: GateSegment[] | null, t: number): number {
-  if (gate === null) return 1;
-  let s = 0;
-  for (const seg of gate)
-    if (t >= seg.start && t <= seg.end && seg.strength > s) s = seg.strength;
-  return s;
-}
-
-// Whole-strip frame for a program with no pixel matrix, mirroring the live
-// preview's swatch math (brightness/gate/strobe scale the frame color) so
-// the bench strip and the on-screen light can never disagree.
-function solidFrame(
-  output: ProgramOutput,
-  pixelCount: number,
-  t: number,
-  frame: number,
-): Uint8ClampedArray {
-  const lit = gateStrengthAt(output.gate, t);
-  const b = output.channels.brightness ? output.channels.brightness[frame] : 1;
-  let s = lit > 0 ? Math.min(1, (0.12 + 1.05 * b) * lit) : 0;
-  const rate = output.channels.strobe_rate
-    ? output.channels.strobe_rate[frame]
-    : 0;
-  if (rate > 0 && (t * rate) % 1 >= 0.5) s = 0;
-  const c = oklchToRgb(channelColor(output.channels, frame));
-  const rgb = new Uint8ClampedArray(pixelCount * 3);
-  const r = Math.round(Math.min(1, c.r * s) * 255);
-  const g = Math.round(Math.min(1, c.g * s) * 255);
-  const bl = Math.round(Math.min(1, c.b * s) * 255);
-  for (let p = 0; p < pixelCount; p++) {
-    rgb[p * 3] = r;
-    rgb[p * 3 + 1] = g;
-    rgb[p * 3 + 2] = bl;
-  }
-  return rgb;
-}
 
 // One streaming tick at playhead time `t`. Sends each live patch target its
 // program's pixel frame (or the solid whole-strip color when the program has

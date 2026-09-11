@@ -268,8 +268,19 @@ export const RigEventSchema = z.object({
   rig: RigSchema,
 });
 
+// Outcome of a companion publish (docs/companion-api.md): the companion's
+// show summary on success, a user-facing message on failure.
+export const CompanionPublishResultEventSchema = z.object({
+  type: z.literal("companion.publish_result"),
+  song_id: z.string(),
+  ok: z.boolean(),
+  error: z.string().nullable().default(null),
+  show: z.record(z.string(), z.unknown()).nullable().default(null),
+});
+
 // All events the sidecar can send on stdout.
 export const SidecarEventSchema = z.discriminatedUnion("type", [
+  CompanionPublishResultEventSchema,
   LibrarySongsEventSchema,
   ImportFailedEventSchema,
   ImportStartedEventSchema,

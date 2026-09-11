@@ -7,6 +7,7 @@ use tauri_plugin_opener::OpenerExt;
 
 mod applog;
 mod hardware;
+mod show;
 
 // Facts gathered at startup for the frontend's health surface.
 struct StartupInfo {
@@ -196,7 +197,9 @@ pub fn run() {
             log_frontend_error,
             open_logs,
             hardware::ddp_send,
-            hardware::discovery_snapshot
+            hardware::discovery_snapshot,
+            show::write_show_frames,
+            show::clear_show_frames
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

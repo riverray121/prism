@@ -40,6 +40,32 @@ export function requestImportKey(requestId: string): string {
   return `request:${requestId}`;
 }
 
+// Write one light's rendered frames under songs/{id}/show/frames via the
+// shell: the bytes travel as the invoke body, never through JSON.
+export function writeShowFrames(
+  songId: string,
+  key: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  return invoke("write_show_frames", bytes, {
+    headers: { "x-song-id": songId, "x-light-key": key },
+  });
+}
+
+export function clearShowFrames(songId: string): Promise<void> {
+  return invoke("clear_show_frames", { songId });
+}
+
+// Pack songs/{id} plus its show frames into a bundle and upload it to the
+// companion; the result arrives as a companion.publish_result event.
+export function publishShow(songId: string, manifest: object): Promise<void> {
+  return sendCommand({
+    type: "companion.publish",
+    song_id: songId,
+    manifest,
+  });
+}
+
 // Remove a song: its library row and its whole on-disk folder.
 export function deleteSong(songId: string): Promise<void> {
   return sendCommand({ type: "library.delete", song_id: songId });

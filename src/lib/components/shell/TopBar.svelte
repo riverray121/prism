@@ -1,6 +1,11 @@
 <script lang="ts">
   import CompanionDialog from "$lib/components/CompanionDialog.svelte";
-  import { companion } from "$lib/state/companion.svelte";
+  import {
+    canPublish,
+    companion,
+    publish,
+    publishing,
+  } from "$lib/state/companion.svelte";
   import { close, inspection } from "$lib/state/inspection.svelte";
   import { songById } from "$lib/state/library.svelte";
   import {
@@ -12,6 +17,28 @@
 
   const openSong = $derived(songById(inspection.songId));
   let companionOpen = $state(false);
+
+  // Publish button label for the open song; stages from another song do not
+  // show here.
+  const publishLabel = $derived.by(() => {
+    if (publishing.songId !== inspection.songId) return "Publish";
+    switch (publishing.stage) {
+      case "rendering":
+        return "Rendering…";
+      case "uploading":
+        return "Uploading…";
+      case "done":
+        return "Published";
+      case "failed":
+        return "Publish failed";
+      default:
+        return "Publish";
+    }
+  });
+  const publishBusy = $derived(
+    publishing.songId === inspection.songId &&
+      (publishing.stage === "rendering" || publishing.stage === "uploading"),
+  );
 </script>
 
 <header
@@ -71,6 +98,21 @@
   {/if}
 
   <div class="flex items-center px-2">
+    {#if openSong && companion.status === "connected"}
+      <button
+        onclick={() => void publish()}
+        disabled={publishBusy || !canPublish()}
+        title={publishing.songId === inspection.songId && publishing.error
+          ? publishing.error
+          : "Publish this song's show to the companion"}
+        class="mr-1 rounded px-2.5 py-1 text-sm font-medium {publishing.songId ===
+          inspection.songId && publishing.stage === 'failed'
+          ? 'text-danger'
+          : 'text-ink-muted'} hover:bg-raised hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        {publishLabel}
+      </button>
+    {/if}
     <button
       onclick={() => (companionOpen = true)}
       title="Companion"

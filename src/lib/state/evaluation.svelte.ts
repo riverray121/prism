@@ -42,6 +42,12 @@ let matrices: Matrices = {};
 let loadingMatrices = new Set<string>();
 const matrixVersion = $state({ n: 0 });
 
+// The heatmap matrices loaded for the open song, for renderers that run the
+// evaluator outside the store (the show renderer).
+export function currentMatrices(): Matrices {
+  return matrices;
+}
+
 function ensureMatrix(source: string, absPath: string): void {
   if (matrices[source] || loadingMatrices.has(source)) return;
   // Writes land in the containers captured at entry: source paths repeat

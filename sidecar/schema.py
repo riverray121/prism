@@ -15,6 +15,25 @@ class ImportYoutubeCommand(BaseModel):
     url: str
 
 
+class CompanionPublishCommand(BaseModel):
+    """Pack the song's show (frames already under songs/{id}/show) and upload
+    it to the companion. ``manifest`` is the frontend-built manifest plus
+    ``source_file`` naming the audio inside the song folder."""
+
+    type: Literal["companion.publish"]
+    song_id: str
+    manifest: dict
+
+
+class CompanionPublishResultEvent(BaseModel):
+    type: Literal["companion.publish_result"] = "companion.publish_result"
+    song_id: str
+    ok: bool
+    error: str | None = None
+    # The companion's show summary on success.
+    show: dict | None = None
+
+
 class CompanionImportCommand(BaseModel):
     """Import a companion request: YouTube search for the artist and title,
     then the normal import with the request's metadata and a link row."""

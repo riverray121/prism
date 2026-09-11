@@ -8,7 +8,25 @@ import {
   type CompanionRequest,
   type Endpoint,
 } from "$lib/companion/client";
-import { importRequest as sendImportRequest } from "$lib/ipc";
+import { getVersion } from "@tauri-apps/api/app";
+
+import {
+  buildManifest,
+  renderShowFrames,
+  showLights,
+} from "$lib/companion/bundle";
+import {
+  clearShowFrames,
+  importRequest as sendImportRequest,
+  publishShow,
+  writeShowFrames,
+} from "$lib/ipc";
+import type { MappingDoc } from "$lib/mapping/schema";
+import { currentMatrices } from "$lib/state/evaluation.svelte";
+import { hardware, rigLatencyMs } from "$lib/state/hardware.svelte";
+import { getRawProfile, inspection } from "$lib/state/inspection.svelte";
+import { songById } from "$lib/state/library.svelte";
+import { mapping } from "$lib/state/mapping.svelte";
 import { settings } from "$lib/state/settings.svelte";
 
 // Connection to the one configured companion (docs/companion-api.md).
@@ -117,6 +135,84 @@ export async function rejectRequest(request: CompanionRequest): Promise<void> {
     console.warn("companion request reject failed", request.id, e);
     await refreshRequests();
   }
+}
+
+// Publishing the open song: render, hand the frames to the shell, then let
+// the sidecar pack and upload. One publish at a time; the result event
+// lands through applyPublishResult.
+export type PublishStage =
+  | "idle"
+  | "rendering"
+  | "uploading"
+  | "done"
+  | "failed";
+
+export const publishing = $state<{
+  songId: string | null;
+  stage: PublishStage;
+  error: string | null;
+}>({ songId: null, stage: "idle", error: null });
+
+// The open song can publish when a companion is connected and at least one
+// rig light is patched to an enabled program.
+export function canPublish(): boolean {
+  if (companion.status !== "connected") return false;
+  if (!inspection.songId || !mapping.doc || !getRawProfile()) return false;
+  return showLights(mapping.doc, hardware.rig.hubs).length > 0;
+}
+
+export async function publish(): Promise<void> {
+  const songId = inspection.songId;
+  const profile = getRawProfile();
+  const song = songById(songId);
+  if (!songId || !profile || !song || !mapping.doc || !canPublish()) return;
+  if (
+    publishing.songId === songId &&
+    (publishing.stage === "rendering" || publishing.stage === "uploading")
+  )
+    return;
+  const doc = $state.snapshot(mapping.doc) as MappingDoc;
+  publishing.songId = songId;
+  publishing.stage = "rendering";
+  publishing.error = null;
+  try {
+    const { frameCount, lights } = renderShowFrames(
+      profile,
+      doc,
+      $state.snapshot(hardware.rig.hubs),
+      currentMatrices(),
+    );
+    await clearShowFrames(songId);
+    for (const rendered of lights) {
+      await writeShowFrames(songId, rendered.light.key, rendered.bytes);
+    }
+    const manifest = buildManifest({
+      title: song.title,
+      artist: song.artist,
+      profile,
+      sourceFile: song.source_path.slice(song.source_path.lastIndexOf("/") + 1),
+      lights: lights.map((l) => l.light),
+      frameCount,
+      latencyMs: rigLatencyMs(),
+      prismVersion: await getVersion(),
+    });
+    publishing.stage = "uploading";
+    await publishShow(songId, manifest);
+  } catch (e) {
+    publishing.stage = "failed";
+    publishing.error = e instanceof Error ? e.message : String(e);
+  }
+}
+
+export function applyPublishResult(
+  songId: string,
+  ok: boolean,
+  error: string | null,
+): void {
+  if (publishing.songId !== songId) return;
+  publishing.stage = ok ? "done" : "failed";
+  publishing.error = ok ? null : (error ?? "publish failed");
+  if (ok) void refreshRequests();
 }
 
 // Session: re-check whenever the configured endpoint changes, and every

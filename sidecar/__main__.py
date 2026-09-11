@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from . import (
+    companion,
     ipc,
     library,
     logs,
@@ -22,6 +23,8 @@ from . import (
 )
 from .schema import (
     CompanionImportCommand,
+    CompanionPublishCommand,
+    CompanionPublishResultEvent,
     DeleteSongCommand,
     GetMappingCommand,
     GetProfileCommand,
@@ -131,6 +134,18 @@ def import_request(cmd: CompanionImportCommand) -> None:
     emit_snapshot()
 
 
+def publish_show(cmd: CompanionPublishCommand) -> None:
+    """Pack and upload on a worker thread; the result arrives as an event."""
+    try:
+        show = companion.publish(cmd.song_id, cmd.manifest)
+        ipc.emit(CompanionPublishResultEvent(song_id=cmd.song_id, ok=True, show=show))
+    except Exception as exc:
+        log.exception("publish failed: %s", cmd.song_id)
+        ipc.emit(
+            CompanionPublishResultEvent(song_id=cmd.song_id, ok=False, error=str(exc))
+        )
+
+
 def import_youtube(url: str) -> None:
     """Download a URL's audio then run the normal import; emits its own events.
 
@@ -169,6 +184,9 @@ def handle(msg: dict) -> None:
     elif msg_type == "library.import_youtube":
         cmd = ImportYoutubeCommand.model_validate(msg)
         threading.Thread(target=import_youtube, args=(cmd.url,), daemon=True).start()
+    elif msg_type == "companion.publish":
+        cmd = CompanionPublishCommand.model_validate(msg)
+        threading.Thread(target=publish_show, args=(cmd,), daemon=True).start()
     elif msg_type == "companion.import":
         cmd = CompanionImportCommand.model_validate(msg)
         threading.Thread(target=import_request, args=(cmd,), daemon=True).start()
