@@ -158,11 +158,11 @@ export function ddpSend(
   return invoke("ddp_send", { address, port, data });
 }
 
-// Hubs the shell's mDNS browse can currently see, as found events. Pulled
-// once after the discovery listener attaches: resolves usually land before
-// the webview is ready, and mDNS won't re-announce them for hours.
+// Hubs the shell's mDNS browse can currently see, as discovery events.
+// Pulled once after the discovery listener attaches: resolves usually land
+// before the webview is ready, and mDNS won't re-announce them for hours.
 export function discoverySnapshot(): Promise<
-  { kind: "found" | "lost"; name: string; ip: string | null }[]
+  { name: string; ip: string | null }[]
 > {
   return invoke("discovery_snapshot");
 }

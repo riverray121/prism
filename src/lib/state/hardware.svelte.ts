@@ -23,7 +23,8 @@ import { mapping } from "$lib/state/mapping.svelte";
 
 // Hardware state: the persisted rig (known hubs + named lights), runtime
 // discovery results, and per-hub reachability. Components render this and
-// call the actions; the sidecar owns rig.json, the Rust shell owns mDNS.
+// call the actions; the sidecar owns rig.json, the Rust shell owns mDNS,
+// and reachability is this module's own HTTP probe.
 
 export const hardware = $state<{
   rig: Rig;
@@ -36,12 +37,9 @@ export const hardware = $state<{
   online: Record<string, boolean>;
 }>({ rig: emptyRig(), rigLoaded: false, discovered: [], online: {} });
 
-// mDNS instance name → MAC, learned when a found event's config fetch lands,
-// so a later lost event (which carries only the name) can be attributed.
-const macByMdnsName = new Map<string, string>();
-
 // IPs with a config fetch in flight; mDNS rebroadcasts arrive in bursts and
-// each found event would otherwise start a duplicate probe.
+// each found event would otherwise start a duplicate probe, and a
+// reachability pass must not stack on one either.
 const probing = new Set<string>();
 
 export function applyRigEvent(rig: Rig): void {
@@ -285,8 +283,8 @@ export function startScan(): void {
   void discoverySnapshot()
     .then((events) => {
       if (gen !== generation) return; // superseded by stop or a newer start
-      for (const { kind, name, ip } of events) {
-        if (kind === "found" && ip) void handleFound(name, ip);
+      for (const { ip } of events) {
+        if (ip) void handleFound(ip);
       }
     })
     .catch((e) => console.warn("discovery snapshot failed", e));
@@ -315,10 +313,10 @@ export async function probeAddress(ip: string): Promise<void> {
   }
 }
 
-// A found hub announces an IP; its identity (MAC) only comes from asking the
-// device. Fetch its config, then merge. Fetch failures are logged and dropped:
-// a hub that stops answering just stays/goes offline.
-async function handleFound(name: string, ip: string): Promise<void> {
+// A resolved hub announces an IP; its identity (MAC) only comes from asking
+// the device. Fetch its config, then merge. Fetch failures are logged and
+// dropped: the reachability pass decides online status.
+async function handleFound(ip: string): Promise<void> {
   if (probing.has(ip)) return;
   probing.add(ip);
   const gen = generation;
@@ -327,7 +325,6 @@ async function handleFound(name: string, ip: string): Promise<void> {
     // A fetch outliving the session (stop, or a newer start) must not write
     // into the replacement session's state or rewrite the rig.
     if (gen !== generation) return;
-    macByMdnsName.set(name, hub.mac);
     applyHubSeen(hub);
   } catch (e) {
     console.warn("hub config fetch failed", ip, e);
@@ -336,8 +333,43 @@ async function handleFound(name: string, ip: string): Promise<void> {
   }
 }
 
+// ── Reachability ────────────────────────────────────────────────────────────
+// Online is an HTTP fact, not an mDNS one: every rig and discovered hub is
+// re-read on an interval, and a hub that stops answering flips offline. mDNS
+// only supplies addresses. Its cached records expire on their own schedule
+// and a failed refresh says nothing about the device, so a "lost" record
+// never touches online status.
+
+const REACHABILITY_INTERVAL_MS = 10_000;
+let reachabilityTimer: ReturnType<typeof setInterval> | null = null;
+
+// One reachability pass over every known hub. A hub with a fetch already in
+// flight is skipped this pass; that fetch reports for it.
+export async function probeReachability(): Promise<void> {
+  const gen = generation;
+  const targets = [...hardware.rig.hubs, ...hardware.discovered].map((h) => ({
+    mac: h.mac,
+    ip: h.ip,
+  }));
+  await Promise.all(
+    targets.map(async ({ mac, ip }) => {
+      if (probing.has(ip)) return;
+      probing.add(ip);
+      try {
+        const hub = await fetchHub(ip);
+        if (gen !== generation) return;
+        applyHubSeen(hub);
+      } catch {
+        if (gen !== generation) return;
+        markHubOffline(mac);
+      } finally {
+        probing.delete(ip);
+      }
+    }),
+  );
+}
+
 interface DiscoveryPayload {
-  kind: "found" | "lost";
   name: string;
   ip: string | null;
 }
@@ -353,13 +385,8 @@ export function startHardwareSession(): void {
     const detach = await listen<DiscoveryPayload>(
       "hardware-discovery",
       (event) => {
-        const { kind, name, ip } = event.payload;
-        if (kind === "found" && ip) {
-          void handleFound(name, ip);
-        } else if (kind === "lost") {
-          const mac = macByMdnsName.get(name);
-          if (mac) markHubOffline(mac);
-        }
+        const { ip } = event.payload;
+        if (ip) void handleFound(ip);
       },
     );
     if (gen !== generation) {
@@ -370,6 +397,11 @@ export function startHardwareSession(): void {
     off = detach;
     getRig();
     startScan();
+    if (reachabilityTimer !== null) clearInterval(reachabilityTimer);
+    reachabilityTimer = setInterval(
+      () => void probeReachability(),
+      REACHABILITY_INTERVAL_MS,
+    );
   })();
 }
 
@@ -382,4 +414,8 @@ export function stopHardwareSession(): void {
     scanTimer = null;
   }
   scan.active = false;
+  if (reachabilityTimer !== null) {
+    clearInterval(reachabilityTimer);
+    reachabilityTimer = null;
+  }
 }

@@ -30,6 +30,7 @@ import {
   markHubOffline,
   probe,
   probeAddress,
+  probeReachability,
   renameLight,
   scan,
   setLatency,
@@ -180,11 +181,40 @@ describe("connect and forget", () => {
     expect(updateRig).toHaveBeenCalledTimes(2);
   });
 
-  it("lost hubs flip offline and leave the discovered list", () => {
+  it("an offline hub leaves the discovered list", () => {
     applyHubSeen(benchHub());
     markHubOffline("a842e39b1c60");
     expect(hardware.online["a842e39b1c60"]).toBe(false);
     expect(hardware.discovered).toHaveLength(0);
+  });
+});
+
+describe("reachability", () => {
+  it("a rig hub that stops answering flips offline", async () => {
+    applyRigEvent({ hubs: [benchHub()] });
+    hardware.online["a842e39b1c60"] = true;
+    fetchHub.mockRejectedValueOnce(new Error("timeout"));
+    await probeReachability();
+    expect(fetchHub).toHaveBeenCalledWith("192.168.0.84");
+    expect(hardware.online["a842e39b1c60"]).toBe(false);
+    expect(hardware.rig.hubs).toHaveLength(1);
+  });
+
+  it("a rig hub that answers again comes back online", async () => {
+    applyRigEvent({ hubs: [benchHub()] });
+    hardware.online["a842e39b1c60"] = false;
+    fetchHub.mockResolvedValueOnce(benchHub());
+    await probeReachability();
+    expect(hardware.online["a842e39b1c60"]).toBe(true);
+    expect(updateRig).not.toHaveBeenCalled();
+  });
+
+  it("a discovered hub that stops answering leaves Connect new", async () => {
+    applyHubSeen(benchHub());
+    fetchHub.mockRejectedValueOnce(new Error("timeout"));
+    await probeReachability();
+    expect(hardware.discovered).toHaveLength(0);
+    expect(hardware.online["a842e39b1c60"]).toBe(false);
   });
 });
 

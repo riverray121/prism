@@ -39,3 +39,4 @@
 - `console.warn`/`console.error` mirror into app.log (health.svelte.ts): the app's guard rails (schema drops, failed track loads, muted bindings) report through the console, which a closed webview otherwise takes with it.
 - The unclean-exit banner is release-only (`!cfg!(debug_assertions)` in lib.rs): dev-watcher rebuilds SIGKILL the app, stranding `session.lock`, which made every Rust edit masquerade as a crash. The stale-marker log line still records in both build types.
 - `uvx ruff check sidecar/` reports 10 pre-existing errors (newer ruff rules, `datetime.UTC` etc.) untouched by this milestone; fold into the repo-wide `/clean`.
+- Hub online status is the HTTP reachability probe in `state/hardware.svelte.ts` (`probeReachability`, every 10 s over rig + discovered hubs), never mDNS: a "lost" record is only cache expiry, and mdns-sd below 0.14 reported a hub lost forever once its record expired (upstream #370). `mdns-sd` is at 0.21; the shell emits resolves only.

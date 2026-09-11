@@ -30,12 +30,11 @@ pub fn ddp_send(address: String, port: u16, data: Vec<u8>) -> Result<(), String>
     Ok(())
 }
 
-// Discovery event payload for the frontend: a hub appeared or dropped off.
-// `name` is the mDNS instance name (stable per device); `ip` is present on
-// "found" so the frontend can query the hub's JSON API without resolving.
+// Discovery event payload for the frontend: a hub resolved on the network.
+// `name` is the mDNS instance name (stable per device); `ip` lets the
+// frontend query the hub's JSON API without resolving.
 #[derive(Clone, Serialize)]
 pub struct DiscoveryEvent {
-    kind: &'static str,
     name: String,
     ip: Option<String>,
 }
@@ -50,7 +49,7 @@ pub struct DiscoveryState {
     found: Mutex<HashMap<String, Option<String>>>,
 }
 
-// The currently-visible hubs, as "found" events. The frontend calls this
+// The currently-visible hubs, as discovery events. The frontend calls this
 // right after attaching its `hardware-discovery` listener; everything later
 // arrives as events.
 #[tauri::command]
@@ -63,7 +62,6 @@ pub fn discovery_snapshot(state: State<DiscoveryState>) -> Vec<DiscoveryEvent> {
     found
         .iter()
         .map(|(name, ip)| DiscoveryEvent {
-            kind: "found",
             name: name.clone(),
             ip: ip.clone(),
         })
@@ -71,8 +69,8 @@ pub fn discovery_snapshot(state: State<DiscoveryState>) -> Vec<DiscoveryEvent> {
 }
 
 // Browse the LAN for WLED hubs for the app's lifetime, emitting
-// `hardware-discovery` events (same pattern as `sidecar-message`). mDNS churn
-// (rebroadcasts, cache expiry) is passed through; the frontend merges by MAC.
+// `hardware-discovery` events (same pattern as `sidecar-message`). mDNS
+// rebroadcasts are passed through; the frontend merges by MAC.
 pub fn spawn_discovery(app: &AppHandle) {
     app.manage(DiscoveryState::default());
     let app = app.clone();
@@ -94,41 +92,34 @@ pub fn spawn_discovery(app: &AppHandle) {
         while let Ok(event) = receiver.recv() {
             match event {
                 mdns_sd::ServiceEvent::ServiceResolved(info) => {
-                    let name = info.get_fullname().to_string();
+                    let name = info.fullname.clone();
                     // IPv4 only, lowest address: the frontend dials the hub
                     // over plain HTTP, and a dual-stack hub's set order is
                     // arbitrary — the pick must not flip between announcements.
                     let ip = info
-                        .get_addresses_v4()
-                        .into_iter()
+                        .addresses
+                        .iter()
+                        .filter_map(|a| match a.to_ip_addr() {
+                            std::net::IpAddr::V4(v4) => Some(v4),
+                            std::net::IpAddr::V6(_) => None,
+                        })
                         .min()
                         .map(|a| a.to_string());
                     crate::applog::log(&format!("mdns found {name} at {ip:?}"));
                     if let Ok(mut found) = app.state::<DiscoveryState>().found.lock() {
                         found.insert(name.clone(), ip.clone());
                     }
-                    let _ = app.emit(
-                        "hardware-discovery",
-                        DiscoveryEvent {
-                            kind: "found",
-                            name,
-                            ip,
-                        },
-                    );
+                    let _ = app.emit("hardware-discovery", DiscoveryEvent { name, ip });
                 }
+                // A removal only clears the snapshot so a later resolve
+                // re-announces the hub. Reachability is the frontend's HTTP
+                // probe, not mDNS: cached records expire and their refresh
+                // can fail while the hub is fine.
                 mdns_sd::ServiceEvent::ServiceRemoved(_, fullname) => {
                     crate::applog::log(&format!("mdns lost {fullname}"));
                     if let Ok(mut found) = app.state::<DiscoveryState>().found.lock() {
                         found.remove(&fullname);
                     }
-                    let _ = app.emit(
-                        "hardware-discovery",
-                        DiscoveryEvent {
-                            kind: "lost",
-                            name: fullname,
-                            ip: None,
-                        },
-                    );
                 }
                 _ => {}
             }
