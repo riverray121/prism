@@ -8,7 +8,7 @@ First working rig, assembled 2026-07-26; grown to five outputs 2026-08-01. Prove
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Controller | ESP32-WROOM DevKitC (38-pin), WLED 16.0.1; powered over micro-USB from a wall adapter, never from the PSU (the PSU is relay-switched)  |
 | Relay      | SSR-40DA solid-state relay on the PSU's live input, driven from ESP GPIO 23 through a PN2222A transistor (see PSU relay)               |
-| Strips     | 3× WS2812B 5V, 300 px each (first confirmed by last-pixel probe), on reels                                                             |
+| Strips     | 3× WS2812B 5V, cut from 300 px reels and mounted: TV 237 px, TV shelf 233 px, speaker box 85 px (lengths by end-probe)                 |
 | Tubes      | 2× 幻彩 addressable neon flex, DC5V, 3 m (diffused; 269–272 px by end-probe, buses set to 272)                                         |
 | PSU        | Mean Well LRS-350-5 (5 V 60 A); 115 V input selector; 3-wire cord, wall ground to the FG terminal                                      |
 | Wiring     | Strip red→+V via an inline ATC/ATO blade fuse per strip, white→−V; ESP GND→−V (common ground); data: JST green→terminal block→ESP GPIO |
@@ -18,13 +18,15 @@ First working rig, assembled 2026-07-26; grown to five outputs 2026-08-01. Prove
 - Network: `653BWiFi` (2.4 GHz); IP `192.168.0.95` (DHCP — may change; re-find via mDNS or sweep `/json/info` on 192.168.0.x)
 - LED config: five buses, type WS281x GRB, one per output:
 
-| Bus | GPIO | Fixture | Pixels | Start | Current limit |
-| --- | ---- | ------- | ------ | ----- | ------------- |
-| 0   | 16   | strip   | 300    | 0     | 8 A           |
-| 1   | 17   | strip   | 300    | 300   | 8 A           |
-| 2   | 18   | tube    | 272    | 600   | 8 A           |
-| 3   | 19   | strip   | 300    | 872   | 8 A           |
-| 4   | 21   | tube    | 272    | 1172  | 8 A           |
+| Bus | GPIO | Fixture                          | Pixels | Start | Current limit |
+| --- | ---- | -------------------------------- | ------ | ----- | ------------- |
+| 0   | 16   | tube A (a few px short of 272)   | 272    | 0     | 8 A           |
+| 1   | 17   | tube B                           | 272    | 272   | 8 A           |
+| 2   | 18   | TV shelf strip                   | 233    | 544   | 8 A           |
+| 3   | 19   | speaker box strip (under the TV) | 85     | 777   | 8 A           |
+| 4   | 21   | TV backlight strip               | 237    | 862   | 8 A           |
+
+Total 1099 px. Lengths were found by lighting marker pixels and colored blocks at known offsets and reading back the last visible one; repeat that after any re-cut. A bus longer than its fixture is harmless (the extra addresses go nowhere); a bus shorter than its fixture leaves the far end permanently dark.
 
 Per-bus limits are 8 A each (40 A worst case against the 60 A PSU). Each strip's +V feed carries a 15 A blade fuse in an inline holder placed close to the PSU +V terminal; the fuse rating must not exceed the feed wire's rating (15 A needs 16 AWG or thicker, 18 AWG takes 10 A). Blade fuses have no polarity. GPIO 23 is the PSU relay pin. Safe spare output pins if the rig grows: 22, 25, 26, 27, 32, 33. Never 34–39 (input-only), 0/2/5/12/15 (strapping), 6–11 (flash), 1/3 (UART).
 
