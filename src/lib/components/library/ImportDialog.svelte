@@ -9,6 +9,7 @@
   // the native picker, or a YouTube URL downloaded and converted by the sidecar.
   let { onclose }: { onclose: () => void } = $props();
 
+  let dialogOpen = $state(true);
   let url = $state("");
   // URL whose download we're waiting on; keeps the dialog open with progress.
   let submitted = $state<string | null>(null);
@@ -28,7 +29,7 @@
   let sawStart = $state(false);
   $effect(() => {
     if (downloading) sawStart = true;
-    else if (submitted !== null && sawStart && !failed) onclose();
+    else if (submitted !== null && sawStart && !failed) dialogOpen = false;
   });
 
   async function pickFiles() {
@@ -41,7 +42,7 @@
     if (selected === null) return;
     library.lastImportError = null;
     await importFiles(Array.isArray(selected) ? selected : [selected]);
-    onclose();
+    dialogOpen = false;
   }
 
   function submitUrl() {
@@ -57,7 +58,7 @@
   }
 </script>
 
-<DialogShell title="Add songs" {onclose}>
+<DialogShell title="Add songs" bind:open={dialogOpen} {onclose}>
   <div class="mt-3 flex flex-col gap-4">
     <button
       onclick={pickFiles}

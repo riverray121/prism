@@ -16,6 +16,11 @@
     onclose: () => void;
   } = $props();
 
+  let open = $state(true);
+  // Set when the queue command fails to reach the sidecar; the dialog stays
+  // open so the failure is visible instead of a row that never changes.
+  let sendError = $state<string | null>(null);
+
   // Toggle an engine; update the store optimistically, then persist via the
   // sidecar (which echoes back a settings snapshot to confirm).
   function toggleEngine(engine: string, on: boolean) {
@@ -43,13 +48,25 @@
     settings.engines.some((e) => settings.engineInfo[e]?.drums),
   );
 
-  function confirm() {
-    void queueAnalysis([songId]);
-    onclose();
+  async function confirm() {
+    sendError = null;
+    try {
+      await queueAnalysis([songId]);
+    } catch (e) {
+      console.error("queue analysis failed", songId, e);
+      sendError = e instanceof Error ? e.message : String(e);
+      return;
+    }
+    open = false;
   }
 </script>
 
-<DialogShell title={`Analyze — ${songTitle}`} width="w-[34rem]" {onclose}>
+<DialogShell
+  title={`Analyze — ${songTitle}`}
+  width="w-[34rem]"
+  bind:open
+  {onclose}
+>
   <p class="mt-1 text-xs text-ink-muted">
     Separation engines to run. More engines means longer analysis; every
     engine's stems are kept for comparison.
@@ -99,9 +116,13 @@
     {/if}
   </div>
 
+  {#if sendError}
+    <p class="mt-3 text-xs text-danger">Could not queue: {sendError}</p>
+  {/if}
+
   <div class="mt-4 flex justify-end gap-2">
     <button
-      onclick={onclose}
+      onclick={() => (open = false)}
       class="rounded border border-edge px-3 py-1 text-sm text-ink-muted hover:text-ink"
     >
       Cancel

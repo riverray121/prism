@@ -20,7 +20,7 @@
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2",
-    "bits-ui": "^2.18.1",
+    "bits-ui": "^2.19.2",
     "uplot": "^1.6.32",
     "zod": "^4.4.3"
   },

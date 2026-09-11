@@ -3,21 +3,27 @@
   import type { Snippet } from "svelte";
 
   // Shared modal chrome: dimmed overlay + centered titled panel. Body markup
-  // comes from the caller; esc/overlay dismissal reports through onclose.
+  // comes from the caller. Every close, esc/overlay or the caller's own,
+  // reports through onclose only after the dialog has flipped `open` false,
+  // so its layers (focus trap, body pointer-events lock) tear down in order
+  // before the caller unmounts it. Callers close by setting `open` false,
+  // never by unmounting an open dialog.
   let {
     title,
     onclose,
+    open = $bindable(true),
     width = "w-96",
     children,
   }: {
     title: string;
     onclose: () => void;
+    open?: boolean;
     width?: string; // Tailwind width class for the panel
     children: Snippet;
   } = $props();
 </script>
 
-<Dialog.Root open onOpenChange={(o) => !o && onclose()}>
+<Dialog.Root bind:open onOpenChange={(o) => !o && onclose()}>
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 z-40 bg-black/50" />
     <Dialog.Content
