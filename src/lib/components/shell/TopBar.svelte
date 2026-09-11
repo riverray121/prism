@@ -41,10 +41,12 @@
   );
 </script>
 
+<!-- Three columns with equal outer tracks keep the stages centered while the
+     song chip truncates inside its own track instead of running under them. -->
 <header
-  class="relative flex h-bar shrink-0 items-stretch border-b border-edge bg-surface"
+  class="grid h-bar shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch border-b border-edge bg-surface"
 >
-  <div class="flex min-w-0 flex-1 items-center px-3">
+  <div class="flex min-w-0 items-center px-3">
     {#if openSong}
       <!-- The working song, as a filled chip with a note glyph so it reads as
            "what's open" at a glance rather than blending into the chrome. -->
@@ -81,7 +83,7 @@
   <!-- Pipeline stages, centered. Hidden while split: the pane headers are the
        tab pickers then, so the stages never appear in more than two places. -->
   {#if workspace.splitTab === null}
-    <nav class="absolute inset-x-0 mx-auto flex w-fit items-stretch">
+    <nav class="flex items-stretch">
       {#each TABS as { id, label } (id)}
         <button
           onclick={() => setTab(id)}
@@ -95,9 +97,11 @@
         </button>
       {/each}
     </nav>
+  {:else}
+    <div></div>
   {/if}
 
-  <div class="flex items-center px-2">
+  <div class="flex items-center justify-end px-2">
     {#if openSong && companion.status === "connected"}
       <button
         onclick={() => void publish()}
