@@ -63,7 +63,13 @@ Constraints:
 3. `esptool --port <port> write-flash 0x10000 WLED_<ver>_ESP32.bin`
 4. Wi-Fi via `improv_provision.py <port> <ssid> <pass>` (Improv serial; ESP32 is 2.4 GHz only)
 
+## Home Assistant
+
+The node is in Home Assistant through the core WLED integration (host 192.168.0.95, device and entity named "TV LEDs"): `light.tv_leds` (on/off, brightness, color; off drops the PSU relay through WLED), `select.tv_leds_preset` (presets by name). The WLED node's own name is also "TV LEDs".
+
 ## Saved looks (WLED presets on the node)
+
+- 12 "Day ambient" — the boot preset (`def.ps` 12): solid (255,160,55), bri 48, whole rig. The look the rig wakes up in and the daytime default.
 
 - 1–10: effect showcase playlist (Pacifica, Colorwaves, Meteor, Fire 2012, Ripple, Dancing Shadows, Plasma, Fireworks, Lightning, Flow)
 - 11 "Lantern" — user favorite. Candle Multi (fx 102), col1 amber (255,170,60), col2 ember (110,50,8), sx 96, ix 190, bri 150. Reads as old street lights / lanterns. Candidate `color_temp`/ambience program for the mapping layer.
