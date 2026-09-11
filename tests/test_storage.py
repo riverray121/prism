@@ -202,6 +202,62 @@ def test_write_favorites_without_profile_raises(library_root):
         storage.write_favorites("does-not-exist", ["mix.rms"])
 
 
+def _ft_stems():
+    env = {"render": "continuous", "category": "amplitude", "data": [0.5]}
+    return {
+        "htdemucs_ft": {
+            "bass": {"audio_file": "b.wav", "features": {"energy": dict(env)}},
+            "vocals": {"audio_file": "v.wav", "features": {"energy": dict(env)}},
+            "drums": {
+                "audio_file": "d.wav",
+                "features": {"energy": dict(env)},
+                "substems": {
+                    "kick": {"audio_file": "k.wav", "features": {"energy": dict(env)}},
+                },
+            },
+        }
+    }
+
+
+def test_first_analysis_seeds_default_favorites_that_resolve(library_root):
+    (library_root / "songs" / "s1").mkdir()
+    storage.write_profile(
+        _song(),
+        analyzed_at="t",
+        frame_rate_hz=100.0,
+        frame_count=1,
+        mix={},
+        stems=_ft_stems(),
+    )
+    # bass, kick, vocals resolve; snare/hh/other were not produced.
+    assert storage.read_profile("s1")["favorites"] == [
+        "stems.htdemucs_ft.bass.features.energy",
+        "stems.htdemucs_ft.drums.substems.kick.features.energy",
+        "stems.htdemucs_ft.vocals.features.energy",
+    ]
+
+
+def test_default_favorites_skip_a_profile_without_htdemucs_ft(library_root):
+    (library_root / "songs" / "s1").mkdir()
+    _write_minimal_profile()
+    assert storage.read_profile("s1")["favorites"] == []
+
+
+def test_reanalysis_keeps_user_favorites_over_defaults(library_root):
+    (library_root / "songs" / "s1").mkdir()
+    _write_minimal_profile()
+    storage.write_favorites("s1", ["mix.rms"])
+    storage.write_profile(
+        _song(),
+        analyzed_at="t2",
+        frame_rate_hz=100.0,
+        frame_count=1,
+        mix={},
+        stems=_ft_stems(),
+    )
+    assert storage.read_profile("s1")["favorites"] == ["mix.rms"]
+
+
 def test_reanalysis_preserves_favorites(library_root):
     (library_root / "songs" / "s1").mkdir()
     _write_minimal_profile()

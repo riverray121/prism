@@ -104,10 +104,13 @@ def write_profile(
             },
             "mix": mix,
             "stems": stems or {},
-            # Re-analysis rewrites the profile wholesale; the user's stars
-            # survive it (stale paths are the frontend's warn-only concern).
-            "favorites": _existing_favorites(song["id"]),
         }
+        # Re-analysis rewrites the profile wholesale; the user's stars survive
+        # it (stale paths are the frontend's warn-only concern). A song with
+        # none starts from the defaults.
+        profile["favorites"] = _existing_favorites(song["id"]) or default_favorites(
+            profile
+        )
         write_json_atomic(SONGS_DIR / song["id"] / "profile.json", profile)
 
 
@@ -184,6 +187,34 @@ def _existing_favorites(song_id: str) -> list:
         return favorites if isinstance(favorites, list) else []
     except (FileNotFoundError, json.JSONDecodeError):
         return []
+
+
+# Stars every song carries once analyzed, unless it already has its own: the
+# htdemucs_ft energy envelopes auto-map builds a first mapping from. Paths that
+# do not resolve in the written profile (engine not run, drums not
+# sub-separated) are left out rather than starred blind.
+DEFAULT_FAVORITES = (
+    "stems.htdemucs_ft.bass.features.energy",
+    "stems.htdemucs_ft.drums.substems.kick.features.energy",
+    "stems.htdemucs_ft.drums.substems.snare.features.energy",
+    "stems.htdemucs_ft.drums.substems.hh.features.energy",
+    "stems.htdemucs_ft.other.features.energy",
+    "stems.htdemucs_ft.vocals.features.energy",
+)
+
+
+def _resolves(profile: dict, path: str) -> bool:
+    node: object = profile
+    for key in path.split("."):
+        if not isinstance(node, dict) or key not in node:
+            return False
+        node = node[key]
+    return True
+
+
+def default_favorites(profile: dict) -> list[str]:
+    """The default stars that resolve in ``profile``."""
+    return [path for path in DEFAULT_FAVORITES if _resolves(profile, path)]
 
 
 def write_json_atomic(path: Path, obj: dict) -> None:

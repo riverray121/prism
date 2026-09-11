@@ -281,8 +281,7 @@ Features marked `[WIP]` in the catalog carry `"status": "wip"` in the profile. L
 
 ## Favorites
 
-> **Not yet implemented** (an M6 deliverable). No code emits or models a top-level `favorites` array yet; the example above shows the planned shape.
-
-- Array of dot-path strings referencing canonical feature locations.
+- Array of dot-path strings referencing canonical feature locations. Written by the sidecar (`favorites.update` command); re-analysis preserves the list.
 - Examples: `"mix.beats"`, `"stems.htdemucs_ft.bass.features.pitch"`, `"mix.sections"`.
+- A song analyzed with no favorites starts from `storage.DEFAULT_FAVORITES` (the `htdemucs_ft` energy envelopes of bass, kick, snare, hh, other, vocals), keeping only the paths that resolve in the written profile.
 - Loader validates that each path resolves at load time; broken favorites trigger a warning, not a load failure (a removed feature shouldn't kill the profile).
