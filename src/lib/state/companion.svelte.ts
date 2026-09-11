@@ -2,9 +2,13 @@ import {
   COMPANION_API_VERSION,
   CompanionError,
   getInfo,
+  listRequests,
+  patchRequest,
   type CompanionInfo,
+  type CompanionRequest,
   type Endpoint,
 } from "$lib/companion/client";
+import { importRequest as sendImportRequest } from "$lib/ipc";
 import { settings } from "$lib/state/settings.svelte";
 
 // Connection to the one configured companion (docs/companion-api.md).
@@ -23,7 +27,10 @@ export const companion = $state<{
   status: CompanionStatus;
   info: CompanionInfo | null;
   error: string | null;
-}>({ status: "off", info: null, error: null });
+  // Open requests from the last refresh, newest first. Requests in any other
+  // status are not kept: the UI only offers open ones.
+  requests: CompanionRequest[];
+}>({ status: "off", info: null, error: null, requests: [] });
 
 const RETRY_MS = 60_000;
 
@@ -43,6 +50,7 @@ export async function checkConnection(): Promise<void> {
     companion.status = "off";
     companion.info = null;
     companion.error = null;
+    companion.requests = [];
     return;
   }
   companion.status = "connecting";
@@ -58,6 +66,7 @@ export async function checkConnection(): Promise<void> {
     companion.status = "connected";
     companion.info = info;
     companion.error = null;
+    await refreshRequests();
   } catch (e) {
     if (gen !== checkGeneration) return;
     companion.info = null;
@@ -68,6 +77,45 @@ export async function checkConnection(): Promise<void> {
       companion.status = "unreachable";
       companion.error = e instanceof Error ? e.message : String(e);
     }
+  }
+}
+
+// Pull the open requests. Only meaningful while connected; a failure keeps the
+// last list (the connection check reports reachability).
+export async function refreshRequests(): Promise<void> {
+  const target = endpoint();
+  if (target === null || companion.status !== "connected") return;
+  try {
+    const all = await listRequests(target);
+    companion.requests = all.filter((r) => r.status === "open");
+  } catch (e) {
+    console.warn("companion requests refresh failed", e);
+  }
+}
+
+// Start the import for a request and mark it analyzing. The request leaves
+// the open list at once; the sidecar's import events carry progress.
+export async function importRequest(request: CompanionRequest): Promise<void> {
+  const target = endpoint();
+  if (target === null) return;
+  companion.requests = companion.requests.filter((r) => r.id !== request.id);
+  await sendImportRequest(request);
+  try {
+    await patchRequest(target, request.id, { status: "analyzing" });
+  } catch (e) {
+    console.warn("companion request status update failed", request.id, e);
+  }
+}
+
+export async function rejectRequest(request: CompanionRequest): Promise<void> {
+  const target = endpoint();
+  if (target === null) return;
+  companion.requests = companion.requests.filter((r) => r.id !== request.id);
+  try {
+    await patchRequest(target, request.id, { status: "rejected" });
+  } catch (e) {
+    console.warn("companion request reject failed", request.id, e);
+    await refreshRequests();
   }
 }
 

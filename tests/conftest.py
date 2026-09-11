@@ -25,7 +25,7 @@ def con():
     """In-memory SQLite built from the real schema."""
     c = sqlite3.connect(":memory:")
     c.row_factory = sqlite3.Row
-    c.executescript(library._SCHEMA + library._SETTINGS_SCHEMA)
+    c.executescript(library._SCHEMA + library._SETTINGS_SCHEMA + library._LINKS_SCHEMA)
     yield c
     c.close()
 

@@ -21,6 +21,7 @@ from . import (
     youtube,
 )
 from .schema import (
+    CompanionImportCommand,
     DeleteSongCommand,
     GetMappingCommand,
     GetProfileCommand,
@@ -81,8 +82,9 @@ def emit_settings() -> None:
     )
 
 
-def import_one(path_str: str) -> None:
-    """Copy a file into the library and insert its row. Raises on failure."""
+def import_one(path_str: str) -> str:
+    """Copy a file into the library and insert its row; returns the song id.
+    Raises on failure."""
     source = Path(path_str)
     meta = metadata.extract(source)
     song_id, source_path = storage.import_file(source)
@@ -98,6 +100,35 @@ def import_one(path_str: str) -> None:
             imported_at=datetime.now(UTC).isoformat(),
         )
     log.info("imported %s as %s", source.name, song_id)
+    return song_id
+
+
+# The pending-import key for a companion request, as the frontend sees it in
+# import_started/import_finished events.
+def request_import_key(request_id: str) -> str:
+    return f"request:{request_id}"
+
+
+def import_request(cmd: CompanionImportCommand) -> None:
+    """Search YouTube for the request's artist and title, import the first
+    result under the request's own metadata, and link the song to the request.
+    Worker thread, like import_youtube."""
+    key = request_import_key(cmd.request_id)
+    tmp = Path(tempfile.mkdtemp(prefix="prism-yt-"))
+    ipc.emit(ImportStartedEvent(path=key))
+    try:
+        audio = youtube.download(f"ytsearch1:{cmd.artist} {cmd.title}", dest_dir=tmp)
+        song_id = import_one(str(audio))
+        with library.connect() as con:
+            library.update_metadata(con, song_id, cmd.title, cmd.artist)
+            library.link_request(con, song_id, cmd.request_id, cmd.external)
+    except Exception as exc:
+        log.exception("request import failed: %s", key)
+        ipc.emit(ImportFailedEvent(path=key, error=str(exc)))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        ipc.emit(ImportFinishedEvent(path=key))
+    emit_snapshot()
 
 
 def import_youtube(url: str) -> None:
@@ -138,6 +169,9 @@ def handle(msg: dict) -> None:
     elif msg_type == "library.import_youtube":
         cmd = ImportYoutubeCommand.model_validate(msg)
         threading.Thread(target=import_youtube, args=(cmd.url,), daemon=True).start()
+    elif msg_type == "companion.import":
+        cmd = CompanionImportCommand.model_validate(msg)
+        threading.Thread(target=import_request, args=(cmd,), daemon=True).start()
     elif msg_type == "library.list":
         emit_snapshot()
     elif msg_type == "queue.add":

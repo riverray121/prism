@@ -30,6 +30,8 @@ export const SongSchema = z.object({
   progress: z.number().nullable().default(null),
   // Populated when status is 'failed'; shown in the library with retry.
   error_message: z.string().nullable().default(null),
+  // Companion request this song was imported for; null for ordinary imports.
+  request_id: z.string().nullable().default(null),
 });
 export type Song = z.infer<typeof SongSchema>;
 

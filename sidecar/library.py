@@ -43,6 +43,18 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 """
 
+# Songs imported from a companion request (docs/companion-api.md): the request
+# id and the external ids the companion attached, plus when the song was last
+# published back. One link per song.
+_LINKS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS companion_links (
+    song_id      TEXT PRIMARY KEY REFERENCES songs(id) ON DELETE CASCADE,
+    request_id   TEXT NOT NULL,
+    external     TEXT NOT NULL,
+    published_at TEXT
+);
+"""
+
 # Nulls every in-progress column. Shared by the terminal transitions so adding a
 # progress column can't leave a stale value at one site.
 _CLEAR_PROGRESS = (
@@ -75,6 +87,7 @@ def connect() -> Iterator[sqlite3.Connection]:
             pass
     con.execute(_SCHEMA)
     con.execute(_SETTINGS_SCHEMA)
+    con.execute(_LINKS_SCHEMA)
     try:
         yield con
         con.commit()
@@ -106,11 +119,13 @@ def insert_song(
 def list_songs(con: sqlite3.Connection) -> list[sqlite3.Row]:
     return con.execute(
         """
-        SELECT id, title, artist, duration_sec, sample_rate, source_path,
-               status, imported_at, analyzed_at, current_stage, current_engine,
-               current_step, total_steps, progress, error_message
-        FROM songs
-        ORDER BY imported_at
+        SELECT s.id, s.title, s.artist, s.duration_sec, s.sample_rate,
+               s.source_path, s.status, s.imported_at, s.analyzed_at,
+               s.current_stage, s.current_engine, s.current_step, s.total_steps,
+               s.progress, s.error_message, l.request_id
+        FROM songs s
+        LEFT JOIN companion_links l ON l.song_id = s.id
+        ORDER BY s.imported_at
         """
     ).fetchall()
 
@@ -304,3 +319,40 @@ def delete_song(con: sqlite3.Connection, song_id: str) -> bool:
         "DELETE FROM songs WHERE id=? AND status != 'analyzing'", (song_id,)
     )
     return cur.rowcount > 0
+
+
+def link_request(
+    con: sqlite3.Connection, song_id: str, request_id: str, external: dict[str, str]
+) -> None:
+    """Record that ``song_id`` was imported for a companion request."""
+    con.execute(
+        """
+        INSERT INTO companion_links (song_id, request_id, external)
+        VALUES (?, ?, ?)
+        ON CONFLICT(song_id) DO UPDATE SET
+            request_id=excluded.request_id, external=excluded.external
+        """,
+        (song_id, request_id, json.dumps(external)),
+    )
+
+
+def get_link(con: sqlite3.Connection, song_id: str) -> dict | None:
+    """The song's companion link (request_id, external, published_at) or None."""
+    row = con.execute(
+        "SELECT request_id, external, published_at FROM companion_links WHERE song_id=?",
+        (song_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "request_id": row["request_id"],
+        "external": json.loads(row["external"]),
+        "published_at": row["published_at"],
+    }
+
+
+def mark_published(con: sqlite3.Connection, song_id: str, published_at: str) -> None:
+    con.execute(
+        "UPDATE companion_links SET published_at=? WHERE song_id=?",
+        (published_at, song_id),
+    )

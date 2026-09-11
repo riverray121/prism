@@ -18,6 +18,28 @@ export function importYoutube(url: string): Promise<void> {
   return sendCommand({ type: "library.import_youtube", url });
 }
 
+// Import a companion request: YouTube search for its artist and title, then
+// the normal import linked to the request. Progress arrives as import events
+// keyed by requestImportKey(request_id).
+export function importRequest(request: {
+  id: string;
+  title: string;
+  artist: string;
+  external: Record<string, string>;
+}): Promise<void> {
+  return sendCommand({
+    type: "companion.import",
+    request_id: request.id,
+    title: request.title,
+    artist: request.artist,
+    external: request.external,
+  });
+}
+
+export function requestImportKey(requestId: string): string {
+  return `request:${requestId}`;
+}
+
 // Remove a song: its library row and its whole on-disk folder.
 export function deleteSong(songId: string): Promise<void> {
   return sendCommand({ type: "library.delete", song_id: songId });

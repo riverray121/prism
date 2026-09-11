@@ -15,6 +15,17 @@ class ImportYoutubeCommand(BaseModel):
     url: str
 
 
+class CompanionImportCommand(BaseModel):
+    """Import a companion request: YouTube search for the artist and title,
+    then the normal import with the request's metadata and a link row."""
+
+    type: Literal["companion.import"]
+    request_id: str
+    title: str
+    artist: str
+    external: dict[str, str] = {}
+
+
 class DeleteSongCommand(BaseModel):
     type: Literal["library.delete"]
     song_id: str
@@ -111,6 +122,8 @@ class Song(BaseModel):
     progress: float | None = None
     # Populated when status='failed'; shown in the library with a retry action.
     error_message: str | None = None
+    # Companion request this song was imported for (docs/companion-api.md).
+    request_id: str | None = None
 
 
 class LibrarySongsEvent(BaseModel):

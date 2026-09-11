@@ -58,6 +58,7 @@ const song: Song = {
   total_steps: null,
   progress: null,
   error_message: null,
+  request_id: null,
 };
 
 function makeProfile(overrides: Partial<Profile> = {}): Profile {

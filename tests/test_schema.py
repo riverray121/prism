@@ -87,3 +87,15 @@ def test_song_analyzed_at_defaults_none():
         imported_at="then",
     )
     assert song.analyzed_at is None
+
+
+def test_companion_import_command_defaults_external():
+    cmd = schema.CompanionImportCommand.model_validate(
+        {
+            "type": "companion.import",
+            "request_id": "r1",
+            "title": "Dior",
+            "artist": "Joji",
+        }
+    )
+    assert cmd.external == {}
