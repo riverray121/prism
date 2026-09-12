@@ -7,7 +7,9 @@
   // reports through onclose only after the dialog has flipped `open` false,
   // so its layers (focus trap, body pointer-events lock) tear down in order
   // before the caller unmounts it. Callers close by setting `open` false,
-  // never by unmounting an open dialog.
+  // never by unmounting an open dialog. The flag is watched here rather
+  // than through bits-ui's onOpenChange, which fires only for the closes
+  // bits-ui itself performs (esc, overlay), not for a bound `open` set false.
   let {
     title,
     onclose,
@@ -21,9 +23,13 @@
     width?: string; // Tailwind width class for the panel
     children: Snippet;
   } = $props();
+
+  $effect(() => {
+    if (!open) onclose();
+  });
 </script>
 
-<Dialog.Root bind:open onOpenChange={(o) => !o && onclose()}>
+<Dialog.Root bind:open>
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 z-40 bg-black/50" />
     <Dialog.Content
