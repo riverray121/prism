@@ -48,6 +48,11 @@ export function currentMatrices(): Matrices {
   return matrices;
 }
 
+// Heatmap matrix loads still in flight for the open song.
+export function matricesPending(): number {
+  return loadingMatrices.size;
+}
+
 function ensureMatrix(source: string, absPath: string): void {
   if (matrices[source] || loadingMatrices.has(source)) return;
   // Writes land in the containers captured at entry: source paths repeat

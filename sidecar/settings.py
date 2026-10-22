@@ -58,3 +58,13 @@ def set_companion(con: sqlite3.Connection, url: str | None, token: str | None) -
         library.set_setting(con, "companion_url", url.strip().rstrip("/"))
     if token is not None:
         library.set_setting(con, "companion_token", token.strip())
+
+
+def get_companion_auto(con: sqlite3.Connection) -> bool:
+    """Whether the companion automation runs: import open requests, analyze,
+    auto-map, and publish without a person. Default off."""
+    return bool(library.get_setting(con, "companion_auto", False))
+
+
+def set_companion_auto(con: sqlite3.Connection, on: bool) -> None:
+    library.set_setting(con, "companion_auto", bool(on))

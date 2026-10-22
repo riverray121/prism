@@ -16,9 +16,11 @@ Pull: a Shows section lists published shows that are not in the library, or whos
 
 Restore on stop: before the first frame of a play run Prism reads each target hub's power state. On stop it stops sending. A hub that was on returns to its own look once its realtime timeout expires; a hub that was off gets a blackout frame and is powered off. Nothing else about streaming changes.
 
+Automatic mode: a setting in the Companion dialog, off by default. When on and connected, Prism imports every open request, queues analysis for the imported songs, and for each analyzed song it opens the song, auto-maps from its favorites when the mapping doc is empty, patches every rig light round-robin over the enabled programs when the patch is empty, waits for the song's tracks to load, and publishes. A song that cannot be processed is skipped with a reason shown in the dialog and not retried in the session. This is what runs on an always-on machine; a laptop leaves it off.
+
 ## Usage
 
-- Settings, Companion section: URL, token, Connect. A connected companion shows its name and version.
+- Settings, Companion section: URL, token, Connect, Automatic. A connected companion shows its name and version; automatic mode shows its current step.
 - Library panel: Requested (import, reject) and Shows (pull) sections, present only while connected.
 - Song: Publish in the song's actions. Enabled when the song has a patch. Publishing shows progress and the result.
 

@@ -10,6 +10,8 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - Slice 4 — Publish: `companion/bundle.ts` (`showLights`, `renderShowFrames` per distinct pixel count via `evaluateDoc` + `applyMacro`, `buildManifest`), `hardware/frame.ts` (solid-frame math shared with the streamer), `show.rs` (`write_show_frames` raw-body invoke, `clear_show_frames`), `sidecar/companion.py` (`pack`: manifest + audio + frames + project mirror minus stems/show, `upload` PUT, request PATCH to published), `companion.publish` command and `companion.publish_result` event, Publish button in the top bar with stage labels. Bench publish to prism-player pending user run.
 - Slice 5 — Shows section and pull: `companion.pull` command (`companion.download` + `restore`: audio to `source.<ext>`, `project/` replaces profile, sidecars and mapping, row created or marked analyzed, link restored from the manifest's `request_id`), `published_at` in the songs listing, `pullableShows` (missing locally, or newer on the companion than the local publish), `ShowsSection` with a replace confirmation. Bench pull pending user run.
 
+- Automatic mode: `companion_auto` setting, `companion/automation.ts` (`nextAction`, `roundRobinPatch`, pure), `automationTick` every 10 s in companion state (import, queue, open + auto-map + patch + wait for tracks + publish; skip with reason on failure or 180 s timeout), checkbox and status line in the dialog, sidecar emits a songs snapshot after publish so `published_at` lands.
+
 ## Todo
 
 - [x] Slice 1 — Connect

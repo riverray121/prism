@@ -12,6 +12,9 @@ import {
 } from "$lib/companion/client";
 import { getVersion } from "@tauri-apps/api/app";
 
+import { nextAction, roundRobinPatch } from "$lib/companion/automation";
+import { autoMap, proposalIsEmpty } from "$lib/mapping/automap";
+
 import {
   buildManifest,
   renderShowFrames,
@@ -22,15 +25,27 @@ import {
   importRequest as sendImportRequest,
   publishShow,
   pullShow,
+  queueAnalysis,
   writeShowFrames,
 } from "$lib/ipc";
 import type { MappingDoc } from "$lib/mapping/schema";
-import { currentMatrices } from "$lib/state/evaluation.svelte";
+import { currentMatrices, matricesPending } from "$lib/state/evaluation.svelte";
 import { hardware, rigLatencyMs } from "$lib/state/hardware.svelte";
-import { getRawProfile, inspection } from "$lib/state/inspection.svelte";
+import {
+  getRawProfile,
+  inspection,
+  open as openSong,
+} from "$lib/state/inspection.svelte";
 import { library, songById } from "$lib/state/library.svelte";
-import { mapping } from "$lib/state/mapping.svelte";
+import {
+  applyAutoMapProposal,
+  docIsEmpty,
+  flushMappingSave,
+  mapping,
+  setPatch,
+} from "$lib/state/mapping.svelte";
 import { settings } from "$lib/state/settings.svelte";
+import { tracksPending } from "$lib/state/tracks.svelte";
 
 // Connection to the one configured companion (docs/companion-api.md).
 // `off` means no URL is set; every other status is the result of the last
@@ -275,10 +290,136 @@ export function applyPublishResult(
   }
 }
 
+// ── Automation ──────────────────────────────────────────────────────────────
+// With the setting on and a companion connected, requests are imported,
+// analyzed, auto-mapped onto every rig light, and published without a
+// person. One step per tick; a song that cannot be processed is skipped with
+// a reason and never retried in this session.
+
+export const automation = $state<{
+  // The song being processed and what it waits on, for the dialog.
+  current: { songId: string; since: number; step: string } | null;
+  skipped: Record<string, string>;
+  lastNote: string | null;
+}>({ current: null, skipped: {}, lastNote: null });
+
+const AUTOMATION_TICK_MS = 10_000;
+// Opening a song, loading its tracks, and rendering must finish within this.
+const PROCESS_TIMEOUT_MS = 180_000;
+// Settle time after doc edits so the evaluation effect requests every track.
+const SETTLE_MS = 3_000;
+
+export async function automationTick(): Promise<void> {
+  if (!settings.companionAuto || companion.status !== "connected") return;
+  if (!library.loaded || !hardware.rigLoaded) return;
+  const action = nextAction({
+    requests: companion.requests,
+    songs: library.songs,
+    importsPending: library.pendingImports.some((p) =>
+      p.startsWith("request:"),
+    ),
+    publishing:
+      publishing.stage === "rendering" || publishing.stage === "uploading",
+    skipped: new Set(Object.keys(automation.skipped)),
+  });
+  switch (action.kind) {
+    case "import":
+      automation.lastNote = `importing ${action.request.artist} - ${action.request.title}`;
+      await importRequest(action.request);
+      return;
+    case "queue":
+      automation.lastNote = `queuing analysis for ${action.songIds.length} song(s)`;
+      await queueAnalysis(action.songIds);
+      return;
+    case "process":
+      await processSong(action.song.id);
+      return;
+    case "wait":
+      automation.lastNote = action.reason;
+      return;
+    default:
+      if (automation.current === null) automation.lastNote = null;
+  }
+}
+
+function skip(songId: string, reason: string): void {
+  automation.skipped[songId] = reason;
+  automation.lastNote = `skipped: ${reason}`;
+  automation.current = null;
+}
+
+async function processSong(songId: string): Promise<void> {
+  const now = Date.now();
+  if (automation.current?.songId !== songId) {
+    automation.current = { songId, since: now, step: "opening" };
+    openSong(songId);
+    return;
+  }
+  const cur = automation.current;
+  if (now - cur.since > PROCESS_TIMEOUT_MS) {
+    skip(songId, `timed out while ${cur.step}`);
+    return;
+  }
+  const profile = getRawProfile();
+  if (inspection.songId !== songId || !profile || mapping.doc === null) {
+    cur.step = "loading";
+    return;
+  }
+  const doc = $state.snapshot(mapping.doc) as MappingDoc;
+  if (docIsEmpty(doc)) {
+    const proposal = autoMap(profile, doc, { intensity: "feature" });
+    if (proposalIsEmpty(proposal)) {
+      skip(songId, "nothing to auto-map (no usable favorites)");
+      return;
+    }
+    applyAutoMapProposal(proposal);
+    cur.step = "mapping";
+    cur.since = now;
+    return;
+  }
+  if (Object.keys(doc.patch).length === 0) {
+    const patch = roundRobinPatch(doc, $state.snapshot(hardware.rig.hubs));
+    if (patch === null) {
+      skip(songId, "no rig lights or no enabled programs to patch");
+      return;
+    }
+    for (const [lightId, programId] of Object.entries(patch))
+      setPatch(lightId, programId);
+    cur.step = "patching";
+    cur.since = now;
+    return;
+  }
+  if (
+    now - cur.since < SETTLE_MS ||
+    tracksPending() > 0 ||
+    matricesPending() > 0
+  ) {
+    cur.step = "loading tracks";
+    return;
+  }
+  if (publishing.songId === songId) {
+    if (publishing.stage === "failed") {
+      skip(songId, `publish failed: ${publishing.error}`);
+      return;
+    }
+    if (publishing.stage === "done") {
+      automation.lastNote = `published ${songById(songId)?.title ?? songId}`;
+      automation.current = null;
+      return;
+    }
+    cur.step = "publishing";
+    return;
+  }
+  cur.step = "publishing";
+  flushMappingSave();
+  await publish();
+}
+
 // Session: re-check whenever the configured endpoint changes, and every
 // RETRY_MS while one is configured. Hosted by the shell route.
 let stopEffects: (() => void) | undefined;
 let timer: ReturnType<typeof setInterval> | null = null;
+let autoTimer: ReturnType<typeof setInterval> | null = null;
 
 export function startCompanionSession(): void {
   stopCompanionSession();
@@ -294,6 +435,7 @@ export function startCompanionSession(): void {
   timer = setInterval(() => {
     if (endpoint() !== null) void checkConnection();
   }, RETRY_MS);
+  autoTimer = setInterval(() => void automationTick(), AUTOMATION_TICK_MS);
 }
 
 export function stopCompanionSession(): void {
@@ -301,5 +443,7 @@ export function stopCompanionSession(): void {
   stopEffects = undefined;
   if (timer !== null) clearInterval(timer);
   timer = null;
+  if (autoTimer !== null) clearInterval(autoTimer);
+  autoTimer = null;
   checkGeneration++;
 }

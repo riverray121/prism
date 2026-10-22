@@ -9,6 +9,10 @@ vi.mock("$lib/companion/client", async (importOriginal) => ({
 }));
 vi.mock("$lib/ipc", () => ({
   importRequest: vi.fn(() => Promise.resolve()),
+  queueAnalysis: vi.fn(() => Promise.resolve()),
+  getProfile: vi.fn(() => Promise.resolve()),
+  getMapping: vi.fn(() => Promise.resolve()),
+  updateMapping: vi.fn(() => Promise.resolve()),
   pullShow: vi.fn(() => Promise.resolve()),
   publishShow: vi.fn(() => Promise.resolve()),
   writeShowFrames: vi.fn(() => Promise.resolve()),

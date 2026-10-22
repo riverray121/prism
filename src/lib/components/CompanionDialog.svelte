@@ -1,7 +1,12 @@
 <script lang="ts">
   import DialogShell from "$lib/components/DialogShell.svelte";
   import { updateSettings } from "$lib/ipc";
-  import { checkConnection, companion } from "$lib/state/companion.svelte";
+  import {
+    automation,
+    checkConnection,
+    companion,
+  } from "$lib/state/companion.svelte";
+  import { songById } from "$lib/state/library.svelte";
   import { settings } from "$lib/state/settings.svelte";
 
   // Companion connection settings: one server URL and bearer token, persisted
@@ -76,6 +81,30 @@
         {/if}
       </span>
     </div>
+    {#if settings.companionUrl !== ""}
+      <label class="flex items-start gap-2 text-xs text-ink-muted">
+        <input
+          type="checkbox"
+          checked={settings.companionAuto}
+          onchange={(e) =>
+            void updateSettings({
+              companion_auto: (e.currentTarget as HTMLInputElement).checked,
+            })}
+          class="mt-0.5"
+        />
+        <span>
+          Automatic: import open requests, analyze, auto-map onto every rig
+          light, and publish, without asking. Opens songs while it works.
+          {#if settings.companionAuto}
+            <span class="block text-ink-faint">
+              {automation.current
+                ? `${songById(automation.current.songId)?.title ?? automation.current.songId}: ${automation.current.step}`
+                : (automation.lastNote ?? "idle")}
+            </span>
+          {/if}
+        </span>
+      </label>
+    {/if}
     <div class="flex justify-end gap-2 pt-1">
       {#if settings.companionUrl !== ""}
         <button

@@ -57,6 +57,7 @@ def test_settings_event_round_trips():
         drum_subsep=True,
         companion_url="http://192.168.8.2:8760",
         companion_token="tok",
+        companion_auto=False,
     )
     dumped = json.loads(ev.model_dump_json())
     assert dumped["type"] == "settings"

@@ -75,6 +75,7 @@ def emit_settings() -> None:
         engines = settings.get_engines(con)
         drum_subsep = settings.get_drum_subsep(con)
         companion_url, companion_token = settings.get_companion(con)
+        companion_auto = settings.get_companion_auto(con)
     ipc.emit(
         SettingsEvent(
             engines=engines,
@@ -83,6 +84,7 @@ def emit_settings() -> None:
             drum_subsep=drum_subsep,
             companion_url=companion_url,
             companion_token=companion_token,
+            companion_auto=companion_auto,
         )
     )
 
@@ -141,6 +143,7 @@ def publish_show(cmd: CompanionPublishCommand) -> None:
     try:
         show = companion.publish(cmd.song_id, cmd.manifest)
         ipc.emit(CompanionPublishResultEvent(song_id=cmd.song_id, ok=True, show=show))
+        emit_snapshot()
     except Exception as exc:
         log.exception("publish failed: %s", cmd.song_id)
         ipc.emit(
@@ -285,6 +288,8 @@ def handle(msg: dict) -> None:
                 settings.set_drum_subsep(con, cmd.drum_subsep)
             if cmd.companion_url is not None or cmd.companion_token is not None:
                 settings.set_companion(con, cmd.companion_url, cmd.companion_token)
+            if cmd.companion_auto is not None:
+                settings.set_companion_auto(con, cmd.companion_auto)
         emit_settings()
     else:
         log.warning("unknown command: %r", msg)

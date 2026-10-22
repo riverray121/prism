@@ -128,6 +128,8 @@ class UpdateSettingsCommand(BaseModel):
     # Companion server base URL (empty disconnects) and bearer token.
     companion_url: str | None = None
     companion_token: str | None = None
+    # Companion automation: import, analyze, auto-map, publish unattended.
+    companion_auto: bool | None = None
 
 
 # Sidecar -> frontend events.
@@ -231,3 +233,4 @@ class SettingsEvent(BaseModel):
     # Companion server base URL and bearer token; empty when no companion is set.
     companion_url: str
     companion_token: str
+    companion_auto: bool

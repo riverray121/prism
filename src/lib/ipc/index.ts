@@ -144,6 +144,7 @@ export function updateSettings(update: {
   drum_subsep?: boolean;
   companion_url?: string;
   companion_token?: string;
+  companion_auto?: boolean;
 }): Promise<void> {
   return sendCommand({ type: "settings.update", ...update });
 }

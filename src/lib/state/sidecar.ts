@@ -63,6 +63,7 @@ function applySidecarEvent(event: SidecarEvent): void {
     settings.drumSubsep = event.drum_subsep;
     settings.companionUrl = event.companion_url;
     settings.companionToken = event.companion_token;
+    settings.companionAuto = event.companion_auto;
     settings.loaded = true;
   }
 }

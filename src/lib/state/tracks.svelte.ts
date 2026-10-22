@@ -40,6 +40,11 @@ export function requestTrack(
     .finally(() => target.delete(rel));
 }
 
+// Sidecar loads still in flight for the open song.
+export function tracksPending(): number {
+  return loading.size;
+}
+
 // Song switch: loaded data leaves with the old profile object; only the
 // in-flight bookkeeping needs replacing (a late arrival hydrates a dead
 // envelope, harmlessly).

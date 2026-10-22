@@ -52,3 +52,9 @@ def test_set_companion_none_leaves_field_unchanged(con):
     assert settings.get_companion(con) == ("http://a:1", "t2")
     settings.set_companion(con, "", None)
     assert settings.get_companion(con) == ("", "t2")
+
+
+def test_companion_auto_defaults_off_and_round_trips(con):
+    assert settings.get_companion_auto(con) is False
+    settings.set_companion_auto(con, True)
+    assert settings.get_companion_auto(con) is True

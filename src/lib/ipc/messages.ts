@@ -258,6 +258,7 @@ export const SettingsEventSchema = z.object({
   // Companion server base URL and bearer token; empty strings when unset.
   companion_url: z.string(),
   companion_token: z.string(),
+  companion_auto: z.boolean().default(false),
 });
 export type EngineInfo = z.infer<
   typeof SettingsEventSchema

@@ -12,6 +12,7 @@ export const settings = $state<{
   drumSubsep: boolean;
   companionUrl: string;
   companionToken: string;
+  companionAuto: boolean;
   loaded: boolean;
 }>({
   engines: [],
@@ -20,5 +21,6 @@ export const settings = $state<{
   drumSubsep: false,
   companionUrl: "",
   companionToken: "",
+  companionAuto: false,
   loaded: false,
 });
