@@ -20,7 +20,7 @@ Built with Tauri 2 (Rust shell), Svelte 5, and a Python analysis sidecar.
 
 ### Analysis
 
-![Analysis tab](docs/images/02-analysis.png)
+![Per-stem analysis graphs](docs/images/02-analysis.png)
 
 - **Stem separation** through `audio-separator`, with selectable engines: Demucs `htdemucs_ft` (vocals/drums/bass/other), Demucs `htdemucs_6s` (adds guitar/piano), BS-RoFormer, Mel-Band RoFormer. Optional drum sub-separation.
 - **Mix-level features**: BPM, beats, downbeats, rhythmic density, spectral centroid/flux/flatness/rolloff, six band energies, RMS, peak, LUFS, dynamic range, key, chords, chroma, tuning, MFCC, zero-crossing rate, stereo width, sections, novelty, PANNs sound tags.
