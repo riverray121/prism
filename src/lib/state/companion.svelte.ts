@@ -184,8 +184,13 @@ export function applyPullResult(
 }
 
 // Start the import for a request and mark it analyzing. The request leaves
-// the open list at once; the sidecar's import events carry progress.
-export async function importRequest(request: CompanionRequest): Promise<void> {
+// the open list at once; the sidecar's import events carry progress. With
+// `retryOnFailure`, a failed download puts the request back to open so the
+// next automation tick tries again; otherwise a failure rejects it.
+export async function importRequest(
+  request: CompanionRequest,
+  retryOnFailure = false,
+): Promise<void> {
   const target = endpoint();
   if (target === null) return;
   companion.requests = companion.requests.filter((r) => r.id !== request.id);
@@ -195,6 +200,34 @@ export async function importRequest(request: CompanionRequest): Promise<void> {
   } catch (e) {
     console.warn("companion request status update failed", request.id, e);
   }
+  watchImport(request, retryOnFailure);
+}
+
+// Resolve an import's outcome from the library's import events: the key
+// leaves pendingImports when the sidecar finishes, and lastImportError names
+// it on failure.
+function watchImport(request: CompanionRequest, retry: boolean): void {
+  const key = `request:${request.id}`;
+  const deadline = Date.now() + 10 * 60_000;
+  const poll = async () => {
+    if (library.pendingImports.includes(key) && Date.now() < deadline) {
+      setTimeout(() => void poll(), 2_000);
+      return;
+    }
+    const failed = library.lastImportError?.path === key;
+    if (!failed) return;
+    const target = endpoint();
+    if (target === null) return;
+    const status = retry ? "open" : "rejected";
+    automation.lastNote = `${retry ? "retrying" : "rejected"}: ${request.title} (${library.lastImportError?.error ?? "import failed"})`;
+    try {
+      await patchRequest(target, request.id, { status });
+    } catch (e) {
+      console.warn("companion request status update failed", request.id, e);
+    }
+    if (retry) await refreshRequests();
+  };
+  setTimeout(() => void poll(), 3_000);
 }
 
 export async function rejectRequest(request: CompanionRequest): Promise<void> {
@@ -303,6 +336,12 @@ export const automation = $state<{
   lastNote: string | null;
 }>({ current: null, skipped: {}, lastNote: null });
 
+// Import attempts per request id this session. A YouTube download can fail
+// once and succeed on retry; a second failure rejects the request so it
+// cannot sit in `analyzing` forever.
+const importAttempts = new Map<string, number>();
+const IMPORT_ATTEMPTS = 2;
+
 const AUTOMATION_TICK_MS = 10_000;
 // Opening a song, loading its tracks, and rendering must finish within this.
 const PROCESS_TIMEOUT_MS = 180_000;
@@ -323,10 +362,13 @@ export async function automationTick(): Promise<void> {
     skipped: new Set(Object.keys(automation.skipped)),
   });
   switch (action.kind) {
-    case "import":
+    case "import": {
+      const attempts = (importAttempts.get(action.request.id) ?? 0) + 1;
+      importAttempts.set(action.request.id, attempts);
       automation.lastNote = `importing ${action.request.artist} - ${action.request.title}`;
-      await importRequest(action.request);
+      await importRequest(action.request, attempts < IMPORT_ATTEMPTS);
       return;
+    }
     case "queue":
       automation.lastNote = `queuing analysis for ${action.songIds.length} song(s)`;
       await queueAnalysis(action.songIds);
