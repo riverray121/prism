@@ -85,3 +85,9 @@ def test_other_errors_do_not_retry(monkeypatch, tmp_path):
     with pytest.raises(Exception, match="Video unavailable"):
         youtube.download("https://example.com/watch?v=x", dest_dir=tmp_path)
     assert len(attempts) == 1
+
+
+def test_search_url_changes_source_on_the_third_attempt():
+    assert youtube.search_url("Joji", "Dior", 1) == ("ytsearch1:Joji Dior", 1)
+    assert youtube.search_url("Joji", "Dior", 2) == ("ytsearch1:Joji Dior", 1)
+    assert youtube.search_url("Joji", "Dior", 3) == ("ytsearch2:Joji Dior audio", 2)

@@ -100,3 +100,4 @@ def test_companion_import_command_defaults_external():
         }
     )
     assert cmd.external == {}
+    assert cmd.attempt == 1

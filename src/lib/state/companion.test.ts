@@ -161,7 +161,7 @@ describe("requests", () => {
     patchRequest.mockResolvedValueOnce({ ...open, status: "analyzing" });
     await importRequest(open);
     expect(companion.requests).toEqual([]);
-    expect(ipc.importRequest).toHaveBeenCalledWith(open);
+    expect(ipc.importRequest).toHaveBeenCalledWith(open, 1);
     expect(patchRequest).toHaveBeenCalledWith(
       { url: "http://pi:8760", token: "tok" },
       "r1",

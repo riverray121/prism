@@ -190,11 +190,12 @@ export function applyPullResult(
 export async function importRequest(
   request: CompanionRequest,
   retryOnFailure = false,
+  attempt = 1,
 ): Promise<void> {
   const target = endpoint();
   if (target === null) return;
   companion.requests = companion.requests.filter((r) => r.id !== request.id);
-  await sendImportRequest(request);
+  await sendImportRequest(request, attempt);
   try {
     await patchRequest(target, request.id, { status: "analyzing" });
   } catch (e) {
@@ -337,10 +338,11 @@ export const automation = $state<{
 }>({ current: null, skipped: {}, lastNote: null });
 
 // Import attempts per request id this session. A YouTube download can fail
-// once and succeed on retry; a second failure rejects the request so it
+// once and succeed on retry; the third try takes a different video (the
+// sidecar's search plan); a failure after that rejects the request so it
 // cannot sit in `analyzing` forever.
 const importAttempts = new Map<string, number>();
-const IMPORT_ATTEMPTS = 2;
+const IMPORT_ATTEMPTS = 3;
 
 const AUTOMATION_TICK_MS = 10_000;
 // Opening a song, loading its tracks, and rendering must finish within this.
@@ -366,7 +368,7 @@ export async function automationTick(): Promise<void> {
       const attempts = (importAttempts.get(action.request.id) ?? 0) + 1;
       importAttempts.set(action.request.id, attempts);
       automation.lastNote = `importing ${action.request.artist} - ${action.request.title}`;
-      await importRequest(action.request, attempts < IMPORT_ATTEMPTS);
+      await importRequest(action.request, attempts < IMPORT_ATTEMPTS, attempts);
       return;
     }
     case "queue":

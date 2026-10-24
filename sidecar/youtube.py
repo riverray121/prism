@@ -31,12 +31,23 @@ def _run(url: str, options: dict) -> None:
         ydl.extract_info(url, download=True)
 
 
-def download(url: str, dest_dir: Path | None = None) -> Path:
+def search_url(artist: str, title: str, attempt: int) -> tuple[str, int]:
+    """The yt-dlp search target and the result rank to take for an import
+    attempt: the first result of the plain query twice (a failed download is
+    often transient), then the second result of the query widened with
+    "audio", a different video for a song whose top hit has no usable audio."""
+    if attempt <= 2:
+        return f"ytsearch1:{artist} {title}", 1
+    return f"ytsearch2:{artist} {title} audio", 2
+
+
+def download(url: str, dest_dir: Path | None = None, *, rank: int = 1) -> Path:
     """Download ``url``'s audio into a FLAC file and return its path.
 
     The filename is ``{uploader} - {title}.flac`` so the existing
-    ``Artist - Title`` metadata heuristic applies on import. Raises RuntimeError
-    with an actionable message when ffmpeg is missing; yt-dlp errors propagate.
+    ``Artist - Title`` metadata heuristic applies on import. For a search URL,
+    ``rank`` picks which result to download. Raises RuntimeError with an
+    actionable message when ffmpeg is missing; yt-dlp errors propagate.
     """
     if shutil.which("ffmpeg") is None:
         raise RuntimeError(
@@ -48,6 +59,7 @@ def download(url: str, dest_dir: Path | None = None) -> Path:
         "outtmpl": str(out_dir / "%(uploader)s - %(title)s.%(ext)s"),
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "flac"}],
         "quiet": True,
+        "playlist_items": str(rank),
         "noprogress": True,
         "logger": log,
     }

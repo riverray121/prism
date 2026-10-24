@@ -124,7 +124,8 @@ def import_request(cmd: CompanionImportCommand) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="prism-yt-"))
     ipc.emit(ImportStartedEvent(path=key))
     try:
-        audio = youtube.download(f"ytsearch1:{cmd.artist} {cmd.title}", dest_dir=tmp)
+        url, rank = youtube.search_url(cmd.artist, cmd.title, cmd.attempt)
+        audio = youtube.download(url, dest_dir=tmp, rank=rank)
         song_id = import_one(str(audio))
         with library.connect() as con:
             library.update_metadata(con, song_id, cmd.title, cmd.artist)

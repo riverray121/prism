@@ -21,18 +21,22 @@ export function importYoutube(url: string): Promise<void> {
 // Import a companion request: YouTube search for its artist and title, then
 // the normal import linked to the request. Progress arrives as import events
 // keyed by requestImportKey(request_id).
-export function importRequest(request: {
-  id: string;
-  title: string;
-  artist: string;
-  external: Record<string, string>;
-}): Promise<void> {
+export function importRequest(
+  request: {
+    id: string;
+    title: string;
+    artist: string;
+    external: Record<string, string>;
+  },
+  attempt = 1,
+): Promise<void> {
   return sendCommand({
     type: "companion.import",
     request_id: request.id,
     title: request.title,
     artist: request.artist,
     external: request.external,
+    attempt,
   });
 }
 

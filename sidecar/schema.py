@@ -58,6 +58,8 @@ class CompanionImportCommand(BaseModel):
     title: str
     artist: str
     external: dict[str, str] = {}
+    # Which try this is for the request; later tries use another source.
+    attempt: int = 1
 
 
 class DeleteSongCommand(BaseModel):

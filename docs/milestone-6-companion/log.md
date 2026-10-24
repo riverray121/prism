@@ -12,7 +12,7 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 - Automatic mode: `companion_auto` setting, `companion/automation.ts` (`nextAction`, `roundRobinPatch`, pure), `automationTick` every 10 s in companion state (import, queue, open + auto-map + patch + wait for tracks + publish; skip with reason on failure or 180 s timeout), checkbox and status line in the dialog, sidecar emits a songs snapshot after publish so `published_at` lands.
 
-- Automatic mode retries a failed request import once (request back to `open`) and rejects it on the second failure, so a YouTube miss never leaves a request in `analyzing`.
+- Automatic mode retries a failed request import twice (request back to `open`): the second try repeats the search, the third takes the second result of the query widened with "audio" (`youtube.search_url`, `attempt` on `companion.import`); a failure after that rejects the request, so a YouTube miss never leaves a request in `analyzing`.
 
 ## Todo
 
