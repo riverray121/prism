@@ -31,14 +31,22 @@ def _run(url: str, options: dict) -> None:
         ydl.extract_info(url, download=True)
 
 
+def primary_artist(artist: str) -> str:
+    """The first credited artist. Feature credits joined with commas ("jigitz,
+    Lay Bankz") make YouTube's search return nothing; the lead name alone
+    finds the song."""
+    return artist.split(",")[0].strip() or artist.strip()
+
+
 def search_url(artist: str, title: str, attempt: int) -> tuple[str, int]:
     """The yt-dlp search target and the result rank to take for an import
-    attempt: the first result of the plain query twice (a failed download is
-    often transient), then the second result of the query widened with
-    "audio", a different video for a song whose top hit has no usable audio."""
+    attempt: the first result of "<artist> <title>" twice (a failed download
+    is often transient), then the second result of "<title> <artist>", a
+    different video for a song whose top hit has no usable audio."""
+    lead = primary_artist(artist)
     if attempt <= 2:
-        return f"ytsearch1:{artist} {title}", 1
-    return f"ytsearch2:{artist} {title} audio", 2
+        return f"ytsearch1:{lead} {title}", 1
+    return f"ytsearch2:{title} {lead}", 2
 
 
 def download(url: str, dest_dir: Path | None = None, *, rank: int = 1) -> Path:

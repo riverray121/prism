@@ -87,7 +87,12 @@ def test_other_errors_do_not_retry(monkeypatch, tmp_path):
     assert len(attempts) == 1
 
 
-def test_search_url_changes_source_on_the_third_attempt():
+def test_search_url_uses_the_lead_artist_and_changes_source_on_the_third_attempt():
     assert youtube.search_url("Joji", "Dior", 1) == ("ytsearch1:Joji Dior", 1)
     assert youtube.search_url("Joji", "Dior", 2) == ("ytsearch1:Joji Dior", 1)
-    assert youtube.search_url("Joji", "Dior", 3) == ("ytsearch2:Joji Dior audio", 2)
+    assert youtube.search_url("Joji", "Dior", 3) == ("ytsearch2:Dior Joji", 2)
+    assert youtube.search_url("jigitz, Lay Bankz", "dollaz n dollaz", 1) == (
+        "ytsearch1:jigitz dollaz n dollaz",
+        1,
+    )
+    assert youtube.primary_artist(", x") == ", x"
