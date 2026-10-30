@@ -6,9 +6,9 @@
 
 Prism turns a song into a light show. It splits the song into its instruments with machine-learning models, measures how each one changes over time, and lets you connect those measurements to LED lights that play in sync with the music.
 
-[![Prism light show playing Ne Plus Ultra (click to play with sound)](docs/images/demo-poster.jpg)](docs/images/demo.mp4)
+https://github.com/user-attachments/assets/327e67be-e0ba-4e83-8c1e-54ade9175897
 
-_A Prism show for "Ne Plus Ultra" on TV and shelf LED strips. Click to play with sound._
+_A Prism show for "Ne Plus Ultra" on TV and shelf LED strips. Unmute for sound._
 
 ![Prism library and analysis view](docs/images/01-library.png)
 
