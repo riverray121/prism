@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Merged into the bundle's Info.plist by Tauri. macOS shows this text in
+       the Local Network permission prompt, which it raises on the app's first
+       request to a device on the network (hub discovery at launch). -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Prism finds your WLED light hubs and streams light shows to them over your local network.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_wled._tcp</string>
+  </array>
+</dict>
+</plist>

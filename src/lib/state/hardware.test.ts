@@ -25,7 +25,9 @@ import {
   applyHubSeen,
   applyRigEvent,
   connectHub,
+  dismissNetworkBlocked,
   forgetHub,
+  handleFound,
   hardware,
   markHubOffline,
   probe,
@@ -67,6 +69,7 @@ beforeEach(() => {
   applyRigEvent({ hubs: [] });
   hardware.discovered = [];
   hardware.online = {};
+  dismissNetworkBlocked();
   updateRig.mockClear();
 });
 
@@ -215,6 +218,51 @@ describe("reachability", () => {
     await probeReachability();
     expect(hardware.discovered).toHaveLength(0);
     expect(hardware.online["a842e39b1c60"]).toBe(false);
+  });
+});
+
+describe("local network blocked", () => {
+  it("announced hubs that never answer over HTTP flag the network as blocked", async () => {
+    fetchHub.mockRejectedValueOnce(new Error("error sending request"));
+    await handleFound("192.168.0.84");
+    expect(hardware.networkBlocked).toBe(false);
+    fetchHub.mockRejectedValueOnce(new Error("error sending request"));
+    await handleFound("192.168.0.84");
+    expect(hardware.networkBlocked).toBe(true);
+  });
+
+  it("any successful hub read clears it", async () => {
+    fetchHub.mockRejectedValue(new Error("error sending request"));
+    await handleFound("192.168.0.84");
+    await handleFound("192.168.0.84");
+    expect(hardware.networkBlocked).toBe(true);
+    fetchHub.mockReset();
+    fetchHub.mockResolvedValueOnce(benchHub());
+    await handleFound("192.168.0.84");
+    expect(hardware.networkBlocked).toBe(false);
+  });
+
+  it("a success between failures resets the count", async () => {
+    fetchHub.mockRejectedValueOnce(new Error("timeout"));
+    await handleFound("192.168.0.84");
+    fetchHub.mockResolvedValueOnce(benchHub());
+    await handleFound("192.168.0.84");
+    fetchHub.mockRejectedValueOnce(new Error("timeout"));
+    await handleFound("192.168.0.84");
+    expect(hardware.networkBlocked).toBe(false);
+  });
+
+  it("dismissing hides it until it is detected again", async () => {
+    fetchHub.mockRejectedValue(new Error("error sending request"));
+    await handleFound("192.168.0.84");
+    await handleFound("192.168.0.84");
+    dismissNetworkBlocked();
+    expect(hardware.networkBlocked).toBe(false);
+    await handleFound("192.168.0.84");
+    expect(hardware.networkBlocked).toBe(false);
+    await handleFound("192.168.0.84");
+    expect(hardware.networkBlocked).toBe(true);
+    fetchHub.mockReset();
   });
 });
 

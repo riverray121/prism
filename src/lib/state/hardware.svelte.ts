@@ -35,7 +35,23 @@ export const hardware = $state<{
   discovered: RigHub[];
   // Hub MAC → currently reachable. Absent = never seen this session.
   online: Record<string, boolean>;
-}>({ rig: emptyRig(), rigLoaded: false, discovered: [], online: {} });
+  // True while hubs announce themselves over mDNS but every HTTP request to
+  // them fails: the signature of macOS Local Network privacy blocking the
+  // app. macOS has no API to read that permission, so this is inferred.
+  networkBlocked: boolean;
+}>({
+  rig: emptyRig(),
+  rigLoaded: false,
+  discovered: [],
+  online: {},
+  networkBlocked: false,
+});
+
+// Consecutive mDNS-announced addresses whose HTTP fetch failed, with no
+// success in between. One failure can be a hub rebooting; this many, with
+// nothing reachable, is the app being blocked.
+const BLOCKED_AFTER_FAILURES = 2;
+let announcedButUnreachable = 0;
 
 // IPs with a config fetch in flight; mDNS rebroadcasts arrive in bursts and
 // each found event would otherwise start a duplicate probe, and a
@@ -81,6 +97,9 @@ export function applyHubSeen(hub: RigHub): void {
     ];
   }
   hardware.online[hub.mac] = true;
+  // Any successful read off a device proves the network is open to the app.
+  announcedButUnreachable = 0;
+  hardware.networkBlocked = false;
 }
 
 export function markHubOffline(mac: string): void {
@@ -315,8 +334,10 @@ export async function probeAddress(ip: string): Promise<void> {
 
 // A resolved hub announces an IP; its identity (MAC) only comes from asking
 // the device. Fetch its config, then merge. Fetch failures are logged and
-// dropped: the reachability pass decides online status.
-async function handleFound(ip: string): Promise<void> {
+// dropped: the reachability pass decides online status. A hub that just
+// announced itself is alive, so its fetch failing counts toward
+// networkBlocked.
+export async function handleFound(ip: string): Promise<void> {
   if (probing.has(ip)) return;
   probing.add(ip);
   const gen = generation;
@@ -328,9 +349,20 @@ async function handleFound(ip: string): Promise<void> {
     applyHubSeen(hub);
   } catch (e) {
     console.warn("hub config fetch failed", ip, e);
+    if (gen === generation) {
+      announcedButUnreachable += 1;
+      if (announcedButUnreachable >= BLOCKED_AFTER_FAILURES) {
+        hardware.networkBlocked = true;
+      }
+    }
   } finally {
     probing.delete(ip);
   }
+}
+
+export function dismissNetworkBlocked(): void {
+  hardware.networkBlocked = false;
+  announcedButUnreachable = 0;
 }
 
 // ── Reachability ────────────────────────────────────────────────────────────

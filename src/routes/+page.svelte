@@ -17,10 +17,18 @@
     startCompanionSession,
     stopCompanionSession,
   } from "$lib/state/companion.svelte";
+  import { openUrl } from "@tauri-apps/plugin-opener";
+
   import {
+    dismissNetworkBlocked,
+    hardware,
     startHardwareSession,
     stopHardwareSession,
   } from "$lib/state/hardware.svelte";
+
+  // System Settings → Privacy & Security → Local Network.
+  const LOCAL_NETWORK_SETTINGS =
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork";
   import { startSidecarSession, stopSidecarSession } from "$lib/state/sidecar";
   import { startStreamLoop } from "$lib/state/stream.svelte";
   import { workspace } from "$lib/state/workspace.svelte";
@@ -63,6 +71,31 @@
         </button>
         <button
           onclick={dismissSidecarDown}
+          title="Dismiss"
+          class="ml-auto rounded px-2 py-0.5 text-ink-faint hover:text-ink"
+        >
+          ×
+        </button>
+      </div>
+    {/if}
+    {#if hardware.networkBlocked}
+      <div
+        class="flex shrink-0 items-center gap-3 border-b border-edge bg-danger/15 px-3 py-2 text-sm text-danger"
+      >
+        <span>
+          Prism can see your light hubs but can't reach them. macOS is blocking
+          local network access: turn Prism on in Privacy &amp; Security → Local
+          Network, then restart Prism.
+        </span>
+        <button
+          onclick={() => void openUrl(LOCAL_NETWORK_SETTINGS)}
+          title="Open Local Network settings"
+          class="rounded border border-danger px-2 py-0.5 hover:bg-danger hover:text-surface"
+        >
+          Open Settings
+        </button>
+        <button
+          onclick={dismissNetworkBlocked}
           title="Dismiss"
           class="ml-auto rounded px-2 py-0.5 text-ink-faint hover:text-ink"
         >
