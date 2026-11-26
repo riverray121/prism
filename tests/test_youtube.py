@@ -77,6 +77,21 @@ def test_bot_check_retries_with_browser_cookies(monkeypatch, tmp_path):
     assert attempts[1]["cookiesfrombrowser"] == ("chrome",)
 
 
+def test_age_restriction_does_not_borrow_browser_cookies(monkeypatch, tmp_path):
+    monkeypatch.setattr(youtube.shutil, "which", lambda name: "/usr/bin/ffmpeg")
+    import yt_dlp
+
+    attempts = []
+    monkeypatch.setattr(
+        yt_dlp,
+        "YoutubeDL",
+        _ydl_factory(attempts, fail_first_with="Sign in to confirm your age"),
+    )
+    with pytest.raises(Exception, match="confirm your age"):
+        youtube.download("https://example.com/watch?v=x", dest_dir=tmp_path)
+    assert len(attempts) == 1
+
+
 def test_other_errors_do_not_retry(monkeypatch, tmp_path):
     monkeypatch.setattr(youtube.shutil, "which", lambda name: "/usr/bin/ffmpeg")
     import yt_dlp

@@ -28,7 +28,10 @@ log = logging.getLogger("sidecar.youtube")
 
 # YouTube's anti-bot challenge message; anonymous downloads sometimes hit it.
 # A retry authenticated with the local browser's cookies usually clears it.
-_BOT_CHECK = "Sign in to confirm"
+# Only this check: "Sign in to confirm your age" (age-restricted videos) is
+# not fixed by cookies of a browser that is not signed in, and every retry
+# raises the Keychain prompt.
+_BOT_CHECK = "not a bot"
 
 # Browser whose cookies the retry borrows. Reading its cookie store may make
 # macOS prompt once for Keychain access ("Chrome Safe Storage") — allow it.
@@ -45,15 +48,10 @@ def _run(url: str, options: dict, download: bool = True) -> dict:
 
 
 def _info(url: str, options: dict) -> dict:
-    """Metadata without downloading, with the same bot-check cookie retry."""
-    try:
-        return _run(url, options, download=False)
-    except Exception as exc:
-        if _BOT_CHECK not in str(exc):
-            raise
-        return _run(
-            url, {**options, "cookiesfrombrowser": (_COOKIE_BROWSER,)}, download=False
-        )
+    """Metadata without downloading. Never borrows browser cookies: reading
+    them raises a macOS Keychain prompt on the Mac's screen, and a search
+    can skip a result it cannot read."""
+    return _run(url, options, download=False)
 
 
 def primary_artist(artist: str) -> str:
