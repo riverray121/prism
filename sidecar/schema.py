@@ -58,6 +58,8 @@ class CompanionImportCommand(BaseModel):
     title: str
     artist: str
     external: dict[str, str] = {}
+    # The source track's length; picks the upload that is that recording.
+    duration_s: float | None = None
     # Which try this is for the request; later tries use another source.
     attempt: int = 1
 

@@ -117,15 +117,17 @@ def request_import_key(request_id: str) -> str:
 
 
 def import_request(cmd: CompanionImportCommand) -> None:
-    """Search YouTube for the request's artist and title, import the first
-    result under the request's own metadata, and link the song to the request.
-    Worker thread, like import_youtube."""
+    """Find the upload that is the request's track (youtube.find_source),
+    bring it to the shared loudness, import it under the request's own
+    metadata, and link the song to the request. Worker thread, like
+    import_youtube."""
     key = request_import_key(cmd.request_id)
     tmp = Path(tempfile.mkdtemp(prefix="prism-yt-"))
     ipc.emit(ImportStartedEvent(path=key))
     try:
-        url, rank = youtube.search_url(cmd.artist, cmd.title, cmd.attempt)
-        audio = youtube.download(url, dest_dir=tmp, rank=rank)
+        url = youtube.find_source(cmd.artist, cmd.title, cmd.duration_s, cmd.attempt)
+        audio = youtube.download(url, dest_dir=tmp)
+        youtube.normalize_loudness(audio)
         song_id = import_one(str(audio))
         with library.connect() as con:
             library.update_metadata(con, song_id, cmd.title, cmd.artist)

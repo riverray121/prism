@@ -12,11 +12,13 @@ The contract between Prism and a companion server: a service on the network that
 ## Objects
 
 ```
-Request     {id, title, artist, external: {spotify_uri?}, requested_at,
+Request     {id, title, artist, external: {spotify_uri?}, duration_s?, requested_at,
              status: "open" | "analyzing" | "published" | "rejected", show_id?}
 ShowSummary {id, title, artist, duration_s, frame_rate_hz, light_count,
              updated_at, request_id?}
 ```
+
+`duration_s` is the source track's length in seconds, when the producer knows it. Prism imports only an upload of that length (within 3 s or 3%), so a live recording or a music-video edit of the same title is skipped; without it, Prism matches on title and version tags alone.
 
 `external` carries ids from the system that produced the request. Prism stores them with the song and writes them back into the manifest so the companion can match a show to its source.
 
@@ -26,7 +28,7 @@ ShowSummary {id, title, artist, duration_s, frame_rate_hz, light_count,
 | ------ | ----------------------- | -------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------- |
 | GET    | `/v1/info`              |                                              | `{name, version, api: 1}` | Connection check. `api` is this document's version.                                            |
 | GET    | `/v1/requests`          |                                              | `{requests: [Request]}`   | All requests, newest first, every status.                                                      |
-| POST   | `/v1/requests`          | `{title, artist, external?}`                 | Request                   | Create a request. Companions create requests from their own sources; Prism does not call this. |
+| POST   | `/v1/requests`          | `{title, artist, external?, duration_s?}`    | Request                   | Create a request. Companions create requests from their own sources; Prism does not call this. |
 | PATCH  | `/v1/requests/{id}`     | `{status, show_id?}`                         | Request                   | Prism sets `analyzing` on import, `published` with `show_id` on publish, `rejected` on reject. |
 | GET    | `/v1/shows`             |                                              | `{shows: [ShowSummary]}`  | Published shows.                                                                               |
 | PUT    | `/v1/shows/{id}`        | show bundle, `Content-Type: application/zip` | ShowSummary               | Create or replace. Replacing keeps the id, so a republish overwrites in place.                 |

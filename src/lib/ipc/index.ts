@@ -27,6 +27,7 @@ export function importRequest(
     title: string;
     artist: string;
     external: Record<string, string>;
+    duration_s?: number | null;
   },
   attempt = 1,
 ): Promise<void> {
@@ -36,6 +37,7 @@ export function importRequest(
     title: request.title,
     artist: request.artist,
     external: request.external,
+    duration_s: request.duration_s ?? null,
     attempt,
   });
 }

@@ -24,6 +24,7 @@ export const RequestSchema = z.object({
   title: z.string(),
   artist: z.string(),
   external: z.record(z.string(), z.string()).default({}),
+  duration_s: z.number().nullable().optional(),
   requested_at: z.string(),
   status: RequestStatusSchema,
   show_id: z.string().nullable().optional(),

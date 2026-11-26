@@ -18,6 +18,8 @@ Restore on stop: before the first frame of a play run Prism reads each target hu
 
 Automatic mode: a setting in the Companion dialog, off by default. When on and connected, Prism imports every open request, queues analysis for the imported songs, and for each analyzed song it opens the song, auto-maps from its favorites when the mapping doc is empty, patches every rig light round-robin over the enabled programs when the patch is empty, waits for the song's tracks to load, and publishes. A song that cannot be processed is skipped with a reason shown in the dialog and not retried in the session. This is what runs on an always-on machine; a laptop leaves it off.
 
+A request names a track, not a video, so the import picks its source (`youtube.find_source`): candidates from YouTube Music's song results and a regular YouTube search, kept only when the title contains the request's core title (no bracketed notes or dash suffix), the version tags match (live, remix, slowed, extended...; a note naming one of the track's credited artists counts as a credit, not a version), and, when the request carries `duration_s`, the length is within 3 s or 3%. YouTube Music results win ties; the closest length within 15% is the fallback. The download is then brought to -14 LUFS with a single linear gain (two-pass loudnorm), so shows play at one volume. The first hit of a plain search was a live recording or a music-video edit for 3 of 7 requests in one batch.
+
 Automatic mode runs on timers in the web view, so the window sets `backgroundThrottling: "disabled"` (tauri.conf.json). Without it, WebKit suspends a hidden or occluded web view's timers after about 5 minutes, and an unattended Mac picks up new requests only when the window next comes to the front.
 
 ## Usage
