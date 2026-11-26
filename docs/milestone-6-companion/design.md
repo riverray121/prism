@@ -18,6 +18,8 @@ Restore on stop: before the first frame of a play run Prism reads each target hu
 
 Automatic mode: a setting in the Companion dialog, off by default. When on and connected, Prism imports every open request, queues analysis for the imported songs, and for each analyzed song it opens the song, auto-maps from its favorites when the mapping doc is empty, patches every rig light round-robin over the enabled programs when the patch is empty, waits for the song's tracks to load, and publishes. A song that cannot be processed is skipped with a reason shown in the dialog and not retried in the session. This is what runs on an always-on machine; a laptop leaves it off.
 
+Automatic mode runs on timers in the web view, so the window sets `backgroundThrottling: "disabled"` (tauri.conf.json). Without it, WebKit suspends a hidden or occluded web view's timers after about 5 minutes, and an unattended Mac picks up new requests only when the window next comes to the front.
+
 ## Usage
 
 - Settings, Companion section: URL, token, Connect, Automatic. A connected companion shows its name and version; automatic mode shows its current step.
