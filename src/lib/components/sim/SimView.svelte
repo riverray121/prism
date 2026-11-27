@@ -21,7 +21,12 @@
     roomLights,
     type Room,
   } from "$lib/sim/room";
-  import { createSimScene, type SimScene } from "$lib/sim/scene";
+  import {
+    AMBIENT,
+    createSimScene,
+    EDIT_AMBIENT,
+    type SimScene,
+  } from "$lib/sim/scene";
   import { getRawProfile, inspection } from "$lib/state/inspection.svelte";
   import {
     activeRoom,
@@ -147,12 +152,14 @@
           profile.mix.bpm?.render === "scalar"
             ? Number(profile.mix.bpm.value)
             : 120;
+        scene.setAmbient(AMBIENT);
         scene.setLightStates(
           sampleLights(profile, showSnapshot, outputs, lights, t),
           t,
           bpm,
         );
       } else {
+        scene.setAmbient(EDIT_AMBIENT);
         scene.setLightStates(new Map(), t, 120);
       }
       scene.render();

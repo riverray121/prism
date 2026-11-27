@@ -31,11 +31,15 @@ export default defineConfig(async () => ({
       // mid-use. Everything the frontend never imports must be ignored:
       // docs edits, the sidecar's Python, the library the sidecar writes
       // into (profile/mapping/rig saves would otherwise reload the app),
-      // and test files (vitest runs them; the app doesn't import them).
+      // the lab's libraries, runs and scripts, and test files (vitest runs
+      // them; the app doesn't import them).
       ignored: [
         "**/src-tauri/**",
         "**/docs/**",
         "**/library/**",
+        "**/eval-library/**",
+        "**/eval-runs/**",
+        "**/lab/**",
         "**/sidecar/**",
         "**/tests/**",
         "**/*.test.ts",

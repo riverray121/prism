@@ -7,6 +7,11 @@ import { v1Baseline } from "$lib/showgen/algorithms/v1-baseline";
 import { v2Ranked } from "$lib/showgen/algorithms/v2-ranked";
 import { v3Roles } from "$lib/showgen/algorithms/v3-roles";
 import {
+  lightActivity,
+  MIN_ACTIVE,
+  v4Verified,
+} from "$lib/showgen/algorithms/v4-verified";
+import {
   applyPalette,
   hexToOklch,
   PALETTES,
@@ -360,5 +365,28 @@ describe("v3-roles", () => {
       palette: { id: "blue" },
     });
     expect(new Set(Object.values(r.patch)).size).toBe(7);
+  });
+});
+
+describe("v4-verified", () => {
+  const room: LightSpec[] = [
+    { id: "strip", name: "strip", kind: "strip", pixelCount: 20 },
+    { id: "wash", name: "wash", kind: "wash", pixelCount: 1 },
+  ];
+
+  it("never puts an accent on a strip when no accent fixture exists", () => {
+    const r = v4Verified.generate({
+      profile: profile(),
+      lights: room,
+      palette: { id: "blue" },
+    });
+    expect(r.report.picks.every((p) => p.role !== "accent")).toBe(true);
+  });
+
+  it("keeps only lights that visibly change as programmed", () => {
+    const input = { profile: profile(), lights: room, palette: { id: "blue" } };
+    const r = v4Verified.generate(input);
+    for (const a of lightActivity(input, r).values())
+      expect(a.active).toBeGreaterThanOrEqual(MIN_ACTIVE);
   });
 });

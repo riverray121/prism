@@ -46,6 +46,9 @@ export interface SimScene {
   objectFor(id: string): THREE.Object3D | undefined;
   // Point the camera at the room's saved view (or a default one).
   resetCamera(): void;
+  // Room fill light: AMBIENT while a show plays; higher while editing a
+  // room with no show, so furniture and fixtures stay visible.
+  setAmbient(intensity: number): void;
   dispose(): void;
 }
 
@@ -53,7 +56,8 @@ const WALL_COLOR = "#8a8d93";
 const FLOOR_COLOR = "#5b5248";
 const CEILING_COLOR = "#7d8086";
 // Faint fill so unlit surfaces read as a dark room, not a void.
-const AMBIENT = 0.06;
+export const AMBIENT = 0.06;
+export const EDIT_AMBIENT = 0.9;
 
 let areaLightsReady = false;
 
@@ -90,7 +94,8 @@ export function createSimScene(
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#040405");
   const camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 60);
-  scene.add(new THREE.HemisphereLight(0xb8c4d6, 0x2a241e, AMBIENT));
+  const fill = new THREE.HemisphereLight(0xb8c4d6, 0x2a241e, AMBIENT);
+  scene.add(fill);
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
@@ -286,6 +291,9 @@ export function createSimScene(
     },
     objectFor(id) {
       return objects.get(id);
+    },
+    setAmbient(intensity) {
+      fill.intensity = intensity;
     },
     resetCamera() {
       defaultCamera(current);

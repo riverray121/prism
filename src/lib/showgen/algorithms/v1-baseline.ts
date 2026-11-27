@@ -5,6 +5,7 @@
 // the later algorithms are compared against.
 
 import { autoMap } from "$lib/mapping/automap";
+import { sourceLabel } from "$lib/mapping/labels";
 import { MappingDocSchema } from "$lib/mapping/schema";
 import { applyPalette } from "$lib/showgen/palettes";
 import type { ShowAlgorithm, ShowInput, ShowResult } from "$lib/showgen/types";
@@ -38,7 +39,7 @@ export const v1Baseline: ShowAlgorithm = {
         algorithm: "v1-baseline",
         candidates: [...favorites].map((path, i) => ({
           path,
-          label: path,
+          label: sourceLabel(path),
           family: path,
           measures: {},
           score: 0,

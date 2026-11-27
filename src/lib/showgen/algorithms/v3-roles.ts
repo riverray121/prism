@@ -95,17 +95,25 @@ interface Slot {
 }
 
 // Picks in score order go to the first free light of a kind their role
-// prefers; leftovers fill the remaining lights in order.
+// prefers; leftovers fill the remaining lights in order. With
+// `accentKinds`, an accent that finds none of those kinds free becomes a
+// swell instead of landing on whatever light is left.
 export function placeRoles(
   slots: Slot[],
   lights: LightSpec[],
+  accentKinds?: FixtureKind[],
 ): Map<string, Slot> {
   const placed = new Map<string, Slot>();
   const waiting: Slot[] = [];
-  for (const slot of slots) {
+  const free = (kind: FixtureKind) =>
+    lights.find((l) => l.kind === kind && !placed.has(l.id));
+  for (const original of slots) {
+    let slot = original;
+    if (accentKinds && slot.role === "accent" && !accentKinds.some(free))
+      slot = { ...slot, role: "swell" };
     let chosen: LightSpec | undefined;
     for (const kind of ROLE_KINDS[slot.role]) {
-      chosen = lights.find((l) => l.kind === kind && !placed.has(l.id));
+      chosen = free(kind);
       if (chosen) break;
     }
     if (chosen) placed.set(chosen.id, slot);
@@ -120,147 +128,168 @@ export function placeRoles(
   return placed;
 }
 
+export interface RoleShowOptions {
+  algorithm: string;
+  accentKinds?: FixtureKind[];
+}
+
+// Programs, patch, section scenes and report for a set of picks, by role.
+// Shared by v3 and later role-based algorithms; v3 calls it with roleOf and
+// no accent restriction.
+export function buildRoleShow(
+  { lights, palette }: ShowInput,
+  ctx: SongContext,
+  measured: Measured[],
+  picks: Measured[],
+  passed: Map<string, string>,
+  roleFn: (m: Measured) => Role,
+  options: RoleShowOptions,
+): ShowResult {
+  const slots: Slot[] = picks.map((pick) => ({ pick, role: roleFn(pick) }));
+  const placed = placeRoles(slots, lights, options.accentKinds);
+  const roles = new Map<string, string>();
+  for (const slot of placed.values())
+    roles.set(slot.pick.candidate.path, slot.role);
+  for (const slot of slots)
+    if (!roles.has(slot.pick.candidate.path))
+      roles.set(slot.pick.candidate.path, slot.role);
+
+  const pal = resolvePalette(palette);
+  const base = pal.colors.filter((_, i) => i !== pal.outlier);
+  const accentHex =
+    pal.outlier !== undefined ? pal.colors[pal.outlier] : base[0];
+  const decayPulse = Math.max(0.12, 0.6 * ctx.beatPeriodS);
+
+  const taken = new Set<string>();
+  const programs: Program[] = [];
+  const derivations: Derivation[] = [];
+  const patch: Record<string, string> = {};
+  const pickOfProgram = new Map<string, Slot>();
+
+  const build = (
+    slot: Slot,
+    role: Role,
+    colorOffset: number,
+    suffix = "",
+  ): Program => {
+    const c = slot.pick.candidate;
+    const id = programId(slot.pick, taken) + suffix;
+    taken.add(id);
+    let program: Program;
+    if (role === "swell") {
+      program = {
+        id,
+        name: c.label,
+        enabled: true,
+        channels: { brightness: glowBrightness(c.path, c.data) },
+      };
+    } else {
+      const dId = uniqueId(`${id}_hits`, new Set(derivations.map((d) => d.id)));
+      derivations.push(onsetDerivation(dId, c.path, c.data));
+      program = flashProgram(
+        id,
+        c.label,
+        dId,
+        role === "pulse" ? decayPulse : 0.25,
+      );
+    }
+    if (role === "accent") {
+      const { hue } = hueSaturation(accentHex);
+      program.channels.hue = hue;
+      program.channels.saturation = 0.3;
+    } else if (ctx.sections.length > 0) {
+      const color = sectionColor(ctx.sections, base, colorOffset);
+      program.channels.hue = color.hue;
+      program.channels.saturation = color.saturation;
+    } else {
+      const { hue, saturation } = hueSaturation(
+        base[colorOffset % base.length],
+      );
+      program.channels.hue = hue;
+      program.channels.saturation = saturation;
+    }
+    programs.push(program);
+    pickOfProgram.set(id, { pick: slot.pick, role });
+    return program;
+  };
+
+  const programOfPick = new Map<string, Program>();
+  let offset = 0;
+  for (const light of lights) {
+    const slot = placed.get(light.id);
+    if (!slot) continue;
+    let program = programOfPick.get(slot.pick.candidate.path);
+    if (!program) {
+      program = build(slot, slot.role, offset++);
+      programOfPick.set(slot.pick.candidate.path, program);
+    }
+    patch[light.id] = program.id;
+  }
+  // More lights than picks: each extra light plays a pick in score order
+  // in the other motion (a pulse source as a swell and the reverse) and
+  // another color, so no two lights show the same frames.
+  let k = 0;
+  for (const light of lights) {
+    if (patch[light.id] || slots.length === 0) continue;
+    const slot = slots[k % slots.length];
+    const alt: Role =
+      slot.role === "swell" && slot.pick.measures.pulse >= 0.2
+        ? "pulse"
+        : "swell";
+    patch[light.id] = build(slot, alt, offset++, "_alt").id;
+    k++;
+  }
+
+  const levels = sectionLevels(ctx);
+  const macro: Macro = Object.keys(levels).length
+    ? {
+        scenes_from: "mix.sections",
+        scenes: Object.fromEntries(
+          Object.entries(levels).map(([label, level]) => [
+            label,
+            { programs: programs.map((p) => p.id), master_scale: level },
+          ]),
+        ),
+        master: null,
+      }
+    : { scenes_from: null, scenes: {}, master: null };
+
+  return {
+    programs,
+    derivations,
+    patch,
+    macro,
+    report: {
+      algorithm: options.algorithm,
+      candidates: reportCandidates(measured, picks, passed, roles),
+      picks: programs.map((p) => ({
+        path: pickOfProgram.get(p.id)!.pick.candidate.path,
+        programId: p.id,
+        lights: lights.filter((l) => patch[l.id] === p.id).map((l) => l.id),
+        role: pickOfProgram.get(p.id)!.role,
+      })),
+      notes:
+        picks.length < lights.length
+          ? [
+              `${picks.length} distinct tracks for ${lights.length} lights; extra lights play a pick in the other motion`,
+            ]
+          : [],
+    },
+  };
+}
+
 export const v3Roles: ShowAlgorithm = {
   id: "v3-roles",
   label: "v3 roles",
   description:
     "v2 picks with roles (pulse, swell, accent) placed on suitable fixtures, section-stepped color and section levels.",
-  generate({ profile, lights, palette }: ShowInput): ShowResult {
-    const ctx = songContext(profile);
-    const measured = measureCandidates(enumerateCandidates(profile), ctx);
+  generate(input: ShowInput): ShowResult {
+    const ctx = songContext(input.profile);
+    const measured = measureCandidates(enumerateCandidates(input.profile), ctx);
     applyVisibility(measured, ctx.hz);
-    const { picks, passed } = selectMMR(measured, lights.length);
-    const roles = new Map(picks.map((m) => [m.candidate.path, roleOf(m)]));
-    const slots: Slot[] = picks.map((pick) => ({
-      pick,
-      role: roles.get(pick.candidate.path)!,
-    }));
-    const placed = placeRoles(slots, lights);
-
-    const pal = resolvePalette(palette);
-    const base = pal.colors.filter((_, i) => i !== pal.outlier);
-    const accentHex =
-      pal.outlier !== undefined ? pal.colors[pal.outlier] : base[0];
-    const decayPulse = Math.max(0.12, 0.6 * ctx.beatPeriodS);
-
-    const taken = new Set<string>();
-    const programs: Program[] = [];
-    const derivations: Derivation[] = [];
-    const patch: Record<string, string> = {};
-    const pickOfProgram = new Map<string, Slot>();
-
-    const build = (
-      slot: Slot,
-      role: Role,
-      colorOffset: number,
-      suffix = "",
-    ): Program => {
-      const c = slot.pick.candidate;
-      const id = programId(slot.pick, taken) + suffix;
-      taken.add(id);
-      let program: Program;
-      if (role === "swell") {
-        program = {
-          id,
-          name: c.label,
-          enabled: true,
-          channels: { brightness: glowBrightness(c.path, c.data) },
-        };
-      } else {
-        const dId = uniqueId(
-          `${id}_hits`,
-          new Set(derivations.map((d) => d.id)),
-        );
-        derivations.push(onsetDerivation(dId, c.path, c.data));
-        program = flashProgram(
-          id,
-          c.label,
-          dId,
-          role === "pulse" ? decayPulse : 0.25,
-        );
-      }
-      if (role === "accent") {
-        const { hue } = hueSaturation(accentHex);
-        program.channels.hue = hue;
-        program.channels.saturation = 0.3;
-      } else if (ctx.sections.length > 0) {
-        const color = sectionColor(ctx.sections, base, colorOffset);
-        program.channels.hue = color.hue;
-        program.channels.saturation = color.saturation;
-      } else {
-        const { hue, saturation } = hueSaturation(
-          base[colorOffset % base.length],
-        );
-        program.channels.hue = hue;
-        program.channels.saturation = saturation;
-      }
-      programs.push(program);
-      pickOfProgram.set(id, { pick: slot.pick, role });
-      return program;
-    };
-
-    const programOfPick = new Map<string, Program>();
-    let offset = 0;
-    for (const light of lights) {
-      const slot = placed.get(light.id);
-      if (!slot) continue;
-      let program = programOfPick.get(slot.pick.candidate.path);
-      if (!program) {
-        program = build(slot, slot.role, offset++);
-        programOfPick.set(slot.pick.candidate.path, program);
-      }
-      patch[light.id] = program.id;
-    }
-    // More lights than picks: each extra light plays a pick in score order
-    // in the other motion (a pulse source as a swell and the reverse) and
-    // another color, so no two lights show the same frames.
-    let k = 0;
-    for (const light of lights) {
-      if (patch[light.id] || slots.length === 0) continue;
-      const slot = slots[k % slots.length];
-      const alt: Role =
-        slot.role === "swell" && slot.pick.measures.pulse >= 0.2
-          ? "pulse"
-          : "swell";
-      patch[light.id] = build(slot, alt, offset++, "_alt").id;
-      k++;
-    }
-
-    const levels = sectionLevels(ctx);
-    const macro: Macro = Object.keys(levels).length
-      ? {
-          scenes_from: "mix.sections",
-          scenes: Object.fromEntries(
-            Object.entries(levels).map(([label, level]) => [
-              label,
-              { programs: programs.map((p) => p.id), master_scale: level },
-            ]),
-          ),
-          master: null,
-        }
-      : { scenes_from: null, scenes: {}, master: null };
-
-    return {
-      programs,
-      derivations,
-      patch,
-      macro,
-      report: {
-        algorithm: "v3-roles",
-        candidates: reportCandidates(measured, picks, passed, roles),
-        picks: programs.map((p) => ({
-          path: pickOfProgram.get(p.id)!.pick.candidate.path,
-          programId: p.id,
-          lights: lights.filter((l) => patch[l.id] === p.id).map((l) => l.id),
-          role: pickOfProgram.get(p.id)!.role,
-        })),
-        notes:
-          picks.length < lights.length
-            ? [
-                `${picks.length} distinct tracks for ${lights.length} lights; extra lights play a pick in the other motion`,
-              ]
-            : [],
-      },
-    };
+    const { picks, passed } = selectMMR(measured, input.lights.length);
+    return buildRoleShow(input, ctx, measured, picks, passed, roleOf, {
+      algorithm: "v3-roles",
+    });
   },
 };
