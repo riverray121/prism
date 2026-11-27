@@ -2,6 +2,7 @@
 and analyze them into a library folder without the app.
 
     uv run python -m sidecar.lab --library eval-library fetch "Artist - Title" ...
+    uv run python -m sidecar.lab --library eval-library add FILE --artist A --title T
     uv run python -m sidecar.lab --library eval-library analyze [--all-models]
     uv run python -m sidecar.lab --library eval-library list
 
@@ -68,6 +69,14 @@ def fetch(queries: list[str]) -> None:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+def add(path: Path, artist: str, title: str) -> None:
+    """Import a local audio file and queue it."""
+    song_id = _import_audio(path, title, artist)
+    with library.connect() as con:
+        library.mark_queued(con, [song_id], datetime.now(UTC).isoformat())
+    log.info("imported %s as %s", path.name, song_id)
+
+
 def analyze(all_models: bool) -> None:
     with library.connect() as con:
         if all_models:
@@ -93,6 +102,10 @@ def main(argv: list[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_fetch = sub.add_parser("fetch")
     p_fetch.add_argument("queries", nargs="+")
+    p_add = sub.add_parser("add")
+    p_add.add_argument("file", type=Path)
+    p_add.add_argument("--artist", required=True)
+    p_add.add_argument("--title", required=True)
     p_an = sub.add_parser("analyze")
     p_an.add_argument("--all-models", action="store_true")
     sub.add_parser("list")
@@ -106,6 +119,8 @@ def main(argv: list[str] | None = None) -> None:
     storage.set_library_root(args.library.resolve())
     if args.cmd == "fetch":
         fetch(args.queries)
+    elif args.cmd == "add":
+        add(args.file.resolve(), args.artist, args.title)
     elif args.cmd == "analyze":
         analyze(args.all_models)
     else:
