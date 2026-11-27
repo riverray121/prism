@@ -13,6 +13,7 @@ import {
   applyPullResult,
 } from "$lib/state/companion.svelte";
 import { settings } from "$lib/state/settings.svelte";
+import { applyRoomsEvent, applySimEvent } from "$lib/state/sim.svelte";
 import { resetForSong } from "$lib/state/transport.svelte";
 
 // Reducer mapping inbound sidecar events onto the durable $state stores. The
@@ -52,6 +53,10 @@ function applySidecarEvent(event: SidecarEvent): void {
     applyMappingEvent(event.song_id, event.doc);
   } else if (event.type === "rig") {
     applyRigEvent(event.rig);
+  } else if (event.type === "rooms") {
+    applyRoomsEvent(event.rooms);
+  } else if (event.type === "sim") {
+    applySimEvent(event.song_id, event.doc);
   } else if (event.type === "companion.publish_result") {
     applyPublishResult(event.song_id, event.ok, event.error);
   } else if (event.type === "companion.pull_result") {

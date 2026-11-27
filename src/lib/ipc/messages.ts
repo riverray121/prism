@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { RigSchema } from "$lib/hardware/wled";
 import { MappingEventSchema } from "$lib/mapping/schema";
+import { SimDocSchema } from "$lib/sim/show";
 
 // Mirror of the sidecar's pydantic models. Validated at the IPC boundary so a
 // schema mismatch surfaces here, not as a confusing downstream error.
@@ -290,6 +291,21 @@ export const CompanionPullResultEventSchema = z.object({
   error: z.string().nullable().default(null),
 });
 
+// Every saved simulator room. Each room is validated on its own in the
+// reducer (sim/room.ts RoomSchema), so one malformed file never hides the
+// rest.
+export const RoomsEventSchema = z.object({
+  type: z.literal("rooms"),
+  rooms: z.array(z.unknown()),
+});
+
+// A song's room shows (songs/{id}/mapping/sim.json).
+export const SimEventSchema = z.object({
+  type: z.literal("sim"),
+  song_id: z.string(),
+  doc: SimDocSchema,
+});
+
 // All events the sidecar can send on stdout.
 export const SidecarEventSchema = z.discriminatedUnion("type", [
   CompanionPublishResultEventSchema,
@@ -302,5 +318,7 @@ export const SidecarEventSchema = z.discriminatedUnion("type", [
   SettingsEventSchema,
   MappingEventSchema,
   RigEventSchema,
+  RoomsEventSchema,
+  SimEventSchema,
 ]);
 export type SidecarEvent = z.infer<typeof SidecarEventSchema>;
