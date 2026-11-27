@@ -39,6 +39,16 @@ SONGS_DIR = LIBRARY_ROOT / "songs"
 DB_PATH = LIBRARY_ROOT / "library.db"
 
 
+def set_library_root(root: Path) -> None:
+    """Point every library path at ``root``. Other modules read these globals
+    at call time (``storage.SONGS_DIR``), so this redirects the whole sidecar.
+    Used by ``sidecar.lab`` to work on a library other than the app's."""
+    global LIBRARY_ROOT, SONGS_DIR, DB_PATH
+    LIBRARY_ROOT = root
+    SONGS_DIR = root / "songs"
+    DB_PATH = root / "library.db"
+
+
 def import_file(source: Path) -> tuple[str, str]:
     """Copy ``source`` into a new per-song folder.
 

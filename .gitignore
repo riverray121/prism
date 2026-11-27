@@ -17,5 +17,9 @@ __pycache__/
 # App-managed library data (lives in app data dir; ignore if ever created locally)
 /library
 
+# Show-algorithm lab: its own library, eval runs and rendered videos
+/eval-library
+/eval-runs
+
 # Local scratch audio for development/testing
 /test-audio

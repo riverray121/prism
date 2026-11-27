@@ -1,41 +1,38 @@
-"""Rhythm features (librosa)."""
+"""Rhythm features: librosa onsets and density, Beat This! beats and downbeats."""
 
 import librosa
 import numpy as np
 from scipy.ndimage import uniform_filter1d
 
+from .. import models
+
 # Window for the rhythmic-density running rate, in seconds.
 DENSITY_WINDOW_SEC = 2.0
 
-# Assumed time signature for downbeat inference. The heuristic picks one of
-# METER beat phases as the bar start; non-4/4 meters will be wrong.
-METER = 4
+# Beat This! model, loaded once per process on first use (CPU: about 1.5 s
+# per song on an M-series Mac, faster than MPS for this model size).
+_BEAT_MODEL = None
 
 
-def _infer_downbeats(y: np.ndarray, sr: int, beat_frames: np.ndarray) -> np.ndarray:
-    """Pick the bar-start beat phase and return downbeat times.
+def _beat_model():
+    global _BEAT_MODEL
+    if _BEAT_MODEL is None:
+        from beat_this.inference import Audio2Beats
 
-    Assumes 4/4. Scores each of the METER beat phases by two cues sampled at the
-    beats — onset strength and low-band (<150 Hz, i.e. kick) energy — and takes
-    every METER-th beat from the highest-scoring phase. beat_frames, the onset
-    envelope, and the STFT all use librosa's default 512-sample hop, so the
-    frame indices line up directly.
-    """
-    if len(beat_frames) < METER:
-        return librosa.frames_to_time(beat_frames, sr=sr)
+        _BEAT_MODEL = Audio2Beats(
+            checkpoint_path=str(models.ensure("beat_this_final0")), device="cpu"
+        )
+    return _BEAT_MODEL
 
-    onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-    spectrum = np.abs(librosa.stft(y))
-    freqs = librosa.fft_frequencies(sr=sr)
-    low_band = spectrum[freqs < 150].sum(axis=0)
 
-    def _norm(a: np.ndarray) -> np.ndarray:
-        return a / (a.max() + 1e-9)
-
-    score = _norm(onset_env) + _norm(low_band)
-    beat_scores = score[np.clip(beat_frames, 0, len(score) - 1)]
-    phase = max(range(METER), key=lambda p: beat_scores[p::METER].mean())
-    return librosa.frames_to_time(beat_frames[phase::METER], sr=sr)
+def _snap_downbeats(beats: np.ndarray, downbeats: np.ndarray) -> np.ndarray:
+    """Beat This! predicts beats and downbeats as separate activations, so a
+    downbeat can sit a few ms off its beat. Snap each to the nearest beat so
+    downbeats stay a subset of the beat grid."""
+    if len(beats) == 0:
+        return downbeats
+    idx = np.abs(beats[None, :] - downbeats[:, None]).argmin(axis=1)
+    return np.unique(beats[idx])
 
 
 def onsets(y: np.ndarray, sr: int, hop: int) -> dict:
@@ -87,36 +84,34 @@ def rhythmic_density(y: np.ndarray, sr: int, hop: int) -> dict:
 
 
 def rhythm_features(y: np.ndarray, sr: int) -> dict[str, dict]:
-    """Global tempo, beat positions, and downbeats from one beat-tracking pass.
+    """Global tempo, beat positions, and downbeats from one Beat This! pass.
 
-    Returns bpm (scalar), beats (event), and downbeats (event) together so all
-    come from the same analysis (consistent tempo and beat grid). Downbeats are
-    inferred from the beat grid by a 4/4 heuristic, not a separate tracker.
+    Returns bpm (scalar), beats (event), and downbeats (event) from the same
+    tracker, so the tempo, beat grid and bar starts agree. Beat This! makes no
+    meter assumption. bpm is 60 over the median inter-beat interval.
     """
-    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
-    bpm = float(np.atleast_1d(tempo)[0])
-    beat_times = librosa.frames_to_time(beat_frames, sr=sr)
-    downbeat_times = _infer_downbeats(y, sr, beat_frames)
+    beats, downbeats = _beat_model()(y, sr)
+    beats = np.asarray(beats, dtype=np.float64)
+    downbeats = _snap_downbeats(beats, np.asarray(downbeats, dtype=np.float64))
+    bpm = float(60.0 / np.median(np.diff(beats))) if len(beats) >= 2 else 0.0
     return {
         "bpm": {
             "render": "scalar",
             "category": "rhythm",
-            "source": "librosa.beat",
+            "source": "beat_this",
             "unit": "bpm",
             "value": bpm,
         },
         "beats": {
             "render": "event",
             "category": "rhythm",
-            "source": "librosa.beat",
-            "events": [{"t": float(t)} for t in beat_times],
+            "source": "beat_this",
+            "events": [{"t": float(t)} for t in beats],
         },
         "downbeats": {
             "render": "event",
             "category": "rhythm",
-            "source": "librosa (heuristic)",
-            "events": [
-                {"t": float(t), "bar": i + 1} for i, t in enumerate(downbeat_times)
-            ],
+            "source": "beat_this",
+            "events": [{"t": float(t), "bar": i + 1} for i, t in enumerate(downbeats)],
         },
     }

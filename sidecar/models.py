@@ -39,6 +39,13 @@ _REGISTRY = {
         "sha256": "dd3b4043a87d4ec13df8082c0fcfee3fb5084151808e47e060987a95eabdd142",
         "filename": "Cnn14_DecisionLevelMax.pth",
     },
+    # Beat This! (CPJKU, ISMIR 2024) beat + downbeat tracker, full-size
+    # checkpoint "final0". MIT-licensed code and weights.
+    "beat_this_final0": {
+        "url": "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/final0.ckpt",
+        "sha256": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+        "filename": "beat_this-final0.ckpt",
+    },
 }
 
 

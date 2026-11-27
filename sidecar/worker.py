@@ -41,10 +41,10 @@ log = logging.getLogger("sidecar.worker")
 # Seconds to wait between queue polls when idle.
 POLL_INTERVAL = 1.0
 
-# Models every analysis needs (chords + PANNs tags/axes). Ensured up front so a
+# Models every analysis needs (chords, PANNs tags/axes, Beat This! beats). Ensured up front so a
 # missing/unreachable checkpoint fails the song before the expensive mix pass
 # rather than partway through. Separation engines fetch their own weights.
-_REQUIRED_MODELS = ["btc_large_voca", "panns_cnn14_sed"]
+_REQUIRED_MODELS = ["btc_large_voca", "panns_cnn14_sed", "beat_this_final0"]
 
 # Target frame rate for continuous features; the actual rate is sr/hop. n_fft is
 # the STFT window shared across frequency features.

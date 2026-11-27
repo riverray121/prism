@@ -23,11 +23,12 @@ ML features carry a per-frame `confidence`. DSP features omit it.
 
 ### Rhythm
 
-| Name        | Render  | Source       | Unit / Range        | Notes                   |
-| ----------- | ------- | ------------ | ------------------- | ----------------------- | --- | ------------------ | ---------- | ------------------- | ---------- | ------------------- |
-| `bpm`       | scalar  | librosa.beat | float, ~60–200      | global tempo            |
-| `beats`     | event   | librosa.beat | time                | beat positions          |
-| `downbeats` | event   | madmom       | time + bar position | bar boundaries          |     | `rhythmic_density` | continuous | derived from onsets | onsets/sec | windowed onset rate |
+| Name               | Render     | Source              | Unit / Range        | Notes                                     |
+| ------------------ | ---------- | ------------------- | ------------------- | ----------------------------------------- |
+| `bpm`              | scalar     | Beat This!          | float, ~60–200      | 60 / median inter-beat interval           |
+| `beats`            | event      | Beat This!          | time                | beat positions                            |
+| `downbeats`        | event      | Beat This!          | time + bar position | bar starts, no meter assumption, snapped to the nearest beat |
+| `rhythmic_density` | continuous | derived from onsets | onsets/sec          | windowed onset rate                       |
 | `silence`   | segment | librosa      | start/end           | regions below threshold |
 
 ### Frequency

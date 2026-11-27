@@ -5,6 +5,7 @@ description = "Prism analysis sidecar"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "audio-separator>=0.44.2",
+    "beat-this>=1.1.0",
     "librosa>=0.11.0",
     "mutagen>=1.47.0",
     "numpy>=2.4.6",

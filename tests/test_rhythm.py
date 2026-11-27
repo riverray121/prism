@@ -42,19 +42,41 @@ def test_rhythmic_density_tracks_click_rate():
     assert np.mean(dense["data"][mid]) > 2.5 * np.mean(sparse["data"][mid])
 
 
+def bar_clicks(seconds: float = 12.0, period_sec: float = 0.5) -> np.ndarray:
+    """4/4 bars at 120 BPM: a noise click on every beat, plus a 60 Hz kick on
+    each bar's first beat so the bar start is audible."""
+    y = np.zeros(int(SR * seconds), dtype=np.float32)
+    step = int(SR * period_sec)
+    t = np.arange(int(0.08 * SR)) / SR
+    kick = 0.9 * np.sin(2 * np.pi * 60 * t) * np.exp(-t * 30)
+    for k, i in enumerate(range(0, len(y) - len(t), step)):
+        if k % 4 == 0:
+            y[i : i + len(t)] += kick
+        y[i : i + 200] += np.random.default_rng(k).normal(
+            0, 0.6 if k % 4 == 0 else 0.3, 200
+        )
+    return y
+
+
 def test_rhythm_features_bpm_beats_and_downbeats_are_consistent():
-    feats = rhythm.rhythm_features(clicks(0.5, seconds=8.0), SR)
+    feats = rhythm.rhythm_features(bar_clicks(), SR)
     assert feats["bpm"]["render"] == "scalar"
-    assert 40 <= feats["bpm"]["value"] <= 250
+    assert feats["bpm"]["value"] == pytest.approx(120, abs=2)
 
     beats = [ev["t"] for ev in feats["beats"]["events"]]
-    assert len(beats) >= 8
+    assert len(beats) >= 20
     # Steady click train -> a steady beat grid.
     intervals = np.diff(beats)
     assert np.std(intervals) == pytest.approx(0, abs=0.05)
 
-    downbeats = {ev["t"] for ev in feats["downbeats"]["events"]}
-    assert downbeats.issubset(set(beats))
-    # The 4/4 heuristic keeps roughly every fourth beat.
-    ratio = len(beats) / max(1, len(downbeats))
-    assert 3 <= ratio <= 5
+    downbeats = [ev["t"] for ev in feats["downbeats"]["events"]]
+    assert set(downbeats).issubset(set(beats))
+    # Bar starts land on the kicks, every 2 s (the clip's last edge may add one).
+    assert len(downbeats) >= 5
+    assert np.median(np.diff(downbeats)) == pytest.approx(2.0, abs=0.06)
+
+
+def test_snap_downbeats_moves_each_to_its_nearest_beat():
+    beats = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
+    snapped = rhythm._snap_downbeats(beats, np.array([0.02, 1.97]))
+    assert snapped.tolist() == [0.0, 2.0]
