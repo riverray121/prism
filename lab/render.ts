@@ -26,6 +26,10 @@ export interface RenderOptions {
   size: string;
   // Encoded frame width; height follows the aspect.
   outWidth: number;
+  // Upper bound on the file size: the video bitrate is set from the
+  // duration so the MP4 fits (SendUserFile accepts at most 30 MiB). null
+  // encodes at constant quality instead.
+  maxMiB: number | null;
   // Tiles from any run: overrides the run's algorithm list.
   tiles?: { label: string; runDir: string; alg: string }[];
   // File name suffix, e.g. "compare" or "palettes".
@@ -94,7 +98,28 @@ function encoder(
   start: number,
   seconds: number,
   outWidth: number,
+  maxMiB: number | null,
 ) {
+  const AUDIO_BPS = 128_000;
+  const rate =
+    maxMiB === null
+      ? ["-crf", "21"]
+      : (() => {
+          const kbps = Math.max(
+            300,
+            Math.floor(
+              ((maxMiB * 8 * 1024 * 1024) / seconds - AUDIO_BPS) / 1000,
+            ),
+          );
+          return [
+            "-b:v",
+            `${kbps}k`,
+            "-maxrate",
+            `${kbps}k`,
+            "-bufsize",
+            `${kbps * 2}k`,
+          ];
+        })();
   const ff = spawn(
     "ffmpeg",
     [
@@ -125,14 +150,13 @@ function encoder(
       "libx264",
       "-pix_fmt",
       "yuv420p",
-      "-crf",
-      "21",
+      ...rate,
       "-preset",
       "medium",
       "-c:a",
       "aac",
       "-b:a",
-      "192k",
+      "128k",
       "-shortest",
       "-movflags",
       "+faststart",
@@ -252,6 +276,7 @@ export async function render(opts: RenderOptions): Promise<void> {
         start,
         seconds,
         opts.outWidth,
+        opts.maxMiB,
       );
       const frames = Math.round(seconds * FPS);
       const started = Date.now();

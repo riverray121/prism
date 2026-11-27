@@ -3,7 +3,8 @@
 //            [--algorithms v1-baseline,v2-ranked] [--palette blue] [--songs q1,q2]
 //   report --run NAME
 //   render --run NAME [--songs q1,q2] [--seconds N|full] [--size 960x540]
-//          [--width 1280] [--only ID] [--tiles run:alg:label,...] [--suffix S]
+//          [--width 1280] [--max-mib 28|none] [--only ID]
+//          [--tiles run:alg:label,...] [--suffix S]
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -64,6 +65,7 @@ export async function main(argv: string[]): Promise<void> {
       seconds: !f.seconds || f.seconds === "full" ? null : Number(f.seconds),
       size: f.size ?? "960x540",
       outWidth: Number(f.width ?? 1280),
+      maxMiB: f["max-mib"] === "none" ? null : Number(f["max-mib"] ?? 28),
       only: f.only,
       tiles,
       suffix: f.suffix,
