@@ -21,18 +21,17 @@ export function nextAction(args: {
   importsPending: boolean;
   publishing: boolean;
   skipped: Set<string>;
+  // Request ids the companion marked removed.
+  removedRequests?: Set<string>;
 }): AutomationAction {
   if (args.publishing) return { kind: "wait", reason: "publishing" };
   if (args.importsPending) return { kind: "wait", reason: "importing" };
   // The companion removed these songs (they left every source playlist).
   // A song mid-analysis is deleted once the worker is done with it.
-  const removed = new Set(
-    args.requests.filter((r) => r.status === "removed").map((r) => r.id),
-  );
   const gone = args.songs.filter(
     (s) =>
       s.request_id !== null &&
-      removed.has(s.request_id) &&
+      (args.removedRequests?.has(s.request_id) ?? false) &&
       s.status !== "analyzing" &&
       s.status !== "queued",
   );

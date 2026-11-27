@@ -57,16 +57,16 @@ describe("nextAction", () => {
   });
 
   it("deletes songs whose request was removed, after any analysis finishes", () => {
-    const removed = { ...request, id: "r-gone", status: "removed" as const };
+    const removedRequests = new Set(["r-gone"]);
     const songs = [
       song({ id: "gone", request_id: "r-gone" }),
       song({ id: "kept" }),
       song({ id: "busy", request_id: "r-gone", status: "analyzing" }),
     ];
-    const a = nextAction({ ...base, requests: [removed], songs });
+    const a = nextAction({ ...base, songs, removedRequests });
     expect(a).toEqual({ kind: "remove", songIds: ["gone"] });
     expect(
-      nextAction({ ...base, requests: [removed], songs: [songs[1], songs[2]] })
+      nextAction({ ...base, songs: [songs[1], songs[2]], removedRequests })
         .kind,
     ).toBe("wait");
   });

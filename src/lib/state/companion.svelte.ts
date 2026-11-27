@@ -67,9 +67,19 @@ export const companion = $state<{
   // Open requests from the last refresh, newest first. Requests in any other
   // status are not kept: the UI only offers open ones.
   requests: CompanionRequest[];
+  // Ids of requests the companion marked removed: automatic mode deletes the
+  // songs linked to them.
+  removedRequestIds: string[];
   // Every published show from the last refresh.
   shows: ShowSummary[];
-}>({ status: "off", info: null, error: null, requests: [], shows: [] });
+}>({
+  status: "off",
+  info: null,
+  error: null,
+  requests: [],
+  removedRequestIds: [],
+  shows: [],
+});
 
 const RETRY_MS = 60_000;
 
@@ -90,6 +100,7 @@ export async function checkConnection(): Promise<void> {
     companion.info = null;
     companion.error = null;
     companion.requests = [];
+    companion.removedRequestIds = [];
     companion.shows = [];
     return;
   }
@@ -129,6 +140,9 @@ export async function refreshRequests(): Promise<void> {
   try {
     const all = await listRequests(target);
     companion.requests = all.filter((r) => r.status === "open");
+    companion.removedRequestIds = all
+      .filter((r) => r.status === "removed")
+      .map((r) => r.id);
   } catch (e) {
     console.warn("companion requests refresh failed", e);
   }
@@ -363,6 +377,7 @@ export async function automationTick(): Promise<void> {
     publishing:
       publishing.stage === "rendering" || publishing.stage === "uploading",
     skipped: new Set(Object.keys(automation.skipped)),
+    removedRequests: new Set(companion.removedRequestIds),
   });
   switch (action.kind) {
     case "import": {
