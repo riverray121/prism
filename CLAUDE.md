@@ -26,7 +26,7 @@ Workflow skills: `/spec` plans a milestone's docs through conversation, `/slice`
 ## Git
 
 - Remote: `origin` (github.com/riverray121/prism)
-- Push: only after the user has tested and confirmed a feature works.
+- Push: commit and push as work lands; undo a bad change with `git revert`.
 
 ## Standing rules
 
