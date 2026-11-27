@@ -3,9 +3,10 @@
 
 import { v1Baseline } from "$lib/showgen/algorithms/v1-baseline";
 import { v2Ranked } from "$lib/showgen/algorithms/v2-ranked";
+import { v3Roles } from "$lib/showgen/algorithms/v3-roles";
 import type { ShowAlgorithm, ShowInput, ShowResult } from "$lib/showgen/types";
 
-export const ALGORITHMS: ShowAlgorithm[] = [v1Baseline, v2Ranked];
+export const ALGORITHMS: ShowAlgorithm[] = [v1Baseline, v2Ranked, v3Roles];
 
 export const DEFAULT_ALGORITHM = "v1-baseline";
 

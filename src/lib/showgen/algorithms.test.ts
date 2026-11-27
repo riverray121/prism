@@ -5,6 +5,7 @@ import { autoMap } from "$lib/mapping/automap";
 import { MappingDocSchema } from "$lib/mapping/schema";
 import { v1Baseline } from "$lib/showgen/algorithms/v1-baseline";
 import { v2Ranked } from "$lib/showgen/algorithms/v2-ranked";
+import { v3Roles } from "$lib/showgen/algorithms/v3-roles";
 import {
   applyPalette,
   hexToOklch,
@@ -300,5 +301,64 @@ describe("palettes", () => {
     expect(MappingDocSchema.parse({ schema_version: "0.1.0" }).palette).toEqual(
       { id: "blue" },
     );
+  });
+});
+
+describe("v3-roles", () => {
+  const room: LightSpec[] = [
+    { id: "wash", name: "wash", kind: "wash", pixelCount: 1 },
+    { id: "strobe", name: "strobe", kind: "strobe", pixelCount: 1 },
+    { id: "strip", name: "strip", kind: "strip", pixelCount: 30 },
+  ];
+
+  it("puts the click-like track on the strobe as a pulse", () => {
+    const r = v3Roles.generate({
+      profile: profile(),
+      lights: room,
+      palette: { id: "blue" },
+    });
+    const drums = r.report.candidates.find(
+      (c) => c.path === "stems.eng_a.drums.features.energy",
+    )!;
+    expect(drums.role).toBe("pulse");
+    const pid = r.patch.strobe;
+    expect(r.report.picks.find((p) => p.programId === pid)?.path).toBe(
+      drums.path,
+    );
+    const b = r.programs.find((p) => p.id === pid)!.channels.brightness;
+    expect(typeof b === "object" && b.source.startsWith("derived.")).toBe(true);
+  });
+
+  it("puts a swell on the wall washer", () => {
+    const r = v3Roles.generate({
+      profile: profile(),
+      lights: room,
+      palette: { id: "blue" },
+    });
+    const pick = r.report.picks.find((p) => p.programId === r.patch.wash)!;
+    expect(pick.role).toBe("swell");
+  });
+
+  it("steps hue with the sections and scales each section by its loudness", () => {
+    const r = v3Roles.generate({
+      profile: profile(),
+      lights: room,
+      palette: { id: "blue" },
+    });
+    const swell = r.programs.find((p) => p.id === r.patch.wash)!;
+    const hue = swell.channels.hue;
+    expect(typeof hue === "object" && hue.source).toBe("mix.sections");
+    expect(r.macro.scenes_from).toBe("mix.sections");
+    expect(Object.keys(r.macro.scenes).sort()).toEqual(["chorus", "verse"]);
+  });
+
+  it("gives extra lights a different program from their source pick", () => {
+    const many = lights(7);
+    const r = v3Roles.generate({
+      profile: profile(),
+      lights: many,
+      palette: { id: "blue" },
+    });
+    expect(new Set(Object.values(r.patch)).size).toBe(7);
   });
 });
