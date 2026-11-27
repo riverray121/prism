@@ -9,7 +9,7 @@ import { resolveNode } from "$lib/mapping/sources";
 // hand-written docs load; unknown source paths are never a parse failure —
 // resolution is checked separately and non-resolving bindings are muted.
 
-export const MAPPING_SCHEMA_VERSION = "0.1.0";
+export const MAPPING_SCHEMA_VERSION = "0.2.0";
 
 // Channels of the generic fixture. Programs bind to these abstractly; future
 // fixture types ignore channels they lack.
@@ -184,6 +184,16 @@ export const MappingDocSchema = z.object({
   // before the field existed load unchanged; entries referencing an offline
   // light or a deleted program warn and mute, never a hard failure.
   patch: z.record(z.string(), z.string()).default({}),
+  // The palette programs are colored from (showgen/palettes.ts): a catalog
+  // id, or "single" with one hex color. Docs without it read as blue.
+  palette: z
+    .object({ id: z.string(), color: z.string().optional() })
+    .default({ id: "blue" }),
+  // The show algorithm that generated the programs and its selection report
+  // (showgen/types.ts SelectionReport); absent for hand-built docs.
+  generator: z
+    .object({ algorithm: z.string(), report: z.unknown() })
+    .optional(),
 });
 export type MappingDoc = z.infer<typeof MappingDocSchema>;
 

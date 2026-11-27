@@ -1,0 +1,17 @@
+// Show algorithms by id. A compared algorithm is never edited: a change is a
+// new file registered under a new id.
+
+import { v1Baseline } from "$lib/showgen/algorithms/v1-baseline";
+import type { ShowAlgorithm, ShowInput, ShowResult } from "$lib/showgen/types";
+
+export const ALGORITHMS: ShowAlgorithm[] = [v1Baseline];
+
+export const DEFAULT_ALGORITHM = "v1-baseline";
+
+export function algorithmById(id: string): ShowAlgorithm {
+  return ALGORITHMS.find((a) => a.id === id) ?? ALGORITHMS[0];
+}
+
+export function generateShow(id: string, input: ShowInput): ShowResult {
+  return algorithmById(id).generate(input);
+}
