@@ -74,17 +74,25 @@ Selection stops at N picks (N = number of lights). It also stops early when the 
 
 ## Fewer picks than lights
 
-The extra lights are assigned to the existing picks in order of score. Each extra light takes a variation of its program: the next palette slot, and for a pulse program, alternating onsets (odd or even), so two lights on one pick never show the same frames.
+`v2-ranked`: each extra light gets a copy of a pick, in score order, as its own program, so it takes the next palette slot.
+
+`v3-roles`: each extra light plays a pick, in score order, in the other motion: a pulse or accent source as a swell, a swell source with `pulse >= 0.2` as a pulse, in the next color. No two lights show the same frames.
 
 ## Roles (`v3-roles`)
 
+v3 adds one measure to v2's:
+
+- `visible`: the fraction of 1 s windows in which the envelope, mapped through the swell transform (`p5..p98` to 0..1, gamma 1.6), moves by more than 0.15.
+- A candidate with `visible < 0.2` is rejected.
+- Every other candidate's score is multiplied by `0.5 + 0.5 · visible`, so every light changes noticeably over the song.
+
 Each pick gets one role:
 
-- **pulse**: `pulse >= 0.35` and `alignment >= 0.5`. Program: flash on `onsets_strict` with a 40 ms attack and a decay of 0.6 beat periods, over a floor of 0.1.
-- **accent**: `onset_rate < 0.5` per second and `contrast >= 0.6`. Program: a short full flash per onset, white-tinted.
-- **swell**: everything else. Program: brightness from the envelope, normalized to `p5..p98` with gamma 1.6, smoothed 150 ms, floor 0.12.
+- **pulse**: `pulse >= 0.35` and `alignment >= 0.5`. Program: a derivation peak-picks the envelope at its p70 (clamped to 0.15..0.8, sensitivity 0.6); brightness flashes per event with a 20 ms attack, 30 ms hold and a decay of 0.6 beat periods (at least 120 ms).
+- **accent**: `onset_rate < 0.5` per second and `contrast >= 0.6`. Program: the same event flash with a 250 ms decay, in the palette's outlier color (or its first color) at saturation 0.3.
+- **swell**: everything else. Program: brightness from the envelope, normalized to `p5..p98` with gamma 1.6, smoothed 150 ms.
 
-The mix `rms`, when picked, becomes the macro master instead of a light program.
+Every lit light has the evaluator's 12 % floor (`solidFrame`).
 
 Light assignment by fixture kind:
 
@@ -94,6 +102,8 @@ Light assignment by fixture kind:
 | accent | strobe, moving head, PAR spot                        |
 | swell  | wall washer, lamp, LED strip, curved strip, LED tube |
 
-Remaining lights take the best remaining pick of any role.
+Picks go in score order to the first free light their role prefers. Remaining lights take the remaining picks in order.
 
-Section changes advance each program's palette slot by one, so the room's color moves with the song's structure.
+Color: pulse and swell programs bind hue and saturation to `mix.sections` through a categorical map. Each section label, in order of first appearance, takes the next base palette color, starting at the program's own offset. Colors therefore change at section boundaries, and programs differ from each other.
+
+Level: `macro.scenes_from = mix.sections`. Each label's scene keeps every program and sets `master_scale` to the label's mean mix loudness over the loudest label's, floored at 0.5.

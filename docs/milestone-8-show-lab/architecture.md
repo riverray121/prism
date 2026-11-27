@@ -11,7 +11,7 @@
 
 ## Key decisions
 
-- **One algorithm contract for app and lab.** `ShowAlgorithm.generate(input) → ShowResult` is synchronous and pure. Input holds the profile with every candidate's `data` loaded, the lights (`ShowLight`: id, name, kind, pixel count, optional position), and the palette. Output holds programs, patch, macro and the selection report. Loading data is the caller's job: the app loads through `loadNpy` and the lab through `fs`. An algorithm that loads its own data or reads app state is a bug.
+- **One algorithm contract for app and lab.** `ShowAlgorithm.generate(input) → ShowResult` is synchronous and pure. Input holds the profile with every candidate's `data` loaded, the lights (`LightSpec`: id, name, kind, pixel count, optional position), and the palette. Output holds programs, patch, macro and the selection report. Loading data is the caller's job: the app loads through `loadNpy` and the lab through `fs`. An algorithm that loads its own data or reads app state is a bug.
 - **Algorithms are frozen files.** `showgen/algorithms/v1-baseline.ts`, `v2-ranked.ts`, `v3-roles.ts`, registered in `showgen/registry.ts` by id. A compared algorithm is never edited; a change is a new file with a new id. The shared measure library (`showgen/measures.ts`) is versioned the same way: a measure an algorithm depends on keeps its behavior, and a change adds a new function.
 - **One program per pick.** `v2` and later algorithms build programs directly, one per selected track. They do not go through favorites or the per-stem grouping in `automap.ts`, which merges picks from the same stem into one program. `v1-baseline` keeps using `autoMap` so the baseline stays faithful.
 - **The selection report travels with the show.** `MappingDoc.generator = { algorithm, palette, report }` (optional, schema 0.2.0). Room shows carry the same field. The UI reads why from it; nothing is written to `profile.json`.
@@ -27,7 +27,8 @@
 
 ```
 src/lib/showgen/
-  types.ts         ShowAlgorithm, ShowInput, ShowLight, ShowResult, SelectionReport
+  types.ts         ShowAlgorithm, ShowInput, LightSpec, ShowResult, SelectionReport
+  rig.ts           the real rig as LightSpecs (WLED strips)
   candidates.ts    enumerate candidate tracks from a profile, family labels
   measures.ts      envelope measures (see ranking.md), pure, synthetic-tested
   select.ts        score + MMR selection
