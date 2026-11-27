@@ -13,6 +13,7 @@ import {
 } from "$lib/showgen/algorithms/v4-verified";
 import {
   applyPalette,
+  recolorPrograms,
   hexToOklch,
   PALETTES,
   resolvePalette,
@@ -388,5 +389,35 @@ describe("v4-verified", () => {
     const r = v4Verified.generate(input);
     for (const a of lightActivity(input, r).values())
       expect(a.active).toBeGreaterThanOrEqual(MIN_ACTIVE);
+  });
+});
+
+describe("recolorPrograms", () => {
+  it("keeps section-stepped color, motion and patch when the palette changes", () => {
+    const room: LightSpec[] = [
+      { id: "wash", name: "wash", kind: "wash", pixelCount: 1 },
+      { id: "strobe", name: "strobe", kind: "strobe", pixelCount: 1 },
+    ];
+    const r = v3Roles.generate({
+      profile: profile(),
+      lights: room,
+      palette: { id: "blue" },
+    });
+    const out = recolorPrograms(r.programs, { id: "ember" });
+    const ember = resolvePalette({ id: "ember" });
+    out.forEach((p, i) => {
+      expect(p.channels.brightness).toEqual(r.programs[i].channels.brightness);
+      const hue = p.channels.hue;
+      expect(typeof hue === "object" && hue.source).toBe("mix.sections");
+      const step = typeof hue === "object" ? hue.transform[0] : null;
+      const first =
+        step && "categorical" in step
+          ? Object.values(step.categorical.map)[0]
+          : null;
+      expect(first).toBeCloseTo(
+        hexToOklch(ember.colors[i % ember.colors.length]).h / 360,
+        6,
+      );
+    });
   });
 });

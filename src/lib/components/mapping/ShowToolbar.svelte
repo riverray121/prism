@@ -3,7 +3,7 @@
 
   import { docReport } from "$lib/showgen/edit";
   import {
-    applyPalette,
+    recolorPrograms,
     PALETTES,
     resolvePalette,
     SINGLE_PALETTE_ID,
@@ -102,7 +102,7 @@
   function choose(ref: PaletteRef): void {
     if (mapping.doc === null) return;
     const doc = $state.snapshot(mapping.doc) as MappingDoc;
-    setPalette(ref, applyPalette(doc.programs, ref, accentId(doc)));
+    setPalette(ref, recolorPrograms(doc.programs, ref, accentId(doc)));
   }
 
   let singleColor = $state("#2B6CC4");
@@ -114,7 +114,10 @@
   <span class="text-base font-semibold">Show</span>
   <select
     value={algorithm}
-    onchange={(e) => (picked = e.currentTarget.value)}
+    onchange={(e) => {
+      picked = e.currentTarget.value;
+      void generate();
+    }}
     title={algorithmById(algorithm).description}
     class="rounded border border-edge bg-raised px-1.5 py-1 text-ink focus:border-accent focus:outline-none"
   >

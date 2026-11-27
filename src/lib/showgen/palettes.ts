@@ -167,3 +167,63 @@ export function applyPalette(
     return { ...program, channels };
   });
 }
+
+// Recolor programs for a new palette while keeping how their color moves:
+// a hue bound to the song's sections through a categorical map keeps its
+// labels and takes the new palette's colors (from the program's own offset,
+// its position among non-accent programs); a fixed hue takes the base color
+// at that offset; the accent program takes the outlier at its own
+// saturation. Every other channel is untouched.
+export function recolorPrograms(
+  programs: Program[],
+  ref: PaletteRef,
+  accentProgramId?: string,
+): Program[] {
+  const palette = resolvePalette(ref);
+  const base = baseSlots(palette);
+  let offset = 0;
+  return programs.map((program) => {
+    const channels = { ...program.channels };
+    if (accentProgramId === program.id) {
+      const hex =
+        palette.outlier !== undefined
+          ? palette.colors[palette.outlier]
+          : base[0];
+      channels.hue = hueSaturation(hex).hue;
+      if (typeof channels.saturation !== "number")
+        channels.saturation = hueSaturation(hex).saturation;
+      return { ...program, channels };
+    }
+    const i = offset++;
+    const hue = channels.hue;
+    const step =
+      typeof hue === "object" && hue.source === "mix.sections"
+        ? hue.transform.find((s) => "categorical" in s)
+        : undefined;
+    if (typeof hue === "object" && step && "categorical" in step) {
+      const labels = Object.keys(step.categorical.map);
+      const hueMap: Record<string, number> = {};
+      const satMap: Record<string, number> = {};
+      labels.forEach((label, k) => {
+        const c = hueSaturation(base[(i + k) % base.length]);
+        // Bound hue tracks are 0–1 of a turn; the evaluator scales ×360.
+        hueMap[label] = c.hue / 360;
+        satMap[label] = c.saturation;
+      });
+      channels.hue = {
+        source: "mix.sections",
+        transform: [{ categorical: { map: hueMap } }],
+      };
+      channels.saturation = {
+        source: "mix.sections",
+        transform: [{ categorical: { map: satMap } }],
+      };
+    } else {
+      const c = hueSaturation(base[i % base.length]);
+      channels.hue = c.hue;
+      channels.saturation = c.saturation;
+      delete channels.color_temp;
+    }
+    return { ...program, channels };
+  });
+}

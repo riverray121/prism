@@ -15,6 +15,8 @@
     activeShow,
     assignLight,
     regenerate,
+    setSimAlgorithm,
+    setSimPalette,
     selectItem,
     sim,
   } from "$lib/state/sim.svelte";
@@ -35,17 +37,30 @@
   // The color a light's program is painted with, for its swatch.
   function swatch(programId: string | undefined): string | null {
     const p = show?.programs.find((x) => x.id === programId);
-    if (!p || typeof p.channels.hue !== "number") return null;
-    const s =
-      typeof p.channels.saturation === "number" ? p.channels.saturation : 0.8;
-    return `oklch(0.72 ${(s * 0.32).toFixed(3)} ${p.channels.hue.toFixed(1)})`;
+    if (!p) return null;
+    // A section-bound hue shows its first section's color.
+    const first = (v: unknown, scale: number): number | null => {
+      if (typeof v === "number") return v;
+      const step = (
+        v as
+          | { transform?: { categorical?: { map: Record<string, number> } }[] }
+          | undefined
+      )?.transform?.find((t) => t.categorical)?.categorical;
+      const value = step ? Object.values(step.map)[0] : undefined;
+      return value === undefined ? null : value * scale;
+    };
+    const hue = first(p.channels.hue, 360);
+    if (hue === null) return null;
+    const s = first(p.channels.saturation, 1) ?? 0.8;
+    return `oklch(0.72 ${(s * 0.32).toFixed(3)} ${hue.toFixed(1)})`;
   }
 
   function pickPalette(id: string): void {
-    sim.palette =
+    setSimPalette(
       id === SINGLE_PALETTE_ID
         ? { id, color: sim.palette.color ?? "#2B6CC4" }
-        : { id };
+        : { id },
+    );
   }
 </script>
 
@@ -63,7 +78,7 @@
         Algorithm
         <select
           value={sim.algorithm}
-          onchange={(e) => (sim.algorithm = e.currentTarget.value)}
+          onchange={(e) => setSimAlgorithm(e.currentTarget.value)}
           class="min-w-0 rounded border border-edge bg-app px-1.5 py-0.5 text-ink"
         >
           {#each ALGORITHMS as a (a.id)}
@@ -81,7 +96,7 @@
               type="color"
               value={sim.palette.color ?? "#2B6CC4"}
               oninput={(e) =>
-                (sim.palette = {
+                setSimPalette({
                   id: SINGLE_PALETTE_ID,
                   color: e.currentTarget.value,
                 })}

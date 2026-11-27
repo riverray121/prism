@@ -1,7 +1,7 @@
 import { deleteRoom, getSim, listRooms, saveRoom, updateSim } from "$lib/ipc";
 import type { ContinuousFeature, MixFeature, Profile } from "$lib/ipc/messages";
 import type { MappingDoc } from "$lib/mapping/schema";
-import { DEFAULT_PALETTE } from "$lib/showgen/palettes";
+import { DEFAULT_PALETTE, recolorPrograms } from "$lib/showgen/palettes";
 import { DEFAULT_ALGORITHM, generateShow } from "$lib/showgen/registry";
 import type { PaletteRef } from "$lib/showgen/types";
 import type { GizmoMode } from "$lib/sim/editor";
@@ -288,6 +288,33 @@ export function allTracksLoaded(): boolean {
 
 // Generate the active room's show with the chosen algorithm and palette,
 // replacing any existing one.
+// Change the palette: the active room's show is recolored in place (light
+// assignments, motion and section-stepped color kept), so lights change
+// color immediately, mid-song included.
+export function setSimPalette(ref: PaletteRef): void {
+  sim.palette = ref;
+  const room = activeRoom();
+  const show = activeShow();
+  if (!room || !show || !sim.doc) return;
+  const snapshot = $state.snapshot(show) as MappingDoc;
+  const report = snapshot.generator?.report as
+    | { picks?: { programId: string; role?: string }[] }
+    | undefined;
+  const accent = report?.picks?.find((p) => p.role === "accent")?.programId;
+  sim.doc.rooms[room.id] = {
+    ...snapshot,
+    palette: ref,
+    programs: recolorPrograms(snapshot.programs, ref, accent),
+  };
+  commitSim();
+}
+
+// Change the algorithm: the active room's show is regenerated right away.
+export function setSimAlgorithm(id: string): void {
+  sim.algorithm = id;
+  regenerate();
+}
+
 export function regenerate(): void {
   const room = activeRoom();
   const profile = getRawProfile();
