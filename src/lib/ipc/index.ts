@@ -145,6 +145,30 @@ export function updateRig(rig: object): Promise<void> {
   return sendCommand({ type: "rig.update", rig });
 }
 
+// Request every saved simulator room (answered by a `rooms` event).
+export function listRooms(): Promise<void> {
+  return sendCommand({ type: "rooms.list" });
+}
+
+// Write one room under its id; the sidecar answers with the full room list.
+export function saveRoom(room: object): Promise<void> {
+  return sendCommand({ type: "rooms.save", room });
+}
+
+export function deleteRoom(roomId: string): Promise<void> {
+  return sendCommand({ type: "rooms.delete", room_id: roomId });
+}
+
+// Request a song's room shows (answered by a `sim` event).
+export function getSim(songId: string): Promise<void> {
+  return sendCommand({ type: "sim.get", song_id: songId });
+}
+
+// Replace a song's room shows wholesale.
+export function updateSim(songId: string, doc: object): Promise<void> {
+  return sendCommand({ type: "sim.update", song_id: songId, doc });
+}
+
 export function updateSettings(update: {
   engines?: string[];
   drum_subsep?: boolean;

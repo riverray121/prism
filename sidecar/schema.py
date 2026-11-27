@@ -122,6 +122,33 @@ class UpdateRigCommand(BaseModel):
     rig: dict
 
 
+class ListRoomsCommand(BaseModel):
+    type: Literal["rooms.list"]
+
+
+class SaveRoomCommand(BaseModel):
+    type: Literal["rooms.save"]
+    # The full room doc (frontend-owned schema); its ``id`` names the file.
+    room: dict
+
+
+class DeleteRoomCommand(BaseModel):
+    type: Literal["rooms.delete"]
+    room_id: str
+
+
+class GetSimCommand(BaseModel):
+    type: Literal["sim.get"]
+    song_id: str
+
+
+class UpdateSimCommand(BaseModel):
+    type: Literal["sim.update"]
+    song_id: str
+    # The song's whole sim doc: {"rooms": {room_id: show}}.
+    doc: dict
+
+
 class UpdateSettingsCommand(BaseModel):
     type: Literal["settings.update"]
     # Partial update: each field is applied only if present.
@@ -217,6 +244,19 @@ class RigEvent(BaseModel):
     type: Literal["rig"] = "rig"
     # The app-level rig doc; the empty rig when none is saved yet.
     rig: dict
+
+
+class RoomsEvent(BaseModel):
+    type: Literal["rooms"] = "rooms"
+    # Every saved room, ordered by title.
+    rooms: list[dict]
+
+
+class SimEvent(BaseModel):
+    type: Literal["sim"] = "sim"
+    song_id: str
+    # The song's room shows; {"rooms": {}} when none are saved yet.
+    doc: dict
 
 
 class EngineInfo(BaseModel):

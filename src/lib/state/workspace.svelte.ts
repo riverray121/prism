@@ -14,7 +14,7 @@ export const TABS: { id: Tab; label: string; blurb: string }[] = [
   {
     id: "sim",
     label: "Sim",
-    blurb: "Patch programs onto a simulated rig — future milestone.",
+    blurb: "Build a room of simulated lights and play a song's show in it.",
   },
   {
     id: "hardware",
@@ -36,6 +36,7 @@ export const workspace = $state<{
   sidebarWidth: number;
   mappingPanelWidth: number;
   hardwarePanelWidth: number;
+  simPanelWidth: number;
 }>({
   tab: "analysis",
   splitTab: null,
@@ -43,6 +44,7 @@ export const workspace = $state<{
   sidebarWidth: 384,
   mappingPanelWidth: 288,
   hardwarePanelWidth: 288,
+  simPanelWidth: 288,
 });
 
 export function setTab(tab: Tab): void {

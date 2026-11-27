@@ -2,6 +2,7 @@
   import HardwareView from "$lib/components/hardware/HardwareView.svelte";
   import InspectionView from "$lib/components/InspectionView.svelte";
   import MappingView from "$lib/components/mapping/MappingView.svelte";
+  import SimView from "$lib/components/sim/SimView.svelte";
   import TabStub from "$lib/components/shell/TabStub.svelte";
   import { inspection } from "$lib/state/inspection.svelte";
   import { TABS, type Tab } from "$lib/state/workspace.svelte";
@@ -29,6 +30,10 @@
     <HardwareView />
   {/if}
 {/if}
-{#if inspection.songId === null || tab === "sim"}
+<!-- The Sim tab works without a song: rooms are edited on their own, and
+     an open song adds its show. -->
+{#if tab === "sim"}
+  <SimView />
+{:else if inspection.songId === null}
   <TabStub title={meta.label} blurb={meta.blurb} />
 {/if}

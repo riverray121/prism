@@ -95,6 +95,20 @@ describe("SidecarEventSchema discriminated union", () => {
     expect(finished.type).toBe("library.import_finished");
   });
 
+  it("parses rooms and sim events", () => {
+    const rooms = SidecarEventSchema.parse({
+      type: "rooms",
+      rooms: [{ id: "r" }],
+    });
+    expect(rooms.type === "rooms" && rooms.rooms).toHaveLength(1);
+    const sim = SidecarEventSchema.parse({
+      type: "sim",
+      song_id: "s",
+      doc: { rooms: { r: { patch: { l: "p" } } } },
+    });
+    expect(sim.type === "sim" && sim.doc.rooms.r.patch).toEqual({ l: "p" });
+  });
+
   it("parses a settings event", () => {
     const ev = SidecarEventSchema.parse({
       type: "settings",
