@@ -2,7 +2,8 @@
 //   generate --run NAME [--library eval-library] [--room lab/rooms/demo-room.json]
 //            [--algorithms v1-baseline,v2-ranked] [--palette blue] [--songs q1,q2]
 //   report --run NAME
-//   render --run NAME [--songs q1,q2] [--seconds 45] [--size 960x540]
+//   render --run NAME [--songs q1,q2] [--seconds N|full] [--size 960x540]
+//          [--width 1280] [--only ID] [--tiles run:alg:label,...] [--suffix S]
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -48,12 +49,24 @@ export async function main(argv: string[]): Promise<void> {
     console.log(report(runDir));
   } else if (cmd === "render") {
     const { render } = await import("./render");
+    // --tiles runA:alg[:label],runB:alg[:label],... tiles shows from any runs.
+    const tiles = f.tiles?.split(",").map((spec) => {
+      const [run, alg, label] = spec.split(":");
+      return {
+        runDir: resolve("eval-runs", run),
+        alg,
+        label: label ?? `${run} ${alg}`,
+      };
+    });
     await render({
       runDir,
       songs: f.songs ? f.songs.split(",") : undefined,
-      seconds: Number(f.seconds ?? 45),
+      seconds: !f.seconds || f.seconds === "full" ? null : Number(f.seconds),
       size: f.size ?? "960x540",
+      outWidth: Number(f.width ?? 1280),
       only: f.only,
+      tiles,
+      suffix: f.suffix,
     });
     console.log(`report: ${report(join(runDir))}`);
   } else {

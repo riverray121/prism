@@ -1,6 +1,8 @@
 // lab render: play a run's shows in the demo room in headless Chrome and
-// encode MP4s with the song's audio. One comparison video per song tiles the
-// run's algorithms (up to three) plus an info panel in a 2×2 grid; `--only ID`
+// encode MP4s with the song's audio. One comparison video per song tiles up
+// to four shows in a 2×2 grid: the run's algorithms by default, or any
+// run/algorithm pairs (`tiles`, e.g. one algorithm under four palettes).
+// With up to three tiles the fourth cell is an info panel; `--only ID`
 // renders one algorithm full frame. Time is stepped, never real-time, so the
 // output does not depend on render speed.
 
@@ -19,8 +21,15 @@ export const FPS = 30;
 export interface RenderOptions {
   runDir: string;
   songs?: string[];
-  seconds: number;
+  // null renders the whole song.
+  seconds: number | null;
   size: string;
+  // Encoded frame width; height follows the aspect.
+  outWidth: number;
+  // Tiles from any run: overrides the run's algorithm list.
+  tiles?: { label: string; runDir: string; alg: string }[];
+  // File name suffix, e.g. "compare" or "palettes".
+  suffix?: string;
   only?: string;
 }
 
@@ -79,7 +88,13 @@ export function excerptStart(
   return Math.max(0, Math.min(duration - seconds, best - 2));
 }
 
-function encoder(out: string, audio: string, start: number, seconds: number) {
+function encoder(
+  out: string,
+  audio: string,
+  start: number,
+  seconds: number,
+  outWidth: number,
+) {
   const ff = spawn(
     "ffmpeg",
     [
@@ -104,12 +119,14 @@ function encoder(out: string, audio: string, start: number, seconds: number) {
       "0:v",
       "-map",
       "1:a",
+      "-vf",
+      `scale=${outWidth}:-2:flags=lanczos`,
       "-c:v",
       "libx264",
       "-pix_fmt",
       "yuv420p",
       "-crf",
-      "19",
+      "21",
       "-preset",
       "medium",
       "-c:a",
@@ -139,7 +156,10 @@ export async function render(opts: RenderOptions): Promise<void> {
   const algorithms: { id: string; label: string }[] = run.algorithms.filter(
     (a: { id: string }) => !opts.only || a.id === opts.only,
   );
-  const tiles = algorithms.slice(0, 3);
+  const tiles = (
+    opts.tiles ??
+    algorithms.map((a) => ({ label: a.label, runDir: opts.runDir, alg: a.id }))
+  ).slice(0, 4);
   const songs = listSongs(run.library).filter(
     (s) =>
       run.songs.some((r: { id: string }) => r.id === s.id) &&
@@ -192,7 +212,7 @@ export async function render(opts: RenderOptions): Promise<void> {
         sectionsF?.render === "segment" ? sectionsF.segments : [];
       const rmsF = profile.mix.rms;
       const rms = rmsF?.render === "continuous" ? (rmsF.data ?? null) : null;
-      const seconds = Math.min(opts.seconds, duration);
+      const seconds = Math.min(opts.seconds ?? duration, duration);
       const start = excerptStart(sections, rms, hz, duration, seconds);
       const ready = await page.evaluate(
         (cfg) =>
@@ -208,9 +228,9 @@ export async function render(opts: RenderOptions): Promise<void> {
           tileHeight: h,
           single,
           shows: tiles.map((a) => ({
-            id: a.id,
+            id: a.alg,
             label: a.label,
-            url: `/fs${resolve(opts.runDir, song.id, `${a.id}.json`)}`,
+            url: `/fs${resolve(a.runDir, song.id, `${a.alg}.json`)}`,
           })),
         },
       );
@@ -220,14 +240,18 @@ export async function render(opts: RenderOptions): Promise<void> {
         );
         continue;
       }
+      const readable = `${song.artist} - ${song.title}`
+        .replace(/[/\\:*?"<>|]/g, "")
+        .slice(0, 80);
       const name = single
-        ? `${song.id}-${tiles[0].id}.mp4`
-        : `${song.id}-compare.mp4`;
+        ? `${readable} · ${tiles[0].label}.mp4`
+        : `${readable} · ${opts.suffix ?? "compare"}.mp4`;
       const enc = encoder(
         resolve(outDir, name),
         song.sourceFile,
         start,
         seconds,
+        opts.outWidth,
       );
       const frames = Math.round(seconds * FPS);
       const started = Date.now();

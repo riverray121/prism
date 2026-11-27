@@ -198,6 +198,22 @@ function drawInfo(t: number, x: number, y: number, w: number, h: number): void {
   });
 }
 
+// Four tiles fill the grid: song, time and section go in a strip across the
+// middle instead of the info panel.
+function drawBanner(t: number): void {
+  const text = `${cfg!.artist} - ${cfg!.title}   ·   ${mmss(t)}   ·   ${sectionAt(t)}`;
+  ctx.font = "600 22px -apple-system, Helvetica, sans-serif";
+  const w = ctx.measureText(text).width + 40;
+  const x = (out.width - w) / 2;
+  const y = out.height / 2 - 20;
+  ctx.fillStyle = "rgba(17,18,20,0.8)";
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, 40, 8);
+  ctx.fill();
+  ctx.fillStyle = "#e6e7ea";
+  ctx.fillText(text, x + 20, y + 28);
+}
+
 function frame(t: number): string {
   if (!profile || !cfg) return "";
   const W = cfg.tileWidth;
@@ -210,6 +226,7 @@ function frame(t: number): string {
         [0, 0],
         [W, 0],
         [0, H],
+        [W, H],
       ];
   tiles.forEach((tile, k) => {
     const states = sampleLights(profile!, tile.doc, tile.outputs, lights, t);
@@ -225,7 +242,8 @@ function frame(t: number): string {
     );
     drawLabel(tile.label, x, y);
   });
-  if (!cfg.single) drawInfo(t, W, H, W, H);
+  if (!cfg.single && tiles.length < 4) drawInfo(t, W, H, W, H);
+  else if (tiles.length === 4) drawBanner(t);
   return out.toDataURL("image/jpeg", 0.92).split(",")[1];
 }
 
