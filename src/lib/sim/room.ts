@@ -174,11 +174,14 @@ export function roomLights(room: Room): LightSpec[] {
 }
 
 // A short unique item id: the kind/type plus a counter not already used.
+// Item ids are never reused: every song's sim.json patches lights by id,
+// so a new light must not inherit a deleted light's assignments.
 export function nextItemId(room: Room, base: string): string {
   const taken = new Set(room.items.map((i) => i.id));
-  let n = 1;
-  while (taken.has(`${base}-${n}`)) n++;
-  return `${base}-${n}`;
+  let id: string;
+  do id = `${base}-${Math.random().toString(36).slice(2, 8)}`;
+  while (taken.has(id));
+  return id;
 }
 
 export function emptyRoom(id: string, title: string): Room {

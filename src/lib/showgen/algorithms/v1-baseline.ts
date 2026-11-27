@@ -1,9 +1,8 @@
-// v1-baseline: auto-map as it was before ranked selection. Favorites
-// (storage.DEFAULT_FAVORITES on an un-starred song) grouped per stem into
-// programs by autoMap, patched to lights round-robin in light order. Frozen:
-// it is the reference the later algorithms are compared against. The only
-// addition is the palette, so comparisons differ in selection and motion,
-// not in color.
+// v1-baseline: favorites (storage.DEFAULT_FAVORITES on an un-starred song)
+// grouped per stem into programs by autoMap, patched to lights round-robin in
+// light order, colored from the palette so comparisons with later algorithms
+// differ in selection and motion, not in color. Frozen: it is the reference
+// the later algorithms are compared against.
 
 import { autoMap } from "$lib/mapping/automap";
 import { MappingDocSchema } from "$lib/mapping/schema";

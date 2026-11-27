@@ -56,7 +56,7 @@ ENGINE_INFO = {
         "drums": False,
     },
     "bs_roformer_sw": {
-        "label": "BS-RoFormer SW 6-stem — vocals/drums/bass/guitar/piano/other",
+        "label": "BS-RoFormer SW 6-stem: vocals/drums/bass/guitar/piano/other",
         "drums": True,
     },
 }

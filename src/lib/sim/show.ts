@@ -65,11 +65,22 @@ export function assignProgram(
     const program = mapping.programs.find((p) => p.id === sourceId);
     if (!program) return next;
     if (!next.programs.some((p) => p.id === programId)) {
-      next.programs.push({ ...structuredClone(program), id: programId });
+      // Copied derivations take the prefix too, and the copy's sources are
+      // rewritten to them: the room show may hold a derivation with the same
+      // id and different thresholds.
+      const copy = { ...structuredClone(program), id: programId };
+      for (const [channel, v] of Object.entries(copy.channels))
+        if (typeof v === "object" && v.source.startsWith("derived."))
+          copy.channels[channel as keyof typeof copy.channels] = {
+            ...v,
+            source: `derived.${MAPPING_PREFIX}${v.source.slice("derived.".length)}`,
+          };
+      next.programs.push(copy);
       for (const id of derivationIds(program)) {
         const d = mapping.derivations.find((x) => x.id === id);
-        if (d && !next.derivations.some((x) => x.id === id))
-          next.derivations.push(structuredClone(d));
+        const copyId = `${MAPPING_PREFIX}${id}`;
+        if (d && !next.derivations.some((x) => x.id === copyId))
+          next.derivations.push({ ...structuredClone(d), id: copyId });
       }
     }
   }

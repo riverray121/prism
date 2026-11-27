@@ -109,13 +109,19 @@ describe("room model", () => {
     ]);
   });
 
-  it("numbers new item ids past the taken ones", () => {
+  it("gives new items fresh ids, never a taken one", () => {
     const r = {
       ...room,
       items: [light("strip"), { ...light("strip"), id: "strip-2" }],
     };
-    expect(nextItemId(r, "strip")).toBe("strip-3");
-    expect(nextItemId(r, "lamp")).toBe("lamp-1");
+    const ids = new Set(
+      Array.from({ length: 50 }, () => nextItemId(r, "strip")),
+    );
+    expect(ids.size).toBe(50);
+    for (const id of ids) {
+      expect(id).toMatch(/^strip-[a-z0-9]+$/);
+      expect(r.items.some((i) => i.id === id)).toBe(false);
+    }
   });
 });
 
@@ -280,7 +286,15 @@ describe("room shows", () => {
     const next = assignProgram(show, "l2", id, hardware);
     expect(next.patch.l2).toBe(id);
     expect(next.programs.map((p) => p.id)).toEqual(["a", id]);
-    expect(next.derivations.map((d) => d.id)).toEqual(["kicks"]);
+    // The copy reads its own prefixed derivation, never a room-show one
+    // that happens to share the id.
+    expect(next.derivations.map((d) => d.id)).toEqual([
+      `${MAPPING_PREFIX}kicks`,
+    ]);
+    const gate = next.programs[1].channels.gate;
+    expect(typeof gate === "object" && gate.source).toBe(
+      `derived.${MAPPING_PREFIX}kicks`,
+    );
     // Assigning it again does not duplicate it.
     expect(assignProgram(next, "l1", id, hardware).programs).toHaveLength(2);
   });

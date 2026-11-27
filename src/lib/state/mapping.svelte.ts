@@ -214,7 +214,8 @@ export function applyShowResult(
 }
 
 // One level of undo for Generate: the doc as it was before the last
-// generated show replaced it. Cleared on song switch.
+// generated show replaced it. Cleared on song switch and by any other edit,
+// so Undo never discards edits made after the Generate.
 export const showHistory = $state<{ before: MappingDoc | null }>({
   before: null,
 });
@@ -227,8 +228,9 @@ export function generateWithUndo(
   palette: PaletteRef,
 ): void {
   if (mapping.doc === null) return;
-  showHistory.before = $state.snapshot(mapping.doc) as MappingDoc;
+  const before = structuredClone($state.snapshot(mapping.doc)) as MappingDoc;
   applyShowResult(result, algorithm, palette);
+  showHistory.before = before;
   mappingUi.editingProgram = result.programs[0]?.id ?? null;
   mappingUi.editingDerivation = null;
 }
@@ -310,6 +312,7 @@ export function setMaster(master: Macro["master"]): void {
 export function touchDoc(mutate: (doc: MappingDoc) => void): void {
   if (mapping.doc === null || mapping.songId === null) return;
   mutate(mapping.doc);
+  showHistory.before = null;
   dirtySongId = mapping.songId;
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {

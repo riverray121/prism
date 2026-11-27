@@ -129,6 +129,15 @@ describe("generate with undo", () => {
     expect(showHistory.before).toBeNull();
   });
 
+  it("any edit after Generate clears the undo snapshot", () => {
+    openWithDoc();
+    generateWithUndo(result, "v2-ranked", { id: "blue" });
+    touchDoc((doc) => {
+      doc.patch = { L1: "gen" };
+    });
+    expect(showHistory.before).toBeNull();
+  });
+
   it("a song switch clears the undo snapshot", () => {
     openWithDoc("s1");
     generateWithUndo(result, "v2-ranked", { id: "blue" });

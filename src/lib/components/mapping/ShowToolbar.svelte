@@ -37,7 +37,11 @@
   const TRACK_WAIT_MS = 60_000;
   const VIRTUAL_LIGHTS = 5;
 
-  let algorithm = $state(algorithmById(settings.showAlgorithm).id);
+  // Follows the app-wide setting until the user picks one here.
+  let picked = $state<string | null>(null);
+  const algorithm = $derived(
+    picked ?? algorithmById(settings.showAlgorithm).id,
+  );
   let busy = $state(false);
   let note = $state<string | null>(null);
 
@@ -53,11 +57,14 @@
     if (busy || mapping.doc === null) return;
     busy = true;
     note = null;
+    const songId = mapping.songId;
     try {
       requestCandidateTracks();
       const start = Date.now();
       while (tracksPending() > 0 && Date.now() - start < TRACK_WAIT_MS)
         await new Promise((r) => setTimeout(r, 100));
+      // The user may have opened another song while tracks loaded.
+      if (mapping.songId !== songId) return;
       const profile = getRawProfile();
       if (!profile || mapping.doc === null) return;
       const rig = rigLights($state.snapshot(hardware.rig.hubs));
@@ -106,7 +113,8 @@
 >
   <span class="text-base font-semibold">Show</span>
   <select
-    bind:value={algorithm}
+    value={algorithm}
+    onchange={(e) => (picked = e.currentTarget.value)}
     title={algorithmById(algorithm).description}
     class="rounded border border-edge bg-raised px-1.5 py-1 text-ink focus:border-accent focus:outline-none"
   >

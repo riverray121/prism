@@ -70,9 +70,11 @@ function applySidecarEvent(event: SidecarEvent): void {
     settings.companionUrl = event.companion_url;
     settings.companionToken = event.companion_token;
     settings.companionAuto = event.companion_auto;
+    // The Sim tab's Regenerate follows the app-wide choice when it changes,
+    // not on echoes of other settings.
+    if (!settings.loaded || settings.showAlgorithm !== event.show_algorithm)
+      sim.algorithm = algorithmById(event.show_algorithm).id;
     settings.showAlgorithm = event.show_algorithm;
-    // The Sim tab's Regenerate starts from the app-wide choice.
-    sim.algorithm = algorithmById(event.show_algorithm).id;
     settings.loaded = true;
   }
 }

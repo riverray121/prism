@@ -310,9 +310,14 @@ export function regenerate(): void {
 
 // A room without a show for the open song gets one generated as soon as the
 // song's tracks are loaded. Called from the Sim view's effect.
+// A room with no lights gets no show; a show with no programs (generated
+// while the room was empty) counts as missing, so adding lights fills it.
 export function ensureRoomShow(): void {
   const room = activeRoom();
-  if (!room || !sim.doc || sim.doc.rooms[room.id]) return;
+  if (!room || !sim.doc) return;
+  if (roomLights($state.snapshot(room) as Room).length === 0) return;
+  const show = sim.doc.rooms[room.id];
+  if (show && show.programs.length > 0) return;
   if (!allTracksLoaded()) return;
   regenerate();
 }

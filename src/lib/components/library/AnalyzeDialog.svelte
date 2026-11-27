@@ -103,7 +103,7 @@
               checked={settings.drumSubsep && canDrumSubsep}
               onchange={(e) => toggleDrumSubsep(e.currentTarget.checked)}
             />
-            ↳ Drum sub-separation — kick/snare/toms/hh/ride/crash, on the first drums
+            ↳ Drum sub-separation: kick/snare/toms/hh/ride/crash, on the first drums
             engine
           </label>
         {/if}
