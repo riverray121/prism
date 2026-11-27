@@ -10,7 +10,9 @@ import pyloudnorm as pyln
 
 
 def rms(y: np.ndarray, sr: int, hop: int) -> dict:
-    """Volume envelope, peak-normalized to 0-1."""
+    """Volume envelope, peak-normalized to 0-1. ``scale`` is the raw RMS peak
+    (linear amplitude) the data was divided by, so envelopes from the mix and
+    its stems can be compared on one level."""
     r = librosa.feature.rms(y=y, hop_length=hop)[0]
     peak = float(r.max()) if r.size else 0.0
     normalized = (r / peak) if peak > 0 else r
@@ -20,6 +22,7 @@ def rms(y: np.ndarray, sr: int, hop: int) -> dict:
         "source": "librosa",
         "unit": "normalized",
         "range": [0, 1],
+        "scale": peak,
         "data": [float(x) for x in normalized],
     }
 

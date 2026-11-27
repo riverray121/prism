@@ -122,7 +122,7 @@ Every feature entry carries the same metadata fields (`render`, `category`, `sou
 
 Sampled on the implicit 100 Hz timeline. No timestamps stored.
 
-The sample array lives in a per-feature `.npy` sidecar (float32, 1-D, length `frames`); `data_range` carries the array's `[min, max]` so consumers get the extent without loading. Pre-0.4.0 profiles inlined `data` — the sidecar migrates them at startup (`storage.migrate_profiles`), and the frontend loader accepts only the sidecar form.
+The sample array lives in a per-feature `.npy` sidecar (float32, 1-D, length `frames`); `data_range` carries the array's `[min, max]` so consumers get the extent without loading. RMS envelopes (mix `rms`, stem `energy`) also carry `scale`: the raw RMS peak the data was divided by, so stem and mix levels can be compared. Pre-0.4.0 profiles inlined `data` — the sidecar migrates them at startup (`storage.migrate_profiles`), and the frontend loader accepts only the sidecar form.
 
 ```json
 "rms": {

@@ -92,6 +92,9 @@ export const ContinuousFeatureSchema = z.object({
   sidecar: z.string(),
   frames: z.number(),
   data_range: z.tuple([z.number(), z.number()]),
+  // Raw peak the data was normalized by (RMS envelopes: linear amplitude), so
+  // a stem's level can be compared with the mix's. Absent on older profiles.
+  scale: z.number().optional(),
   // Default onset tracks derived at analysis time; absent on older profiles.
   // `onsets` (0.2.0) is dense — runs of dots trace sustained peaks;
   // `onsets_strict` (0.3.0) keeps prominent maxima only.
