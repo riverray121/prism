@@ -17,6 +17,8 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - Lab findings: v3 put a sparse accent (mix air band) on the TV backlight, which stayed dark (v4 adds the output check); the drums-only song's htdemucs "vocals" passed v2-v4 because it is −68 dB bleed normalized to full scale (v5 adds the level floor); v4's check measured palette brightness until it ran in neutral white.
 - Live palette and algorithm changes: `recolorPrograms` keeps section-bound hue maps and assignments; the Sim tab recolors or regenerates the room show on change.
 
+- Mac Mini production settings: `show_algorithm` v5-calibrated, engines htdemucs_ft only, drum sub-separation on (kick/snare/hi-hat candidates for about 2 extra minutes per song). Corpus picks by source (v5, 13 songs, 130 picks): mix 74, bs_roformer_sw 17, htdemucs_ft 15, htdemucs_6s 10, drum sub-stems 7, mel_band_roformer 5, bs_roformer 2.
+
 ## Todo
 
 - [x] Slice 0 — Models
