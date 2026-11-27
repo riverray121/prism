@@ -56,6 +56,21 @@ describe("nextAction", () => {
     expect(a).toEqual({ kind: "import", request });
   });
 
+  it("deletes songs whose request was removed, after any analysis finishes", () => {
+    const removed = { ...request, id: "r-gone", status: "removed" as const };
+    const songs = [
+      song({ id: "gone", request_id: "r-gone" }),
+      song({ id: "kept" }),
+      song({ id: "busy", request_id: "r-gone", status: "analyzing" }),
+    ];
+    const a = nextAction({ ...base, requests: [removed], songs });
+    expect(a).toEqual({ kind: "remove", songIds: ["gone"] });
+    expect(
+      nextAction({ ...base, requests: [removed], songs: [songs[1], songs[2]] })
+        .kind,
+    ).toBe("wait");
+  });
+
   it("queues every unanalyzed linked song, ignoring ordinary imports", () => {
     const a = nextAction({
       ...base,

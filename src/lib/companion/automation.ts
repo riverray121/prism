@@ -11,6 +11,7 @@ export type AutomationAction =
   | { kind: "idle" }
   | { kind: "wait"; reason: string }
   | { kind: "import"; request: CompanionRequest }
+  | { kind: "remove"; songIds: string[] }
   | { kind: "queue"; songIds: string[] }
   | { kind: "process"; song: Song };
 
@@ -23,6 +24,20 @@ export function nextAction(args: {
 }): AutomationAction {
   if (args.publishing) return { kind: "wait", reason: "publishing" };
   if (args.importsPending) return { kind: "wait", reason: "importing" };
+  // The companion removed these songs (they left every source playlist).
+  // A song mid-analysis is deleted once the worker is done with it.
+  const removed = new Set(
+    args.requests.filter((r) => r.status === "removed").map((r) => r.id),
+  );
+  const gone = args.songs.filter(
+    (s) =>
+      s.request_id !== null &&
+      removed.has(s.request_id) &&
+      s.status !== "analyzing" &&
+      s.status !== "queued",
+  );
+  if (gone.length > 0)
+    return { kind: "remove", songIds: gone.map((s) => s.id) };
   const open = args.requests.find((r) => r.status === "open");
   if (open) return { kind: "import", request: open };
   const linked = args.songs.filter((s) => s.request_id !== null);

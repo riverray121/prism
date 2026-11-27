@@ -16,6 +16,7 @@ export const RequestStatusSchema = z.enum([
   "analyzing",
   "published",
   "rejected",
+  "removed",
 ]);
 export type RequestStatus = z.infer<typeof RequestStatusSchema>;
 

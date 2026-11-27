@@ -13,10 +13,12 @@ The contract between Prism and a companion server: a service on the network that
 
 ```
 Request     {id, title, artist, external: {spotify_uri?}, duration_s?, requested_at,
-             status: "open" | "analyzing" | "published" | "rejected", show_id?}
+             status: "open" | "analyzing" | "published" | "rejected" | "removed", show_id?}
 ShowSummary {id, title, artist, duration_s, frame_rate_hz, light_count,
              updated_at, request_id?}
 ```
+
+`removed` is set by the companion when the song left its source (taken off every playlist the companion reads); the companion deletes the show. Prism in automatic mode deletes the song linked to a removed request from its library. A removed request that the source adds again returns to `open`.
 
 `duration_s` is the source track's length in seconds, when the producer knows it. Prism imports only an upload of that length (within 3 s or 3%), so a live recording or a music-video edit of the same title is skipped; without it, Prism matches on title and version tags alone.
 

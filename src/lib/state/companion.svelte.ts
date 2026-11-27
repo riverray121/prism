@@ -22,6 +22,7 @@ import {
 } from "$lib/companion/bundle";
 import {
   clearShowFrames,
+  deleteSong,
   importRequest as sendImportRequest,
   publishShow,
   pullShow,
@@ -371,6 +372,10 @@ export async function automationTick(): Promise<void> {
       await importRequest(action.request, attempts < IMPORT_ATTEMPTS, attempts);
       return;
     }
+    case "remove":
+      automation.lastNote = `removing ${action.songIds.length} song(s) taken off the playlists`;
+      for (const id of action.songIds) await deleteSong(id);
+      return;
     case "queue":
       automation.lastNote = `queuing analysis for ${action.songIds.length} song(s)`;
       await queueAnalysis(action.songIds);
