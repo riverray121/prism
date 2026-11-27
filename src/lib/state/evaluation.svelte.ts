@@ -10,6 +10,7 @@ import {
 } from "$lib/mapping/evaluate";
 import type { MappingDoc } from "$lib/mapping/schema";
 import { resolveFeature, resolveNode } from "$lib/mapping/sources";
+import { MIX_CANDIDATES } from "$lib/showgen/candidates";
 import { loadNpy } from "$lib/npy";
 import { hardware } from "$lib/state/hardware.svelte";
 import {
@@ -156,6 +157,27 @@ function requestSourceTracks(): void {
       continue;
     }
     const f = resolveFeature(proxy, source);
+    if (f?.render === "continuous") requestFeatureTrack(f);
+  }
+}
+
+// Request every show-algorithm candidate track (showgen/candidates.ts) for
+// the open song, so an algorithm sees all of them loaded. Completion shows
+// in tracksPending().
+export function requestCandidateTracks(): void {
+  const proxy = inspection.profile;
+  if (!proxy) return;
+  for (const stems of Object.values(proxy.stems))
+    for (const stem of Object.values(stems)) {
+      const energy = stem.features.energy;
+      if (energy?.render === "continuous") requestFeatureTrack(energy);
+      for (const sub of Object.values(stem.substems ?? {})) {
+        const e = sub.features.energy;
+        if (e?.render === "continuous") requestFeatureTrack(e);
+      }
+    }
+  for (const name of MIX_CANDIDATES) {
+    const f = proxy.mix[name];
     if (f?.render === "continuous") requestFeatureTrack(f);
   }
 }

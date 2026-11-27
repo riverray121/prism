@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ALGORITHMS, algorithmById } from "$lib/showgen/registry";
   import DialogShell from "$lib/components/DialogShell.svelte";
   import { updateSettings } from "$lib/ipc";
   import {
@@ -103,6 +104,21 @@
             </span>
           {/if}
         </span>
+      </label>
+      <label class="flex items-center gap-2 text-xs text-ink-muted">
+        <span class="shrink-0">Show algorithm</span>
+        <select
+          class="min-w-0 flex-1 rounded border border-edge bg-raised px-1.5 py-1 text-ink"
+          value={algorithmById(settings.showAlgorithm).id}
+          onchange={(e) =>
+            void updateSettings({
+              show_algorithm: (e.currentTarget as HTMLSelectElement).value,
+            })}
+        >
+          {#each ALGORITHMS as alg (alg.id)}
+            <option value={alg.id} title={alg.description}>{alg.label}</option>
+          {/each}
+        </select>
       </label>
     {/if}
     <div class="flex justify-end gap-2 pt-1">

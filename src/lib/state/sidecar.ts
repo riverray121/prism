@@ -64,6 +64,7 @@ function applySidecarEvent(event: SidecarEvent): void {
     settings.companionUrl = event.companion_url;
     settings.companionToken = event.companion_token;
     settings.companionAuto = event.companion_auto;
+    settings.showAlgorithm = event.show_algorithm;
     settings.loaded = true;
   }
 }

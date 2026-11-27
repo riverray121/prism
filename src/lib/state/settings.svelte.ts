@@ -13,6 +13,7 @@ export const settings = $state<{
   companionUrl: string;
   companionToken: string;
   companionAuto: boolean;
+  showAlgorithm: string;
   loaded: boolean;
 }>({
   engines: [],
@@ -22,5 +23,6 @@ export const settings = $state<{
   companionUrl: "",
   companionToken: "",
   companionAuto: false,
+  showAlgorithm: "v1-baseline",
   loaded: false,
 });

@@ -13,7 +13,8 @@ import {
 import { getVersion } from "@tauri-apps/api/app";
 
 import { nextAction, roundRobinPatch } from "$lib/companion/automation";
-import { autoMap, proposalIsEmpty } from "$lib/mapping/automap";
+import { algorithmById, generateShow } from "$lib/showgen/registry";
+import { rigLights } from "$lib/showgen/rig";
 
 import {
   buildManifest,
@@ -30,7 +31,11 @@ import {
   writeShowFrames,
 } from "$lib/ipc";
 import type { MappingDoc } from "$lib/mapping/schema";
-import { currentMatrices, matricesPending } from "$lib/state/evaluation.svelte";
+import {
+  currentMatrices,
+  matricesPending,
+  requestCandidateTracks,
+} from "$lib/state/evaluation.svelte";
 import { hardware, rigLatencyMs } from "$lib/state/hardware.svelte";
 import {
   getRawProfile,
@@ -39,7 +44,7 @@ import {
 } from "$lib/state/inspection.svelte";
 import { library, songById } from "$lib/state/library.svelte";
 import {
-  applyAutoMapProposal,
+  applyShowResult,
   docIsEmpty,
   flushMappingSave,
   mapping,
@@ -431,12 +436,31 @@ async function processSong(songId: string): Promise<void> {
   }
   const doc = $state.snapshot(mapping.doc) as MappingDoc;
   if (docIsEmpty(doc)) {
-    const proposal = autoMap(profile, doc, { intensity: "feature" });
-    if (proposalIsEmpty(proposal)) {
-      skip(songId, "nothing to auto-map (no usable favorites)");
+    // The algorithm reads every candidate track; wait until all are loaded.
+    requestCandidateTracks();
+    if (tracksPending() > 0) {
+      cur.step = "loading tracks";
       return;
     }
-    applyAutoMapProposal(proposal);
+    const lights = rigLights($state.snapshot(hardware.rig.hubs));
+    if (lights.length === 0) {
+      skip(songId, "no rig lights to map onto");
+      return;
+    }
+    const algorithm = algorithmById(settings.showAlgorithm).id;
+    const result = generateShow(algorithm, {
+      profile,
+      lights,
+      palette: doc.palette,
+    });
+    if (result.programs.length === 0) {
+      skip(
+        songId,
+        `nothing to map (${result.report.notes.join("; ") || "no usable tracks"})`,
+      );
+      return;
+    }
+    applyShowResult(result, algorithm, doc.palette);
     cur.step = "mapping";
     cur.since = now;
     return;

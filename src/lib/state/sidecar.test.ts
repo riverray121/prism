@@ -194,6 +194,7 @@ describe("applySidecarEvent", () => {
       companion_url: "http://192.168.8.2:8760",
       companion_token: "tok",
       companion_auto: false,
+      show_algorithm: "v2-ranked",
     });
     expect(settings.engines).toEqual(["htdemucs_ft"]);
     expect(settings.companionUrl).toBe("http://192.168.8.2:8760");

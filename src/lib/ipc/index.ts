@@ -151,6 +151,7 @@ export function updateSettings(update: {
   companion_url?: string;
   companion_token?: string;
   companion_auto?: boolean;
+  show_algorithm?: string;
 }): Promise<void> {
   return sendCommand({ type: "settings.update", ...update });
 }

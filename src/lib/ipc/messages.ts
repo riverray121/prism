@@ -262,6 +262,7 @@ export const SettingsEventSchema = z.object({
   companion_url: z.string(),
   companion_token: z.string(),
   companion_auto: z.boolean().default(false),
+  show_algorithm: z.string().default("v1-baseline"),
 });
 export type EngineInfo = z.infer<
   typeof SettingsEventSchema

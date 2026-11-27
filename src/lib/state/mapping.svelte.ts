@@ -10,6 +10,7 @@ import type {
   Program,
   Scene,
 } from "$lib/mapping/schema";
+import type { PaletteRef, ShowResult } from "$lib/showgen/types";
 
 // This store owns the doc and its persistence only. Rendering the doc into
 // program outputs lives downstream in state/evaluation.svelte.ts — the state
@@ -206,6 +207,23 @@ export function applyAutoMapProposal(proposal: AutoMapProposal): void {
     for (const [label, scene] of Object.entries(proposal.scenes)) {
       if (!(label in doc.macro.scenes)) doc.macro.scenes[label] = scene;
     }
+  });
+}
+
+// Replace the doc's show with a generated one: programs, derivations, macro
+// and patch from the algorithm, plus the palette and selection report.
+export function applyShowResult(
+  result: ShowResult,
+  algorithm: string,
+  palette: PaletteRef,
+): void {
+  touchDoc((doc) => {
+    doc.programs = result.programs;
+    doc.derivations = result.derivations;
+    doc.macro = result.macro;
+    doc.patch = result.patch;
+    doc.palette = palette;
+    doc.generator = { algorithm, report: result.report };
   });
 }
 

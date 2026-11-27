@@ -76,6 +76,7 @@ def emit_settings() -> None:
         drum_subsep = settings.get_drum_subsep(con)
         companion_url, companion_token = settings.get_companion(con)
         companion_auto = settings.get_companion_auto(con)
+        show_algorithm = settings.get_show_algorithm(con)
     ipc.emit(
         SettingsEvent(
             engines=engines,
@@ -85,6 +86,7 @@ def emit_settings() -> None:
             companion_url=companion_url,
             companion_token=companion_token,
             companion_auto=companion_auto,
+            show_algorithm=show_algorithm,
         )
     )
 
@@ -293,6 +295,8 @@ def handle(msg: dict) -> None:
                 settings.set_companion(con, cmd.companion_url, cmd.companion_token)
             if cmd.companion_auto is not None:
                 settings.set_companion_auto(con, cmd.companion_auto)
+            if cmd.show_algorithm is not None:
+                settings.set_show_algorithm(con, cmd.show_algorithm)
         emit_settings()
     else:
         log.warning("unknown command: %r", msg)

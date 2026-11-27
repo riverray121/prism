@@ -134,6 +134,8 @@ class UpdateSettingsCommand(BaseModel):
     companion_token: str | None = None
     # Companion automation: import, analyze, auto-map, publish unattended.
     companion_auto: bool | None = None
+    # Show algorithm id for automatic mode and Generate defaults.
+    show_algorithm: str | None = None
 
 
 # Sidecar -> frontend events.
@@ -238,3 +240,4 @@ class SettingsEvent(BaseModel):
     companion_url: str
     companion_token: str
     companion_auto: bool
+    show_algorithm: str

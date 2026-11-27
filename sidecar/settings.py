@@ -68,3 +68,17 @@ def get_companion_auto(con: sqlite3.Connection) -> bool:
 
 def set_companion_auto(con: sqlite3.Connection, on: bool) -> None:
     library.set_setting(con, "companion_auto", bool(on))
+
+
+# Show algorithm automatic mode generates shows with (frontend registry id,
+# src/lib/showgen/registry.ts). The frontend falls back to its default for an
+# id it does not know.
+DEFAULT_SHOW_ALGORITHM = "v1-baseline"
+
+
+def get_show_algorithm(con: sqlite3.Connection) -> str:
+    return str(library.get_setting(con, "show_algorithm", DEFAULT_SHOW_ALGORITHM))
+
+
+def set_show_algorithm(con: sqlite3.Connection, algorithm_id: str) -> None:
+    library.set_setting(con, "show_algorithm", algorithm_id.strip())

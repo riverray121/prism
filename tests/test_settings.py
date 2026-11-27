@@ -58,3 +58,9 @@ def test_companion_auto_defaults_off_and_round_trips(con):
     assert settings.get_companion_auto(con) is False
     settings.set_companion_auto(con, True)
     assert settings.get_companion_auto(con) is True
+
+
+def test_show_algorithm_defaults_to_baseline_and_round_trips(con):
+    assert settings.get_show_algorithm(con) == "v1-baseline"
+    settings.set_show_algorithm(con, " v2-ranked ")
+    assert settings.get_show_algorithm(con) == "v2-ranked"
