@@ -23,3 +23,6 @@ __pycache__/
 
 # Local scratch audio for development/testing
 /test-audio
+
+# Agent worktrees
+/.claude/worktrees
