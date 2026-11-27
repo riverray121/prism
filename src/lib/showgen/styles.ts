@@ -99,3 +99,54 @@ export function sectionColor(
     },
   };
 }
+
+// Strobe burst per event: a short held flash while strobe_rate chops it at
+// `rateHz`.
+export function strobeProgram(
+  id: string,
+  name: string,
+  derivationId: string,
+  rateHz = 12,
+): Program {
+  return {
+    id,
+    name,
+    enabled: true,
+    channels: {
+      brightness: {
+        source: `derived.${derivationId}`,
+        transform: [
+          { envelope: { attack_s: 0.005, hold_s: 0.12, decay_s: 0.2 } },
+        ],
+      },
+      strobe_rate: rateHz,
+    },
+  };
+}
+
+// A chase along the pixel strip whose speed follows the envelope (0–4
+// cycles/s via the motion channel), over the glow brightness.
+export function chaseProgram(
+  id: string,
+  name: string,
+  path: string,
+  data: ArrayLike<number>,
+): Program {
+  const glow = glowBrightness(path, data);
+  return {
+    id,
+    name,
+    enabled: true,
+    channels: {
+      brightness: glow,
+      motion: {
+        source: path,
+        transform: [
+          glow.transform[0],
+          { smooth: { window_s: 0.3 } },
+          { motion: { primitive: "chase", width: 0.2 } },
+        ],
+      },
+    },
+  };
+}
