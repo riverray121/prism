@@ -1,35 +1,11 @@
-// Lights for a lab run, from a room file's light items.
+// Lights for a lab run: a room file's lights, named and sized exactly as the
+// Sim tab sees them.
 
 import { readFileSync } from "node:fs";
 
-import {
-  FIXTURE_KINDS,
-  PIXEL_KINDS,
-  type FixtureKind,
-  type LightSpec,
-} from "$lib/showgen/types";
-
-interface RoomItem {
-  id: string;
-  kind?: string;
-  position?: [number, number, number];
-  params?: { name?: string; pixelCount?: number };
-}
+import { RoomSchema, roomLights } from "$lib/sim/room";
+import type { LightSpec } from "$lib/showgen/types";
 
 export function lightsFromRoom(path: string): LightSpec[] {
-  const room = JSON.parse(readFileSync(path, "utf8")) as { items: RoomItem[] };
-  return room.items
-    .filter(
-      (it) => it.kind && (FIXTURE_KINDS as readonly string[]).includes(it.kind),
-    )
-    .map((it) => {
-      const kind = it.kind as FixtureKind;
-      return {
-        id: it.id,
-        name: it.params?.name ?? it.id,
-        kind,
-        pixelCount: PIXEL_KINDS.has(kind) ? (it.params?.pixelCount ?? 60) : 1,
-        position: it.position,
-      };
-    });
+  return roomLights(RoomSchema.parse(JSON.parse(readFileSync(path, "utf8"))));
 }

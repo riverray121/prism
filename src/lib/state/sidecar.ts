@@ -1,3 +1,4 @@
+import { algorithmById } from "$lib/showgen/registry";
 import { getSettings, listLibrary, onSidecarEvent } from "$lib/ipc";
 import type { SidecarEvent } from "$lib/ipc/messages";
 import { library } from "$lib/state/library.svelte";
@@ -13,7 +14,7 @@ import {
   applyPullResult,
 } from "$lib/state/companion.svelte";
 import { settings } from "$lib/state/settings.svelte";
-import { applyRoomsEvent, applySimEvent } from "$lib/state/sim.svelte";
+import { applyRoomsEvent, applySimEvent, sim } from "$lib/state/sim.svelte";
 import { resetForSong } from "$lib/state/transport.svelte";
 
 // Reducer mapping inbound sidecar events onto the durable $state stores. The
@@ -70,6 +71,8 @@ function applySidecarEvent(event: SidecarEvent): void {
     settings.companionToken = event.companion_token;
     settings.companionAuto = event.companion_auto;
     settings.showAlgorithm = event.show_algorithm;
+    // The Sim tab's Regenerate starts from the app-wide choice.
+    sim.algorithm = algorithmById(event.show_algorithm).id;
     settings.loaded = true;
   }
 }

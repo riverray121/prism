@@ -86,7 +86,9 @@ export function sectionColor(
   const sat: Record<string, number> = {};
   labels.forEach((label, i) => {
     const c = hueSaturation(colors[(offset + i) % colors.length]);
-    hue[label] = c.hue;
+    // A bound hue track is 0–1 of a turn (the evaluator scales it ×360);
+    // only constants are degrees.
+    hue[label] = c.hue / 360;
     sat[label] = c.saturation;
   });
   return {

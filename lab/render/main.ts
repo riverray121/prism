@@ -4,12 +4,21 @@
 // lab.frame(t) per output frame and encodes the returned JPEG.
 
 import { oklchToCss } from "$lib/color";
-import { ProfileSchema, type MixFeature, type Profile } from "$lib/ipc/messages";
+import {
+  ProfileSchema,
+  type MixFeature,
+  type Profile,
+} from "$lib/ipc/messages";
 import { channelColor } from "$lib/mapping/evaluate";
 import { MappingDocSchema, type MappingDoc } from "$lib/mapping/schema";
 import { parseNpy } from "$lib/npy";
-import { createSimScene, RoomSchema, roomLights, type SimScene } from "$lib/sim";
-import { evaluateForLights, sampleLights, type OutputsByPixels } from "$lib/showgen/lightstate";
+import { RoomSchema, roomLights } from "$lib/sim/room";
+import { createSimScene, type SimScene } from "$lib/sim/scene";
+import {
+  evaluateForLights,
+  sampleLights,
+  type OutputsByPixels,
+} from "$lib/showgen/lightstate";
 import type { LightSpec, ShowResult } from "$lib/showgen/types";
 
 interface LoadConfig {
@@ -40,7 +49,10 @@ let bpm = 120;
 const out = document.getElementById("out") as HTMLCanvasElement;
 const ctx = out.getContext("2d")!;
 
-async function hydrate(dir: string, features: Record<string, MixFeature>): Promise<void> {
+async function hydrate(
+  dir: string,
+  features: Record<string, MixFeature>,
+): Promise<void> {
   await Promise.all(
     Object.values(features).map(async (f) => {
       if (f.render !== "continuous") return;
@@ -51,12 +63,15 @@ async function hydrate(dir: string, features: Record<string, MixFeature>): Promi
 }
 
 async function loadProfile(dir: string): Promise<Profile> {
-  const p = ProfileSchema.parse(await (await fetch(`${dir}/profile.json`)).json());
+  const p = ProfileSchema.parse(
+    await (await fetch(`${dir}/profile.json`)).json(),
+  );
   await hydrate(dir, p.mix);
   for (const stems of Object.values(p.stems))
     for (const stem of Object.values(stems)) {
       await hydrate(dir, stem.features);
-      for (const sub of Object.values(stem.substems ?? {})) await hydrate(dir, sub.features);
+      for (const sub of Object.values(stem.substems ?? {}))
+        await hydrate(dir, sub.features);
     }
   return p;
 }
@@ -71,13 +86,20 @@ async function load(c: LoadConfig): Promise<boolean> {
     lights = roomLights(room);
     profile = await loadProfile(c.songDir);
     const bpmF = profile.mix.bpm;
-    bpm = bpmF?.render === "scalar" && typeof bpmF.value === "number" && bpmF.value > 0 ? bpmF.value : 120;
+    bpm =
+      bpmF?.render === "scalar" &&
+      typeof bpmF.value === "number" &&
+      bpmF.value > 0
+        ? bpmF.value
+        : 120;
     const w = c.single ? c.tileWidth * 2 : c.tileWidth;
     const h = c.single ? c.tileHeight * 2 : c.tileHeight;
     out.width = c.tileWidth * 2;
     out.height = c.tileHeight * 2;
     for (const show of c.shows) {
-      const file = (await (await fetch(show.url)).json()) as { result: ShowResult };
+      const file = (await (await fetch(show.url)).json()) as {
+        result: ShowResult;
+      };
       const r = file.result;
       const doc = MappingDocSchema.parse({
         derivations: r.derivations,
@@ -90,7 +112,7 @@ async function load(c: LoadConfig): Promise<boolean> {
       canvas.width = w;
       canvas.height = h;
       document.getElementById("tiles")!.append(canvas);
-      const scene = createSimScene(canvas, room, { pixelRatio: 1, preserveDrawingBuffer: true });
+      const scene = createSimScene(canvas, room, { pixelRatio: 1 });
       scene.resize(w, h);
       const legend = lights.map((l) => {
         const pid = doc.patch[l.id];
@@ -100,7 +122,9 @@ async function load(c: LoadConfig): Promise<boolean> {
         return {
           light: l.name,
           program: program?.name ?? pid ?? "off",
-          color: o ? oklchToCss({ ...channelColor(o.channels, frame), l: 0.72 }) : "#444",
+          color: o
+            ? oklchToCss({ ...channelColor(o.channels, frame), l: 0.72 })
+            : "#444",
           role: r.report.picks.find((p) => p.programId === pid)?.role,
         };
       });
@@ -145,7 +169,11 @@ function drawInfo(t: number, x: number, y: number, w: number, h: number): void {
   ctx.fillText(cfg!.title, x + pad, y + pad + 28);
   ctx.fillStyle = "#9a9ca3";
   ctx.font = "400 22px -apple-system, Helvetica, sans-serif";
-  ctx.fillText(`${cfg!.artist}  ·  ${mmss(t)}  ·  ${sectionAt(t)}  ·  ${Math.round(bpm)} BPM`, x + pad, y + pad + 62);
+  ctx.fillText(
+    `${cfg!.artist}  ·  ${mmss(t)}  ·  ${sectionAt(t)}  ·  ${Math.round(bpm)} BPM`,
+    x + pad,
+    y + pad + 62,
+  );
   const colW = (w - pad * 2) / Math.max(1, tiles.length);
   tiles.forEach((tile, k) => {
     const cx = x + pad + k * colW;
@@ -160,7 +188,11 @@ function drawInfo(t: number, x: number, y: number, w: number, h: number): void {
       ctx.fillRect(cx, cy - 11, 11, 11);
       ctx.fillStyle = "#c9cace";
       const text = `${row.light}: ${row.program}${row.role ? ` (${row.role})` : ""}`;
-      ctx.fillText(text.length > 34 ? `${text.slice(0, 33)}…` : text, cx + 18, cy);
+      ctx.fillText(
+        text.length > 34 ? `${text.slice(0, 33)}…` : text,
+        cx + 18,
+        cy,
+      );
       cy += 22;
     }
   });
@@ -172,13 +204,25 @@ function frame(t: number): string {
   const H = cfg.tileHeight;
   ctx.fillStyle = "#111214";
   ctx.fillRect(0, 0, out.width, out.height);
-  const slots = cfg.single ? [[0, 0]] : [[0, 0], [W, 0], [0, H]];
+  const slots = cfg.single
+    ? [[0, 0]]
+    : [
+        [0, 0],
+        [W, 0],
+        [0, H],
+      ];
   tiles.forEach((tile, k) => {
     const states = sampleLights(profile!, tile.doc, tile.outputs, lights, t);
     tile.scene.setLightStates(states, t, bpm);
     tile.scene.render();
     const [x, y] = slots[k];
-    ctx.drawImage(tile.canvas, x, y, cfg!.single ? W * 2 : W, cfg!.single ? H * 2 : H);
+    ctx.drawImage(
+      tile.canvas,
+      x,
+      y,
+      cfg!.single ? W * 2 : W,
+      cfg!.single ? H * 2 : H,
+    );
     drawLabel(tile.label, x, y);
   });
   if (!cfg.single) drawInfo(t, W, H, W, H);

@@ -24,7 +24,7 @@ export interface RenderOptions {
   only?: string;
 }
 
-const REPO = fileURLToPath(new URL("..", import.meta.url));
+const REPO = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 // Serves files under the repo at /fs/<absolute path>; nothing outside it.
 function fsPlugin(): Plugin {
@@ -32,7 +32,10 @@ function fsPlugin(): Plugin {
     name: "lab-fs",
     configureServer(server) {
       server.middlewares.use("/fs/", (req, res) => {
-        const path = resolve("/", decodeURIComponent((req.url ?? "").split("?")[0]));
+        const path = resolve(
+          "/",
+          decodeURIComponent((req.url ?? "").split("?")[0]),
+        );
         if (!path.startsWith(REPO + sep) || !existsSync(path)) {
           res.statusCode = 404;
           res.end();
@@ -60,7 +63,10 @@ export function excerptStart(
   if (rms)
     for (const s of sections) {
       const a = Math.floor(s.start * hz);
-      const b = Math.min(rms.length, Math.floor(Math.min(s.end, s.start + seconds) * hz));
+      const b = Math.min(
+        rms.length,
+        Math.floor(Math.min(s.end, s.start + seconds) * hz),
+      );
       if (b - a < hz * 4) continue;
       let sum = 0;
       for (let i = a; i < b; i++) sum += rms[i];
@@ -77,24 +83,58 @@ function encoder(out: string, audio: string, start: number, seconds: number) {
   const ff = spawn(
     "ffmpeg",
     [
-      "-y", "-loglevel", "error",
-      "-f", "image2pipe", "-framerate", String(FPS), "-c:v", "mjpeg", "-i", "-",
-      "-ss", start.toFixed(3), "-t", seconds.toFixed(3), "-i", audio,
-      "-map", "0:v", "-map", "1:a",
-      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "19", "-preset", "medium",
-      "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart",
+      "-y",
+      "-loglevel",
+      "error",
+      "-f",
+      "image2pipe",
+      "-framerate",
+      String(FPS),
+      "-c:v",
+      "mjpeg",
+      "-i",
+      "-",
+      "-ss",
+      start.toFixed(3),
+      "-t",
+      seconds.toFixed(3),
+      "-i",
+      audio,
+      "-map",
+      "0:v",
+      "-map",
+      "1:a",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-crf",
+      "19",
+      "-preset",
+      "medium",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      "-shortest",
+      "-movflags",
+      "+faststart",
       out,
     ],
     { stdio: ["pipe", "inherit", "inherit"] },
   );
   const done = new Promise<void>((ok, fail) =>
-    ff.on("close", (code) => (code === 0 ? ok() : fail(new Error(`ffmpeg exited ${code}`)))),
+    ff.on("close", (code) =>
+      code === 0 ? ok() : fail(new Error(`ffmpeg exited ${code}`)),
+    ),
   );
   return { stdin: ff.stdin, done };
 }
 
 export async function render(opts: RenderOptions): Promise<void> {
-  const run = JSON.parse(readFileSync(resolve(opts.runDir, "run.json"), "utf8"));
+  const run = JSON.parse(
+    readFileSync(resolve(opts.runDir, "run.json"), "utf8"),
+  );
   const [w, h] = opts.size.split("x").map(Number);
   const algorithms: { id: string; label: string }[] = run.algorithms.filter(
     (a: { id: string }) => !opts.only || a.id === opts.only,
@@ -103,7 +143,12 @@ export async function render(opts: RenderOptions): Promise<void> {
   const songs = listSongs(run.library).filter(
     (s) =>
       run.songs.some((r: { id: string }) => r.id === s.id) &&
-      (!opts.songs || opts.songs.some((q) => s.id.startsWith(q) || `${s.artist} - ${s.title}`.toLowerCase().includes(q.toLowerCase()))),
+      (!opts.songs ||
+        opts.songs.some(
+          (q) =>
+            s.id.startsWith(q) ||
+            `${s.artist} - ${s.title}`.toLowerCase().includes(q.toLowerCase()),
+        )),
   );
   const outDir = resolve(opts.runDir, "videos");
   mkdirSync(outDir, { recursive: true });
@@ -126,7 +171,9 @@ export async function render(opts: RenderOptions): Promise<void> {
   });
   const single = tiles.length === 1;
   const page = await browser.newPage({
-    viewport: single ? { width: w * 2, height: h * 2 } : { width: w * 2, height: h * 2 },
+    viewport: single
+      ? { width: w * 2, height: h * 2 }
+      : { width: w * 2, height: h * 2 },
   });
   page.on("console", (m) => {
     if (m.type() === "error") console.error("page:", m.text());
@@ -141,13 +188,17 @@ export async function render(opts: RenderOptions): Promise<void> {
       const hz = profile.timeline.frame_rate_hz;
       const duration = profile.timeline.frame_count / hz;
       const sectionsF = profile.mix.sections;
-      const sections = sectionsF?.render === "segment" ? sectionsF.segments : [];
+      const sections =
+        sectionsF?.render === "segment" ? sectionsF.segments : [];
       const rmsF = profile.mix.rms;
       const rms = rmsF?.render === "continuous" ? (rmsF.data ?? null) : null;
       const seconds = Math.min(opts.seconds, duration);
       const start = excerptStart(sections, rms, hz, duration, seconds);
       const ready = await page.evaluate(
-        (cfg) => (window as unknown as { lab: { load(c: unknown): Promise<boolean> } }).lab.load(cfg),
+        (cfg) =>
+          (
+            window as unknown as { lab: { load(c: unknown): Promise<boolean> } }
+          ).lab.load(cfg),
         {
           roomUrl: `/fs${resolve(REPO, run.room)}`,
           songDir: `/fs${song.dir}`,
@@ -164,16 +215,28 @@ export async function render(opts: RenderOptions): Promise<void> {
         },
       );
       if (!ready) {
-        console.error(`skipped ${song.artist} - ${song.title}: page could not load it`);
+        console.error(
+          `skipped ${song.artist} - ${song.title}: page could not load it`,
+        );
         continue;
       }
-      const name = single ? `${song.id}-${tiles[0].id}.mp4` : `${song.id}-compare.mp4`;
-      const enc = encoder(resolve(outDir, name), song.sourceFile, start, seconds);
+      const name = single
+        ? `${song.id}-${tiles[0].id}.mp4`
+        : `${song.id}-compare.mp4`;
+      const enc = encoder(
+        resolve(outDir, name),
+        song.sourceFile,
+        start,
+        seconds,
+      );
       const frames = Math.round(seconds * FPS);
       const started = Date.now();
       for (let f = 0; f < frames; f++) {
         const b64 = await page.evaluate(
-          (t) => (window as unknown as { lab: { frame(t: number): string } }).lab.frame(t),
+          (t) =>
+            (
+              window as unknown as { lab: { frame(t: number): string } }
+            ).lab.frame(t),
           start + f / FPS,
         );
         if (!enc.stdin.write(Buffer.from(b64, "base64")))
@@ -182,7 +245,9 @@ export async function render(opts: RenderOptions): Promise<void> {
       enc.stdin.end();
       await enc.done;
       const secs = (Date.now() - started) / 1000;
-      console.log(`${name} · ${song.artist} - ${song.title} · ${frames} frames in ${secs.toFixed(0)} s`);
+      console.log(
+        `${name} · ${song.artist} - ${song.title} · ${frames} frames in ${secs.toFixed(0)} s`,
+      );
     }
   } finally {
     await browser.close();

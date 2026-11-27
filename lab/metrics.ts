@@ -114,6 +114,9 @@ export function metricsFromSeries(
     beat_alignment: flashes ? onBeat / flashes : 0,
     dark_time: avg(dark),
     mean_level: avg(series.map((s) => avg(Array.from(s)))),
-    per_light: series.map((s, i) => ({ change: change[i], level: avg(Array.from(s)) })),
+    per_light: series.map((s, i) => ({
+      change: change[i],
+      level: avg(Array.from(s)),
+    })),
   };
 }
