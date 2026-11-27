@@ -137,7 +137,7 @@ The sample array lives in a per-feature `.npy` sidecar (float32, 1-D, length `fr
 }
 ```
 
-Sidecar paths: mix features under `features/{name}.npy`; stem features under `features/{engine}/{stem}/{name}.npy`; drum sub-stems add the sub-stem (`features/{engine}/{stem}/{sub}/{name}.npy`).
+Sidecar paths: mix features under `features/{name}.npy`; stem features under `features/{engine}/{stem}/{name}.npy`; drum sub-stems add the sub-stem (`features/{engine}/{stem}/{sub}/{name}.npy`). Drum sub-separation runs on the first selected engine that emits a `drums` stem only, so `substems` appears under one engine.
 
 ML continuous features may add a parallel `confidence` array of equal length (planned — no extractor emits one yet; `pitch_confidence` is a separate feature, not a sibling array, and the zod loader does not model it). WIP features add `"status": "wip"`.
 

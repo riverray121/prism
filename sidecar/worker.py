@@ -266,6 +266,10 @@ def _separate_and_analyze_stems(
         drum_subsep = settings.get_drum_subsep(con)
     total = len(engines)
     result: dict[str, dict] = {}
+    # Drum sub-separation runs once, on the first engine that emits drums:
+    # another engine's drums stem would yield near-identical sub-stems at the
+    # cost of one more model pass.
+    drums_split = False
 
     # Each engine owns an equal share of the post-mix progress span; separation
     # takes the leading ENGINE_SEP_FRAC of that share, the stem pass the rest.
@@ -310,7 +314,8 @@ def _separate_and_analyze_stems(
             )
             # Second stage: split the drums stem into kick/snare/etc. Shown as a
             # distinct transient, then dsp-stem is restored for the remaining stems.
-            if drum_subsep and stem_name == "drums":
+            if drum_subsep and stem_name == "drums" and not drums_split:
+                drums_split = True
                 # Sub-separation rides inside the drums stem's progress slot.
                 _set_stage(
                     song_id,
