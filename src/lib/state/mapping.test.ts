@@ -10,9 +10,12 @@ import { emptyMappingDoc } from "$lib/mapping/schema";
 import {
   applyMappingEvent,
   flushMappingSave,
+  generateWithUndo,
   mapping,
   resetMappingForSong,
+  showHistory,
   touchDoc,
+  undoGenerate,
 } from "./mapping.svelte";
 
 const updateMapping = vi.mocked(ipc.updateMapping);
@@ -94,5 +97,42 @@ describe("debounced saves", () => {
     openWithDoc();
     flushMappingSave();
     expect(updateMapping).not.toHaveBeenCalled();
+  });
+});
+
+describe("generate with undo", () => {
+  const result = {
+    programs: [{ id: "gen", enabled: true, channels: {} }],
+    derivations: [],
+    patch: { L1: "gen" },
+    macro: { scenes_from: null, scenes: {}, master: null },
+    report: { algorithm: "v2-ranked", candidates: [], picks: [], notes: [] },
+  };
+
+  it("replaces the show and Undo restores the doc from before", () => {
+    openWithDoc();
+    touchDoc((doc) => {
+      doc.programs.push({ id: "mine", enabled: true, channels: {} });
+      doc.patch = { L1: "mine" };
+    });
+    generateWithUndo(result, "v2-ranked", { id: "ember" });
+    expect(mapping.doc?.programs.map((p) => p.id)).toEqual(["gen"]);
+    expect(mapping.doc?.generator?.algorithm).toBe("v2-ranked");
+    expect(mapping.doc?.palette).toEqual({ id: "ember" });
+    expect(showHistory.before).not.toBeNull();
+
+    undoGenerate();
+    expect(mapping.doc?.programs.map((p) => p.id)).toEqual(["mine"]);
+    expect(mapping.doc?.patch).toEqual({ L1: "mine" });
+    expect(mapping.doc?.generator).toBeUndefined();
+    expect(mapping.doc?.palette).toEqual({ id: "blue" });
+    expect(showHistory.before).toBeNull();
+  });
+
+  it("a song switch clears the undo snapshot", () => {
+    openWithDoc("s1");
+    generateWithUndo(result, "v2-ranked", { id: "blue" });
+    resetMappingForSong("s2");
+    expect(showHistory.before).toBeNull();
   });
 });

@@ -1,10 +1,12 @@
 <script lang="ts">
-  import AutoMapButton from "$lib/components/mapping/AutoMapButton.svelte";
+  import CandidatesPanel from "$lib/components/mapping/CandidatesPanel.svelte";
   import DerivationEditor from "$lib/components/mapping/DerivationEditor.svelte";
   import LightPreview from "$lib/components/mapping/LightPreview.svelte";
   import MacroPanel from "$lib/components/mapping/MacroPanel.svelte";
+  import ProgramCards from "$lib/components/mapping/ProgramCards.svelte";
   import ProgramEditor from "$lib/components/mapping/ProgramEditor.svelte";
-  import ProgramList from "$lib/components/mapping/ProgramList.svelte";
+  import ProgramSimpleEditor from "$lib/components/mapping/ProgramSimpleEditor.svelte";
+  import ShowToolbar from "$lib/components/mapping/ShowToolbar.svelte";
   import SourcesPanel from "$lib/components/mapping/SourcesPanel.svelte";
   import ResizablePanel from "$lib/components/shell/ResizablePanel.svelte";
   import PixelLane from "$lib/graphs/PixelLane.svelte";
@@ -27,9 +29,10 @@
     workspace,
   } from "$lib/state/workspace.svelte";
 
-  // The Mapping tab: author derivations and programs from favorited features
-  // and confirm the result against playback. Sources + programs on the left,
-  // the open editor and the ribbon preview stack in the main column.
+  // The Mapping tab: generate a show, then adjust it card by card. Program
+  // cards (and derivations) on the left; the selected program's simple
+  // editor and live light preview in the main column, with the channel
+  // editor, candidate table, scenes and preview lanes in disclosures below.
 
   const ready = $derived(inspection.profile !== null && mapping.doc !== null);
 
@@ -50,6 +53,9 @@
 
   // Per-program exact-value overlay toggle.
   const valueLines = $state<Record<string, boolean>>({});
+
+  const summary =
+    "cursor-pointer select-none text-xs font-medium uppercase tracking-wide text-ink-faint hover:text-ink";
 </script>
 
 {#if !ready}
@@ -57,86 +63,94 @@
     <p class="text-sm text-ink-faint">Loading…</p>
   </div>
 {:else}
-  <div class="flex h-full">
-    <ResizablePanel
-      bind:width={workspace.mappingPanelWidth}
-      min={PANEL_MIN_WIDTH}
-      max={PANEL_MAX_WIDTH}
-    >
-      <div class="flex h-bar shrink-0 items-center px-3">
-        <span class="text-base font-semibold">Derivations &amp; Programs</span>
-      </div>
-      <SourcesPanel />
-      <ProgramList />
-      <AutoMapButton />
-    </ResizablePanel>
-    <main class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-32">
-      <div class="flex items-start gap-4">
-        <div class="min-w-0 flex-1">
-          {#if mappingUi.editingDerivation !== null}
-            <DerivationEditor />
-          {:else if mappingUi.editingProgram !== null}
-            <ProgramEditor />
-          {:else}
-            <p class="text-sm text-ink-faint">
-              Select a derivation or program to edit.
-            </p>
-          {/if}
+  <div class="flex h-full flex-col">
+    <ShowToolbar />
+    <div class="flex min-h-0 flex-1">
+      <ResizablePanel
+        bind:width={workspace.mappingPanelWidth}
+        min={PANEL_MIN_WIDTH}
+        max={PANEL_MAX_WIDTH}
+      >
+        <div class="min-h-0 flex-1 overflow-y-auto pt-3">
+          <ProgramCards />
+          <details class="px-3 pb-3">
+            <summary class={summary}>Derivations</summary>
+            <div class="-mx-3 mt-1.5">
+              <SourcesPanel />
+            </div>
+          </details>
         </div>
-        <LightPreview />
-      </div>
+      </ResizablePanel>
+      <main
+        class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-32"
+      >
+        <div class="flex items-start gap-4">
+          <div class="min-w-0 flex-1">
+            {#if mappingUi.editingDerivation !== null}
+              <DerivationEditor />
+            {:else if mappingUi.editingProgram !== null}
+              <ProgramSimpleEditor />
+              <details class="mt-4">
+                <summary class={summary}>Advanced: channels</summary>
+                <div class="mt-2">
+                  <ProgramEditor />
+                </div>
+              </details>
+            {:else}
+              <p class="text-sm text-ink-faint">
+                {(mapping.doc?.programs.length ?? 0) > 0
+                  ? "Select a program card to adjust it."
+                  : "Press Generate to build a show from this song."}
+              </p>
+            {/if}
+          </div>
+          <LightPreview />
+        </div>
 
-      <MacroPanel />
+        <details>
+          <summary class={summary}>Candidates</summary>
+          <div class="mt-2"><CandidatesPanel /></div>
+        </details>
 
-      {#if previews.length > 0}
-        <section class="flex flex-col gap-2">
-          <p class="text-xs font-medium uppercase tracking-wide text-ink-faint">
-            Preview
-          </p>
-          {#each previews as { program, output } (program.id)}
-            <div>
-              <div class="mb-0.5 flex items-center gap-2">
-                <button
-                  onclick={() => editProgram(program.id)}
-                  class="text-sm text-ink-muted hover:text-ink {mappingUi.editingProgram ===
-                  program.id
-                    ? 'text-accent'
-                    : ''}"
-                >
-                  {programLabel(program)}
-                </button>
-                <button
-                  onclick={() =>
-                    (valueLines[program.id] = !valueLines[program.id])}
-                  title="Toggle the exact brightness value line"
-                  class="rounded border border-edge px-1.5 py-0 text-xs {valueLines[
-                    program.id
-                  ]
-                    ? 'text-accent'
-                    : 'text-ink-faint hover:text-ink'}"
-                >
-                  values
-                </button>
-              </div>
-              <RibbonLane
-                {output}
-                {frameCount}
-                {frameRateHz}
-                showValueLine={valueLines[program.id] ?? false}
-                playheadSec={transport.currentTime}
-                follow={transport.playing}
-                window={view.window}
-                followMode={view.followMode}
-                onWindowChange={setViewWindow}
-                onSeek={scrub}
-                onScrubStart={scrubStart}
-                onScrubEnd={scrubEnd}
-              />
-              {#if output.pixels}
-                <div class="mt-1">
-                  <PixelLane
-                    pixels={output.pixels}
+        <details>
+          <summary class={summary}>Scenes &amp; master</summary>
+          <div class="mt-2"><MacroPanel /></div>
+        </details>
+
+        {#if previews.length > 0}
+          <details open>
+            <summary class={summary}>Preview</summary>
+            <div class="mt-2 flex flex-col gap-2">
+              {#each previews as { program, output } (program.id)}
+                <div>
+                  <div class="mb-0.5 flex items-center gap-2">
+                    <button
+                      onclick={() => editProgram(program.id)}
+                      class="text-sm text-ink-muted hover:text-ink {mappingUi.editingProgram ===
+                      program.id
+                        ? 'text-accent'
+                        : ''}"
+                    >
+                      {programLabel(program)}
+                    </button>
+                    <button
+                      onclick={() =>
+                        (valueLines[program.id] = !valueLines[program.id])}
+                      title="Toggle the exact brightness value line"
+                      class="rounded border border-edge px-1.5 py-0 text-xs {valueLines[
+                        program.id
+                      ]
+                        ? 'text-accent'
+                        : 'text-ink-faint hover:text-ink'}"
+                    >
+                      values
+                    </button>
+                  </div>
+                  <RibbonLane
+                    {output}
+                    {frameCount}
                     {frameRateHz}
+                    showValueLine={valueLines[program.id] ?? false}
                     playheadSec={transport.currentTime}
                     follow={transport.playing}
                     window={view.window}
@@ -146,12 +160,28 @@
                     onScrubStart={scrubStart}
                     onScrubEnd={scrubEnd}
                   />
+                  {#if output.pixels}
+                    <div class="mt-1">
+                      <PixelLane
+                        pixels={output.pixels}
+                        {frameRateHz}
+                        playheadSec={transport.currentTime}
+                        follow={transport.playing}
+                        window={view.window}
+                        followMode={view.followMode}
+                        onWindowChange={setViewWindow}
+                        onSeek={scrub}
+                        onScrubStart={scrubStart}
+                        onScrubEnd={scrubEnd}
+                      />
+                    </div>
+                  {/if}
                 </div>
-              {/if}
+              {/each}
             </div>
-          {/each}
-        </section>
-      {/if}
-    </main>
+          </details>
+        {/if}
+      </main>
+    </div>
   </div>
 {/if}

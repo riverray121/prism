@@ -1,5 +1,4 @@
 import { updateMapping } from "$lib/ipc";
-import type { AutoMapProposal } from "$lib/mapping/automap";
 import type { ProgramOutput } from "$lib/mapping/evaluate";
 import type {
   Channel,
@@ -75,6 +74,7 @@ export function resetMappingForSong(songId: string | null): void {
   mappingUi.editingDerivation = null;
   mappingUi.editingProgram = null;
   audition.output = null;
+  showHistory.before = null;
 }
 
 // Apply an inbound `mapping` event; stale responses (user navigated away
@@ -184,9 +184,9 @@ export function setProgramChannel(
   });
 }
 
-// ── Auto-map ────────────────────────────────────────────────────────────────
+// ── Generated shows ──────────────────────────────────────────────────────────
 
-// A doc with nothing authored yet: a proposal may fill it silently.
+// A doc with nothing authored yet: automatic mode may fill it silently.
 export function docIsEmpty(doc: MappingDoc): boolean {
   return (
     doc.programs.length === 0 &&
@@ -194,20 +194,6 @@ export function docIsEmpty(doc: MappingDoc): boolean {
     doc.macro.scenes_from === null &&
     doc.macro.master === null
   );
-}
-
-// Append a proposal. Strictly additive: existing programs, derivations,
-// scene source, and scene presets are never removed or rewritten.
-export function applyAutoMapProposal(proposal: AutoMapProposal): void {
-  touchDoc((doc) => {
-    doc.programs.push(...proposal.programs);
-    if (proposal.scenesFrom !== null && doc.macro.scenes_from === null) {
-      doc.macro.scenes_from = proposal.scenesFrom;
-    }
-    for (const [label, scene] of Object.entries(proposal.scenes)) {
-      if (!(label in doc.macro.scenes)) doc.macro.scenes[label] = scene;
-    }
-  });
 }
 
 // Replace the doc's show with a generated one: programs, derivations, macro
@@ -224,6 +210,65 @@ export function applyShowResult(
     doc.patch = result.patch;
     doc.palette = palette;
     doc.generator = { algorithm, report: result.report };
+  });
+}
+
+// One level of undo for Generate: the doc as it was before the last
+// generated show replaced it. Cleared on song switch.
+export const showHistory = $state<{ before: MappingDoc | null }>({
+  before: null,
+});
+
+// Generate from the Mapping tab: snapshot the current doc for Undo, then
+// replace the show.
+export function generateWithUndo(
+  result: ShowResult,
+  algorithm: string,
+  palette: PaletteRef,
+): void {
+  if (mapping.doc === null) return;
+  showHistory.before = $state.snapshot(mapping.doc) as MappingDoc;
+  applyShowResult(result, algorithm, palette);
+  mappingUi.editingProgram = result.programs[0]?.id ?? null;
+  mappingUi.editingDerivation = null;
+}
+
+// Restore the doc from before the last Generate.
+export function undoGenerate(): void {
+  const before = showHistory.before;
+  if (before === null) return;
+  showHistory.before = null;
+  touchDoc((doc) => {
+    doc.programs = before.programs;
+    doc.derivations = before.derivations;
+    doc.macro = before.macro;
+    doc.patch = before.patch;
+    doc.palette = before.palette;
+    if (before.generator === undefined) delete doc.generator;
+    else doc.generator = before.generator;
+  });
+  if (!before.programs.some((p) => p.id === mappingUi.editingProgram))
+    mappingUi.editingProgram = null;
+}
+
+// Replace one program and the doc's derivation list together (simple-mode
+// style and source edits own the program's hits derivation).
+export function replaceProgram(
+  program: Program,
+  derivations?: Derivation[],
+): void {
+  touchDoc((doc) => {
+    const i = doc.programs.findIndex((p) => p.id === program.id);
+    if (i >= 0) doc.programs[i] = program;
+    if (derivations) doc.derivations = derivations;
+  });
+}
+
+// Choose the doc's palette and recolor its programs from it.
+export function setPalette(palette: PaletteRef, programs: Program[]): void {
+  touchDoc((doc) => {
+    doc.palette = palette;
+    doc.programs = programs;
   });
 }
 
