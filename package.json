@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "lab": "node lab/cli.mjs"
   },
   "license": "MIT",
   "dependencies": {

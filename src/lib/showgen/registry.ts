@@ -2,9 +2,10 @@
 // new file registered under a new id.
 
 import { v1Baseline } from "$lib/showgen/algorithms/v1-baseline";
+import { v2Ranked } from "$lib/showgen/algorithms/v2-ranked";
 import type { ShowAlgorithm, ShowInput, ShowResult } from "$lib/showgen/types";
 
-export const ALGORITHMS: ShowAlgorithm[] = [v1Baseline];
+export const ALGORITHMS: ShowAlgorithm[] = [v1Baseline, v2Ranked];
 
 export const DEFAULT_ALGORITHM = "v1-baseline";
 

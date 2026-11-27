@@ -5,3 +5,6 @@ pnpm-lock.yaml
 src-tauri/target
 src-tauri/gen
 static
+.pytest_cache
+eval-runs
+eval-library
