@@ -21,6 +21,7 @@
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2",
     "bits-ui": "^2.19.2",
+    "three": "^0.187.0",
     "uplot": "^1.6.32",
     "zod": "^4.4.3"
   },
@@ -31,6 +32,7 @@
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.9.2",
+    "@types/three": "^0.187.0",
     "prettier": "^3.8.3",
     "prettier-plugin-svelte": "^4.1.0",
     "prettier-plugin-tailwindcss": "^0.8.0",
