@@ -107,3 +107,23 @@ Picks go in score order to the first free light their role prefers. Remaining li
 Color: pulse and swell programs bind hue and saturation to `mix.sections` through a categorical map. Each section label, in order of first appearance, takes the next base palette color, starting at the program's own offset. Colors therefore change at section boundaries, and programs differ from each other.
 
 Level: `macro.scenes_from = mix.sections`. Each label's scene keeps every program and sets `master_scale` to the label's mean mix loudness over the loudest label's, floored at 0.5.
+
+## Output check (`v4-verified`)
+
+v4 keeps v3's measures, roles and placement and adds:
+
+- **Presence floor 0.4.** A candidate present under 40 % of the song is rejected.
+- **Accent placement.** An accent goes only to a strobe, moving head or PAR spot. With none of those free, it becomes a swell.
+- **Output check.** After building the show, v4 evaluates every light over the whole song at 10 Hz, in neutral white so palette brightness cannot change the result. A light fails when either of these holds:
+  - it changes by more than 0.15 in under 35 % of 1 s windows
+  - its mean level is under 0.1
+
+  The failing light's pick is rejected and selection runs again, up to 4 rounds. The final show is then built in the real palette.
+
+## Calibration (`v5-calibrated`)
+
+v5 is v4 with these changes, made after running the lab corpus:
+
+- **Level floor 0.03.** A stem whose median level is under 3 % of the mix's (about −30 dB) is separation bleed, even though peak normalization makes its envelope look full. An example is the htdemucs "vocals" of a drums-only song.
+- **Window presence.** Presence is the fraction of 2 s windows whose peak exceeds 10 % of p99, with a floor of 0.4. A kick on every beat is present all song, where per-frame presence rejected it.
+- **Flash level floor.** In the output check, pulse and accent lights need a mean level of only 0.03, since flashes on sparse hits are dark between hits.

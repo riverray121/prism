@@ -314,3 +314,23 @@ export function visibleChange(
   }
   return windows ? moving / windows : 0;
 }
+
+// Fraction of `windowS` windows whose peak exceeds 10 % of the track's p99:
+// how much of the song the track is active in. Unlike per-frame presence it
+// counts a sparse hit track (a kick on every beat) as present throughout.
+export function windowPresence(x: Track, hz: number, windowS = 2): number {
+  const floor = 0.1 * percentile(x, 99);
+  if (floor <= 0) return 0;
+  const win = Math.max(1, Math.round(windowS * hz));
+  let windows = 0;
+  let active = 0;
+  for (let a = 0; a + win <= x.length; a += win) {
+    windows++;
+    for (let i = a; i < a + win; i++)
+      if (x[i] > floor) {
+        active++;
+        break;
+      }
+  }
+  return windows ? active / windows : 0;
+}

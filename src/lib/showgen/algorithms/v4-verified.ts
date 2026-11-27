@@ -14,6 +14,7 @@ import {
   selectMMR,
   songContext,
   type Measured,
+  type SongContext,
 } from "$lib/showgen/select";
 import type {
   FixtureKind,
@@ -83,6 +84,97 @@ export function lightActivity(
   return out;
 }
 
+// Select, build in neutral white, measure every light's output, reject the
+// picks whose lights stay dull, and repeat; then build the final show in the
+// real palette. Shared by v4 and later verified algorithms.
+export function verifyAndBuild(
+  input: ShowInput,
+  ctx: SongContext,
+  measured: Measured[],
+  algorithm: string,
+  // Mean-level floor for pulse and accent lights; flashes on sparse hits
+  // are dark between hits by design. Defaults to MIN_LEVEL (v4).
+  minFlashLevel: number = MIN_LEVEL,
+): ShowResult {
+  const { lights } = input;
+  // The check runs in neutral white: a light's activity must not depend
+  // on how bright its palette color happens to be.
+  const neutral: ShowInput = {
+    ...input,
+    palette: { id: "single", color: "#FFFFFF" },
+  };
+  const options = {
+    algorithm,
+    accentKinds: ["strobe", "moving_head", "par"] as FixtureKind[],
+  };
+  let result: ShowResult | null = null;
+  let final: { picks: Measured[]; passed: Map<string, string> } | null = null;
+  const notes: string[] = [];
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const { picks, passed } = selectMMR(measured, lights.length);
+    final = { picks, passed };
+    result = buildRoleShow(
+      neutral,
+      ctx,
+      measured,
+      picks,
+      passed,
+      roleOf,
+      options,
+    );
+    if (picks.length === 0) break;
+    const activity = lightActivity(neutral, result);
+    const dull = new Set<string>();
+    for (const light of lights) {
+      const a = activity.get(light.id);
+      const programId = result.patch[light.id];
+      const pick = result.report.picks.find((p) => p.programId === programId);
+      if (!a || !pick) continue;
+      const floor =
+        pick.role === "pulse" || pick.role === "accent"
+          ? minFlashLevel
+          : MIN_LEVEL;
+      if (a.active < MIN_ACTIVE || a.level < floor) dull.add(pick.path);
+    }
+    if (dull.size === 0) break;
+    for (const m of measured)
+      if (dull.has(m.candidate.path)) {
+        const a = [...activity.entries()].find(
+          ([id]) =>
+            result!.report.picks.find((p) => p.programId === result!.patch[id])
+              ?.path === m.candidate.path,
+        )?.[1];
+        m.rejected = `its light rarely changed as programmed (active ${a?.active.toFixed(2)}, level ${a?.level.toFixed(2)})`;
+        m.score = 0;
+        notes.push(`round ${round + 1}: replaced ${m.candidate.label}`);
+      }
+  }
+  if (!result)
+    return {
+      programs: [],
+      derivations: [],
+      patch: {},
+      macro: MacroSchema.parse({}),
+      report: {
+        algorithm: algorithm,
+        candidates: [],
+        picks: [],
+        notes: ["no candidates"],
+      },
+    };
+  const colored = buildRoleShow(
+    input,
+    ctx,
+    measured,
+    final!.picks,
+    final!.passed,
+    roleOf,
+    options,
+  );
+  colored.report.notes.push(...notes);
+  return colored;
+}
+
 export const v4Verified: ShowAlgorithm = {
   id: "v4-verified",
   label: "v4 verified",
@@ -99,78 +191,6 @@ export const v4Verified: ShowAlgorithm = {
         m.score = 0;
       }
 
-    // The check runs in neutral white: a light's activity must not depend
-    // on how bright its palette color happens to be.
-    const neutral: ShowInput = {
-      ...input,
-      palette: { id: "single", color: "#FFFFFF" },
-    };
-    const options = {
-      algorithm: "v4-verified",
-      accentKinds: ["strobe", "moving_head", "par"] as FixtureKind[],
-    };
-    let result: ShowResult | null = null;
-    let final: { picks: Measured[]; passed: Map<string, string> } | null = null;
-    const notes: string[] = [];
-    for (let round = 0; round < MAX_ROUNDS; round++) {
-      const { picks, passed } = selectMMR(measured, lights.length);
-      final = { picks, passed };
-      result = buildRoleShow(
-        neutral,
-        ctx,
-        measured,
-        picks,
-        passed,
-        roleOf,
-        options,
-      );
-      if (picks.length === 0) break;
-      const activity = lightActivity(neutral, result);
-      const dull = new Set<string>();
-      for (const light of lights) {
-        const a = activity.get(light.id);
-        const programId = result.patch[light.id];
-        const pick = result.report.picks.find((p) => p.programId === programId);
-        if (!a || !pick) continue;
-        if (a.active < MIN_ACTIVE || a.level < MIN_LEVEL) dull.add(pick.path);
-      }
-      if (dull.size === 0) break;
-      for (const m of measured)
-        if (dull.has(m.candidate.path)) {
-          const a = [...activity.entries()].find(
-            ([id]) =>
-              result!.report.picks.find(
-                (p) => p.programId === result!.patch[id],
-              )?.path === m.candidate.path,
-          )?.[1];
-          m.rejected = `its light rarely changed as programmed (active ${a?.active.toFixed(2)}, level ${a?.level.toFixed(2)})`;
-          m.score = 0;
-          notes.push(`round ${round + 1}: replaced ${m.candidate.label}`);
-        }
-    }
-    if (!result)
-      return {
-        programs: [],
-        derivations: [],
-        patch: {},
-        macro: MacroSchema.parse({}),
-        report: {
-          algorithm: "v4-verified",
-          candidates: [],
-          picks: [],
-          notes: ["no candidates"],
-        },
-      };
-    const colored = buildRoleShow(
-      input,
-      ctx,
-      measured,
-      final!.picks,
-      final!.passed,
-      roleOf,
-      options,
-    );
-    colored.report.notes.push(...notes);
-    return colored;
+    return verifyAndBuild(input, ctx, measured, "v4-verified");
   },
 };

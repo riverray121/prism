@@ -6,6 +6,7 @@ import { MappingDocSchema } from "$lib/mapping/schema";
 import { v1Baseline } from "$lib/showgen/algorithms/v1-baseline";
 import { v2Ranked } from "$lib/showgen/algorithms/v2-ranked";
 import { v3Roles } from "$lib/showgen/algorithms/v3-roles";
+import { v5Calibrated } from "$lib/showgen/algorithms/v5-calibrated";
 import {
   lightActivity,
   MIN_ACTIVE,
@@ -419,5 +420,25 @@ describe("recolorPrograms", () => {
         6,
       );
     });
+  });
+});
+
+describe("v5-calibrated", () => {
+  it("rejects a stem far quieter than the mix as bleed, however full it looks normalized", () => {
+    const p = profile({
+      eng_b: {
+        vocals: { audio_file: "", features: { energy: env(vocal, 0.0002) } },
+      },
+    });
+    const r = v5Calibrated.generate({
+      profile: p,
+      lights: lights(4),
+      palette: { id: "blue" },
+    });
+    const bleed = r.report.candidates.find(
+      (c) => c.path === "stems.eng_b.vocals.features.energy",
+    )!;
+    expect(bleed.picked).toBe(false);
+    expect(bleed.reason).toMatch(/separation bleed/);
   });
 });

@@ -7,6 +7,7 @@ import {
   motion,
   pearson,
   presence,
+  windowPresence,
   pulseClarity,
 } from "$lib/showgen/measures";
 
@@ -54,6 +55,16 @@ describe("measures on synthetic envelopes", () => {
     expect(presence(silence)).toBe(0);
     expect(presence(burst)).toBeLessThan(0.2);
     expect(presence(clicks(120))).toBeGreaterThan(0.2);
+  });
+
+  it("window presence counts a sparse hit track as present all song", () => {
+    // One 50 ms hit per second: per-frame presence is low, every 2 s window has a hit.
+    const hits = Float32Array.from({ length: N }, (_, i) =>
+      i % HZ < 5 ? 1 : 0,
+    );
+    expect(presence(hits)).toBeLessThan(0.2);
+    expect(windowPresence(hits, HZ)).toBe(1);
+    expect(windowPresence(burst, HZ)).toBeLessThan(0.2);
   });
 
   it("white noise flickers far more than a click track", () => {

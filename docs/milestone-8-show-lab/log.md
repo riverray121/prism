@@ -14,6 +14,9 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - Slice 7 — v3 roles: `algorithms/v3-roles.ts` (visible measure, roles, fixture placement, section-stepped hue via categorical on `mix.sections`, section loudness scenes).
 - Slice 8 — Mapping refresh: ShowToolbar (algorithm, palette popover, Generate with one-level Undo), ProgramCards (swatch, style chip, role, light chips, level bar), ProgramSimpleEditor (source by score, style, color, floor/peak/smoothing, Advanced = ProgramEditor), CandidatesPanel, `showgen/edit.ts`; AutoMapButton and ProgramList removed.
 
+- Lab findings: v3 put a sparse accent (mix air band) on the TV backlight, which stayed dark (v4 adds the output check); the drums-only song's htdemucs "vocals" passed v2-v4 because it is −68 dB bleed normalized to full scale (v5 adds the level floor); v4's check measured palette brightness until it ran in neutral white.
+- Live palette and algorithm changes: `recolorPrograms` keeps section-bound hue maps and assignments; the Sim tab recolors or regenerates the room show on change.
+
 ## Todo
 
 - [x] Slice 0 — Models
