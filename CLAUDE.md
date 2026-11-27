@@ -22,6 +22,7 @@ Workflow skills: `/spec` plans a milestone's docs through conversation, `/slice`
 - Lint: `uvx ruff check sidecar/` · `pnpm format:check`
 - Typecheck: `pnpm check`
 - Run: `pnpm tauri dev`
+- Lab (show algorithms, `docs/milestone-8-show-lab/`): `uv run python -m sidecar.lab --library eval-library fetch|add|analyze|list`, then `pnpm lab generate|report|render --run NAME`. Never point the lab at `library/` for writes.
 
 ## Git
 
