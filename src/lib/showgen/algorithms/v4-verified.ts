@@ -15,7 +15,12 @@ import {
   songContext,
   type Measured,
 } from "$lib/showgen/select";
-import type { ShowAlgorithm, ShowInput, ShowResult } from "$lib/showgen/types";
+import type {
+  FixtureKind,
+  ShowAlgorithm,
+  ShowInput,
+  ShowResult,
+} from "$lib/showgen/types";
 
 import { applyVisibility, buildRoleShow, roleOf } from "./v3-roles";
 
@@ -94,16 +99,33 @@ export const v4Verified: ShowAlgorithm = {
         m.score = 0;
       }
 
+    // The check runs in neutral white: a light's activity must not depend
+    // on how bright its palette color happens to be.
+    const neutral: ShowInput = {
+      ...input,
+      palette: { id: "single", color: "#FFFFFF" },
+    };
+    const options = {
+      algorithm: "v4-verified",
+      accentKinds: ["strobe", "moving_head", "par"] as FixtureKind[],
+    };
     let result: ShowResult | null = null;
+    let final: { picks: Measured[]; passed: Map<string, string> } | null = null;
     const notes: string[] = [];
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const { picks, passed } = selectMMR(measured, lights.length);
-      result = buildRoleShow(input, ctx, measured, picks, passed, roleOf, {
-        algorithm: "v4-verified",
-        accentKinds: ["strobe", "moving_head", "par"],
-      });
+      final = { picks, passed };
+      result = buildRoleShow(
+        neutral,
+        ctx,
+        measured,
+        picks,
+        passed,
+        roleOf,
+        options,
+      );
       if (picks.length === 0) break;
-      const activity = lightActivity(input, result);
+      const activity = lightActivity(neutral, result);
       const dull = new Set<string>();
       for (const light of lights) {
         const a = activity.get(light.id);
@@ -139,7 +161,16 @@ export const v4Verified: ShowAlgorithm = {
           notes: ["no candidates"],
         },
       };
-    result.report.notes.push(...notes);
-    return result;
+    const colored = buildRoleShow(
+      input,
+      ctx,
+      measured,
+      final!.picks,
+      final!.passed,
+      roleOf,
+      options,
+    );
+    colored.report.notes.push(...notes);
+    return colored;
   },
 };
