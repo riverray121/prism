@@ -15,6 +15,7 @@ from . import (
     mapping,
     metadata,
     rig,
+    rooms,
     separation,
     settings,
     storage,
@@ -27,28 +28,35 @@ from .schema import (
     CompanionPublishResultEvent,
     CompanionPullCommand,
     CompanionPullResultEvent,
+    DeleteRoomCommand,
     DeleteSongCommand,
     GetMappingCommand,
     GetProfileCommand,
     GetRigCommand,
+    GetSimCommand,
     ImportCommand,
     ImportFailedEvent,
     ImportFinishedEvent,
     ImportStartedEvent,
     ImportYoutubeCommand,
     LibrarySongsEvent,
+    ListRoomsCommand,
     MappingEvent,
     ProfileEvent,
     QueueAddCommand,
     QueueCancelCommand,
     RigEvent,
+    RoomsEvent,
+    SaveRoomCommand,
     SettingsEvent,
+    SimEvent,
     Song,
     UpdateFavoritesCommand,
     UpdateMappingCommand,
     UpdateMetadataCommand,
     UpdateRigCommand,
     UpdateSettingsCommand,
+    UpdateSimCommand,
 )
 
 # stderr keeps the stdout JSON-lines channel clean; logs.configure also mirrors
@@ -280,6 +288,23 @@ def handle(msg: dict) -> None:
     elif msg_type == "rig.update":
         cmd = UpdateRigCommand.model_validate(msg)
         rig.write_rig(cmd.rig)
+    elif msg_type == "rooms.list":
+        ListRoomsCommand.model_validate(msg)
+        ipc.emit(RoomsEvent(rooms=rooms.list_rooms()))
+    elif msg_type == "rooms.save":
+        cmd = SaveRoomCommand.model_validate(msg)
+        rooms.save_room(cmd.room)
+        ipc.emit(RoomsEvent(rooms=rooms.list_rooms()))
+    elif msg_type == "rooms.delete":
+        cmd = DeleteRoomCommand.model_validate(msg)
+        rooms.delete_room(cmd.room_id)
+        ipc.emit(RoomsEvent(rooms=rooms.list_rooms()))
+    elif msg_type == "sim.get":
+        cmd = GetSimCommand.model_validate(msg)
+        ipc.emit(SimEvent(song_id=cmd.song_id, doc=rooms.read_sim(cmd.song_id)))
+    elif msg_type == "sim.update":
+        cmd = UpdateSimCommand.model_validate(msg)
+        rooms.write_sim(cmd.song_id, cmd.doc)
     elif msg_type == "settings.get":
         emit_settings()
     elif msg_type == "settings.update":
