@@ -1,8 +1,15 @@
 {
   "id": "demo-room",
   "title": "Demo living room",
-  "size": { "w": 6, "d": 5, "h": 2.7 },
-  "camera": { "position": [0, 1.45, 2.42], "target": [0, 1.05, -2.5] },
+  "size": {
+    "w": 6,
+    "d": 5,
+    "h": 2.7
+  },
+  "camera": {
+    "position": [0, 1.45, 2.42],
+    "target": [0, 1.05, -2.5]
+  },
   "items": [
     {
       "id": "tv",
@@ -31,7 +38,9 @@
       "type": "tv_stand",
       "position": [0, 0.16, -2.27],
       "rotation": [0, 0, 0],
-      "params": { "height": 0.4 }
+      "params": {
+        "height": 0.4
+      }
     },
     {
       "id": "stand-glow",
@@ -54,7 +63,10 @@
       "name": "Tube left",
       "position": [-1.3, 0, -2.3],
       "rotation": [0, 0, 0],
-      "params": { "pixelCount": 56, "length": 1.4 }
+      "params": {
+        "pixelCount": 56,
+        "length": 1.4
+      }
     },
     {
       "id": "tube-right",
@@ -63,7 +75,10 @@
       "name": "Tube right",
       "position": [1.3, 0, -2.3],
       "rotation": [0, 0, 0],
-      "params": { "pixelCount": 56, "length": 1.4 }
+      "params": {
+        "pixelCount": 56,
+        "length": 1.4
+      }
     },
     {
       "id": "wash-left-back",
@@ -72,7 +87,9 @@
       "name": "Wash left back",
       "position": [-2.88, 0, -1.1],
       "rotation": [0, 1.5708, 0],
-      "params": { "beamAngle": 40 }
+      "params": {
+        "beamAngle": 40
+      }
     },
     {
       "id": "wash-left-front",
@@ -81,7 +98,9 @@
       "name": "Wash left front",
       "position": [-2.88, 0, 1.0],
       "rotation": [0, 1.5708, 0],
-      "params": { "beamAngle": 40 }
+      "params": {
+        "beamAngle": 40
+      }
     },
     {
       "id": "wash-right-back",
@@ -90,7 +109,9 @@
       "name": "Wash right back",
       "position": [2.88, 0, -1.1],
       "rotation": [0, -1.5708, 0],
-      "params": { "beamAngle": 40 }
+      "params": {
+        "beamAngle": 40
+      }
     },
     {
       "id": "wash-right-front",
@@ -99,7 +120,9 @@
       "name": "Wash right front",
       "position": [2.88, 0, 1.0],
       "rotation": [0, -1.5708, 0],
-      "params": { "beamAngle": 40 }
+      "params": {
+        "beamAngle": 40
+      }
     },
     {
       "id": "lamp",
@@ -109,6 +132,17 @@
       "position": [-2.4, 0, -1.95],
       "rotation": [0, 0, 0],
       "params": {}
+    },
+    {
+      "id": "moving-head",
+      "type": "light",
+      "kind": "moving_head",
+      "name": "Moving head",
+      "position": [1.9, 1.1, -2.25],
+      "rotation": [0, 0, 0],
+      "params": {
+        "beamAngle": 14
+      }
     },
     {
       "id": "sofa",
