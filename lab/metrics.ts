@@ -20,6 +20,8 @@ export interface ShowMetrics {
   // Mean over lights of the fraction of time inside dark runs (< 0.05) longer than 4 s.
   dark_time: number;
   mean_level: number;
+  // Per light, in light order: visible change and mean level.
+  per_light: { change: number; level: number }[];
 }
 
 // Per light, its level at METRIC_HZ over the song.
@@ -112,5 +114,6 @@ export function metricsFromSeries(
     beat_alignment: flashes ? onBeat / flashes : 0,
     dark_time: avg(dark),
     mean_level: avg(series.map((s) => avg(Array.from(s)))),
+    per_light: series.map((s, i) => ({ change: change[i], level: avg(Array.from(s)) })),
   };
 }

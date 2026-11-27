@@ -8,6 +8,7 @@
 import type { Derivation, Macro, Program } from "$lib/mapping/schema";
 import { uniqueId } from "$lib/mapping/automap";
 import { enumerateCandidates } from "$lib/showgen/candidates";
+import { visibleChange } from "$lib/showgen/measures";
 import { hueSaturation, resolvePalette } from "$lib/showgen/palettes";
 import {
   measureCandidates,
@@ -47,8 +48,23 @@ export const ROLE_KINDS: Record<Role, FixtureKind[]> = {
   swell: ["wash", "lamp", "strip", "strip_curve", "tube"],
 };
 
+// v3 adds `visible` to v2's measures: a track whose glow would rarely move
+// visibly is rejected, and the score scales with how often it moves, so
+// every light changes noticeably over the song.
+export function applyVisibility(measured: Measured[], hz: number): void {
+  for (const m of measured) {
+    const visible = visibleChange(m.candidate.data, hz);
+    m.measures.visible = visible;
+    if (m.rejected) continue;
+    if (visible < 0.2) {
+      m.rejected = `barely visible on a light (visible ${visible.toFixed(2)})`;
+      m.score = 0;
+    } else m.score *= 0.5 + 0.5 * visible;
+  }
+}
+
 // Section level: each label's mean mix loudness over the loudest label's,
-// floored at 0.35 so quiet sections dim but never go dark.
+// floored at 0.5 so quiet sections dim but stay clearly lit.
 export function sectionLevels(ctx: SongContext): Record<string, number> {
   if (!ctx.mixRms || ctx.sections.length === 0) return {};
   const sum: Record<string, number> = {};
@@ -68,7 +84,7 @@ export function sectionLevels(ctx: SongContext): Record<string, number> {
   return Object.fromEntries(
     Object.entries(means).map(([k, v]) => [
       k,
-      Math.max(0.35, Math.min(1, v / top)),
+      Math.max(0.5, Math.min(1, v / top)),
     ]),
   );
 }
@@ -112,6 +128,7 @@ export const v3Roles: ShowAlgorithm = {
   generate({ profile, lights, palette }: ShowInput): ShowResult {
     const ctx = songContext(profile);
     const measured = measureCandidates(enumerateCandidates(profile), ctx);
+    applyVisibility(measured, ctx.hz);
     const { picks, passed } = selectMMR(measured, lights.length);
     const roles = new Map(picks.map((m) => [m.candidate.path, roleOf(m)]));
     const slots: Slot[] = picks.map((pick) => ({

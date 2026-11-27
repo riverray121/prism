@@ -282,3 +282,35 @@ export function pearson(a: Track, b: Track): number {
   }
   return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
 }
+
+// Fraction of 1 s windows in which the envelope, mapped through the glow
+// transform (p5..p98 → 0..1, gamma), moves by more than `threshold`: how
+// often a light driven by it visibly changes.
+export function visibleChange(
+  x: Track,
+  hz: number,
+  gamma = 1.6,
+  threshold = 0.15,
+): number {
+  const lo = percentile(x, 5);
+  const hi = percentile(x, 98);
+  if (hi <= lo) return 0;
+  const win = Math.max(1, Math.round(hz));
+  let windows = 0;
+  let moving = 0;
+  for (let a = 0; a + win <= x.length; a += win) {
+    let mn = Infinity;
+    let mx = -Infinity;
+    for (let i = a; i < a + win; i++) {
+      const v = Math.pow(
+        Math.min(1, Math.max(0, (x[i] - lo) / (hi - lo))),
+        gamma,
+      );
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+    windows++;
+    if (mx - mn > threshold) moving++;
+  }
+  return windows ? moving / windows : 0;
+}
